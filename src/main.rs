@@ -1,3 +1,5 @@
+mod redis;
+
 use std::str::FromStr;
 
 use chrono::Duration;
@@ -32,6 +34,8 @@ enum Command {
         unit: UnitOfTime,
     },
     Help,
+    #[command(description = "test connection with redis cache.")]
+    Redis,
 }
 
 #[derive(Clone)]
@@ -71,8 +75,20 @@ async fn action(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<()> {
         Command::Kick => kick_user(bot, msg).await?,
         Command::Ban { time, unit } => ban_user(bot, msg, calc_restrict_time(time, unit)).await?,
         Command::Mute { time, unit } => mute_user(bot, msg, calc_restrict_time(time, unit)).await?,
+        Command::Redis => test_redis(bot, msg).await?,
     };
 
+    Ok(())
+}
+
+// Test the Redis cache
+async fn test_redis(bot: Bot, msg: Message) -> ResponseResult<()> {
+    let result = redis::fetch_an_integer();
+    if result.is_ok() {
+        bot.send_message(msg.chat.id, "Redis connected").await?;
+    } else {
+        bot.send_message(msg.chat.id, "Redis disconnected").await?;
+    }
     Ok(())
 }
 
