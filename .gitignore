@@ -2,5 +2,5 @@
 
 # Misc
 **/.DS_Store
-.env.*
+**/.env
 **/.cargo
