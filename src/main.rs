@@ -21,5 +21,7 @@ async fn main() {
 
     let bot = teloxide::Bot::from_env();
 
+    log::info!("PayScribe bot started successfully!");
+
     Command::repl(bot, do_action).await;
 }
