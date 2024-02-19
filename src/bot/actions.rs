@@ -1,15 +1,30 @@
 use chrono::Duration;
 use teloxide::{prelude::*, types::ChatPermissions};
 
-use super::redis::fetch_an_integer;
+use super::redis::{add_user, test_redis_connection};
 
 // Test the Redis cache
 pub async fn test_redis(bot: Bot, msg: Message) -> ResponseResult<()> {
-    let result = fetch_an_integer();
+    let result = test_redis_connection();
     if result.is_ok() {
         bot.send_message(msg.chat.id, "Redis connected").await?;
     } else {
         bot.send_message(msg.chat.id, "Redis disconnected").await?;
+    }
+    Ok(())
+}
+
+// Adds a user to Redis cache
+pub async fn add_user_redis(bot: Bot, msg: Message) -> ResponseResult<()> {
+    let user = msg.from().unwrap();
+    let user_id = user.id.to_string();
+    let username = user.username.as_ref().unwrap();
+    let result = add_user(&user_id, &username);
+    if result.is_ok() {
+        bot.send_message(msg.chat.id, "User added to Redis").await?;
+    } else {
+        bot.send_message(msg.chat.id, "Failed to add user to Redis")
+            .await?;
     }
     Ok(())
 }
