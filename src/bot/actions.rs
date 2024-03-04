@@ -22,9 +22,11 @@ pub async fn add_user_redis(bot: Bot, msg: Message) -> ResponseResult<()> {
     let result = add_user(&user_id, &username);
     if result.is_ok() {
         bot.send_message(msg.chat.id, "User added to Redis").await?;
+        log::info!("User added to Redis: {:?}", user);
     } else {
         bot.send_message(msg.chat.id, "Failed to add user to Redis")
             .await?;
+        log::error!("Failed to add user to Redis: {:?}", result);
     }
     Ok(())
 }

@@ -2,7 +2,7 @@ use redis::Commands;
 
 const REDIS_URL: &str = "redis://127.0.0.1/";
 
-fn connect() -> redis::Connection {
+pub fn connect() -> redis::Connection {
     let client = redis::Client::open(REDIS_URL).expect("Failed to connect to Redis");
     client
         .get_connection()
@@ -16,8 +16,12 @@ pub fn test_redis_connection() -> redis::RedisResult<isize> {
     con.get("my_key")
 }
 
-// Adds a new user to Redis
-pub fn add_user(user_id: &str, username: &str) -> redis::RedisResult<()> {
-    let mut con = connect();
-    con.set(user_id, username)
+#[cfg(test)]
+mod tests {
+    use super::test_redis_connection;
+
+    #[test]
+    fn test_connection() {
+        assert!(test_redis_connection().is_ok());
+    }
 }
