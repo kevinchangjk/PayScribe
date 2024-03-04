@@ -1,4 +1,6 @@
-use crate::bot::actions::{add_user_redis, ban_user, kick_user, mute_user, test_redis};
+use crate::bot::actions::{
+    add_chat_redis, add_user_redis, ban_user, kick_user, mute_user, test_redis,
+};
 
 use std::str::FromStr;
 
@@ -24,6 +26,8 @@ pub enum Command {
     Redis,
     #[command(description = "add current user to redis cache.")]
     AddUser,
+    #[command(description = "add current chat to redis cache.")]
+    AddChat,
 }
 
 #[derive(Clone)]
@@ -65,6 +69,7 @@ pub async fn do_action(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<(
         Command::Mute { time, unit } => mute_user(bot, msg, calc_restrict_time(time, unit)).await?,
         Command::Redis => test_redis(bot, msg).await?,
         Command::AddUser => add_user_redis(bot, msg).await?,
+        Command::AddChat => add_chat_redis(bot, msg).await?,
     };
 
     Ok(())
