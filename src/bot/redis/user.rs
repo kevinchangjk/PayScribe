@@ -1,7 +1,7 @@
 use super::connect::connect;
 use redis::Commands;
 
-const USER_KEY: &str = "user:";
+const USER_KEY: &str = "user";
 
 // Adds a new user to Redis
 pub fn add_user(user_id: &str, username: &str) -> redis::RedisResult<()> {
@@ -11,7 +11,7 @@ pub fn add_user(user_id: &str, username: &str) -> redis::RedisResult<()> {
         ("username", username.to_string()),
     ];
 
-    con.hset_multiple(format!("{USER_KEY}{user_id}"), user)
+    con.hset_multiple(format!("{USER_KEY}:{user_id}"), user)
 }
 
 // Tests

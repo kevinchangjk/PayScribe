@@ -1,34 +1,13 @@
 use super::connect::connect;
-use redis::{Commands, RedisWrite, ToRedisArgs};
+use redis::Commands;
 
-const BALANCE_KEY: &str = "balance:";
-
-enum BalanceField {
-    UserID(String),
-    Amount(i32),
-}
-
-impl ToRedisArgs for BalanceField {
-    fn write_redis_args<W>(&self, out: &mut W)
-    where
-        W: ?Sized + RedisWrite,
-    {
-        match *self {
-            BalanceField::UserID(ref s) => s.write_redis_args(out),
-            BalanceField::Amount(ref i) => i.write_redis_args(out),
-        }
-    }
-}
+const BALANCE_KEY: &str = "balance";
 
 // Adds a new balance to Redis
 pub fn add_balance(chat_id: &str, user_id: &str) -> redis::RedisResult<()> {
     let mut con = connect();
-    let balance: &[(&str, BalanceField)] = &[
-        ("user_id", BalanceField::UserID(user_id.to_string())),
-        ("amount_into", BalanceField::Amount(0)),
-        ("amount_from", BalanceField::Amount(0)),
-    ];
-    con.hset_multiple(format!("{BALANCE_KEY}{chat_id}"), balance)
+    let balance: &[(&str, i32)] = &[("amount_into", 0), ("amount_from", 0)];
+    con.hset_multiple(format!("{BALANCE_KEY}:{chat_id}:{user_id}"), balance)
 }
 
 // Tests
