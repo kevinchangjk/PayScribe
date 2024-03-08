@@ -4,6 +4,7 @@ use redis::Commands;
 const CHAT_KEY: &str = "chat:";
 
 // Adds a new chat to Redis
+// TODO: Change to holding just an array of users, take out the chat_id
 pub fn add_chat(chat_id: &str, user_id: &str) -> redis::RedisResult<()> {
     let mut con = connect();
     let chat: &[(&str, &[String; 1])] = &[
