@@ -1,5 +1,6 @@
 use crate::bot::actions::{
     add_balance_redis, add_chat_redis, add_user_redis, ban_user, kick_user, mute_user, test_redis,
+    update_balance_redis,
 };
 
 use std::str::FromStr;
@@ -30,6 +31,8 @@ pub enum Command {
     AddChat,
     #[command(description = "add current chat and user as balance to redis cache.")]
     AddBalance,
+    #[command(description = "update current chat and user's balance to redis cache.")]
+    UpdateBalance,
 }
 
 #[derive(Clone)]
@@ -73,6 +76,7 @@ pub async fn do_action(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<(
         Command::AddUser => add_user_redis(bot, msg).await?,
         Command::AddChat => add_chat_redis(bot, msg).await?,
         Command::AddBalance => add_balance_redis(bot, msg).await?,
+        Command::UpdateBalance => update_balance_redis(bot, msg).await?,
     };
 
     Ok(())

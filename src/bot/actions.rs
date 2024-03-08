@@ -1,7 +1,7 @@
 use chrono::Duration;
 use teloxide::{prelude::*, types::ChatPermissions};
 
-use super::redis::{add_balance, add_chat, add_user, test_redis_connection};
+use super::redis::{add_balance, add_chat, add_user, test_redis_connection, update_balance};
 
 // Test the Redis cache
 pub async fn test_redis(bot: Bot, msg: Message) -> ResponseResult<()> {
@@ -62,6 +62,24 @@ pub async fn add_balance_redis(bot: Bot, msg: Message) -> ResponseResult<()> {
         bot.send_message(msg.chat.id, "Failed to add balance to Redis")
             .await?;
         log::error!("Failed to add balance to Redis: {:?}", result);
+    }
+    Ok(())
+}
+
+// Updates a balance to Redis cache
+pub async fn update_balance_redis(bot: Bot, msg: Message) -> ResponseResult<()> {
+    let user = msg.from().unwrap();
+    let user_id = user.id.to_string();
+    let chat_id = msg.chat.id.to_string();
+    let result = update_balance(&chat_id, &user_id, 13, 42);
+    if result.is_ok() {
+        bot.send_message(msg.chat.id, "Balance updated in Redis")
+            .await?;
+        log::info!("Balance updated in Redis: {:?}", msg.chat);
+    } else {
+        bot.send_message(msg.chat.id, "Failed to update balance to Redis")
+            .await?;
+        log::error!("Failed to update balance to Redis: {:?}", result);
     }
     Ok(())
 }
