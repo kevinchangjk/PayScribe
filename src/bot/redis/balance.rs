@@ -58,8 +58,9 @@ mod tests {
 
     #[test]
     fn test_update_balance() {
-        let chat_id = "123456789";
-        let user_id = "987654321";
+        let chat_id = "1234567891";
+        let user_id = "9876543211";
+        add_balance(chat_id, user_id).unwrap();
         assert!(update_balance(chat_id, user_id, 13, 42).is_ok());
         assert_eq!(get_balance(chat_id, user_id).unwrap(), (13, 42));
     }
