@@ -17,9 +17,10 @@ pub async fn test_redis(bot: Bot, msg: Message) -> ResponseResult<()> {
 // Adds a user to Redis cache
 pub async fn add_user_redis(bot: Bot, msg: Message) -> ResponseResult<()> {
     let user = msg.from().unwrap();
-    let user_id = user.id.to_string();
     let username = user.username.as_ref().unwrap();
-    let result = add_user(&user_id, &username);
+    let user_id = user.id.to_string();
+    let chat_id = msg.chat.id.to_string();
+    let result = add_user(&username, Some(&user_id), Some(&chat_id));
     if result.is_ok() {
         bot.send_message(msg.chat.id, "User added to Redis").await?;
         log::info!("User added to Redis: {:?}", user);
