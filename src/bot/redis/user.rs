@@ -1,136 +1,78 @@
 use super::connect::connect;
-use redis::{Commands, FromRedisValue, RedisResult, Value};
+use redis::Commands;
 
 const USER_KEY: &str = "user";
+const USER_ID_KEY: &str = "user_id";
 
-pub struct User {
-    username: String,
-    is_init: bool,
-    chats: Vec<String>,
-}
+/* user.rs contains CRUD operations for both `user` and `user_id`.
+ * `user` is the main table used for normal operations.
+ * `user_id` is used only to ensure the correctness of `user.username`
+ */
 
-impl FromRedisValue for User {
-    fn from_redis_value(v: &Value) -> RedisResult<Self> {
-        match *v {
-            Value::Bulk(ref items) => {
-                let mut user = User {
-                    username: "".to_string(),
-                    is_init: false,
-                    chats: vec![],
-                };
-                for (i, item) in items.iter().enumerate() {
-                    match i {
-                        0 => user.username = String::from_redis_value(item)?,
-                        1 => user.is_init = bool::from_redis_value(item)?,
-                        2 => {
-                            user.chats = Vec::from_redis_value(item)?;
-                        }
-                        _ => {}
-                    }
-                }
-                Ok(user)
-            }
-            _ => Err(redis::RedisError::from((
-                redis::ErrorKind::TypeError,
-                "Unknown type",
-            ))),
-        }
-    }
-}
+/* User CRUD Operations */
 
 // Adds a new user to Redis
-// Uses the user_id as the key, or if not, the username
-// Adds in a chat if available
-pub fn add_user(
-    username: &str,
-    user_id: Option<&str>,
-    chat_id: Option<&str>,
-) -> redis::RedisResult<()> {
+// Initialises user_id if provided
+pub fn add_user(username: &str, chat_id: &str, user_id: Option<&str>) -> redis::RedisResult<()> {
     let mut con = connect();
-    let user_key = match user_id {
-        Some(id) => id,
-        None => username,
-    };
-    let user = User {
-        username: username.to_string(),
-        is_init: match user_id {
-            Some(_) => true,
-            None => false,
-        },
-        chats: match chat_id {
-            Some(id) => vec![id.to_string()],
-            None => vec!["".to_string()],
-        },
-    };
 
-    let key = &format!("{USER_KEY}:{user_key}");
-    con.hset(key, "username", &user.username)?;
-    con.hset(key, "is_init", &user.is_init)?;
-    con.hset(key, "chats", &user.chats)?;
+    if let Some(id) = user_id {
+        initialize_user(id, username)?;
+    }
 
-    Ok(())
+    con.rpush(&format!("{USER_KEY}:{username}"), chat_id)
 }
 
-// Gets a user from Redis, can be either by user_id or username
-pub fn get_user(user_key: &str) -> redis::RedisResult<User> {
+// Checks if user exists
+pub fn get_user_exists(username: &str) -> redis::RedisResult<bool> {
     let mut con = connect();
-    let username = con.hget(&format!("{USER_KEY}:{user_key}"), "username")?;
-    let is_init = con.hget(&format!("{USER_KEY}:{user_key}"), "is_init")?;
-    let chats = con.hget(&format!("{USER_KEY}:{user_key}"), "chats")?;
-    Ok(User {
-        username,
-        is_init,
-        chats,
-    })
-}
-
-// Gets username from a specified user_id
-// Only used when user_id is provided
-pub fn get_username(user_id: &str) -> redis::RedisResult<String> {
-    let mut con = connect();
-    con.hget(&format!("{USER_KEY}:{user_id}"), "username")
-}
-
-// Checks if user is initialised
-// Gets is_init from a specified user
-pub fn get_user_is_init(user_key: &str) -> redis::RedisResult<bool> {
-    let mut con = connect();
-    con.hget(&format!("{USER_KEY}:{user_key}"), "is_init")
+    con.exists(&format!("{USER_KEY}:{username}"))
 }
 
 // Gets user chats from a specified user
-pub fn get_user_chats(user_key: &str) -> redis::RedisResult<Vec<String>> {
+pub fn get_user_chats(username: &str) -> redis::RedisResult<Vec<String>> {
     let mut con = connect();
-    con.hget(&format!("{USER_KEY}:{user_key}"), "chats")
+    con.lrange(&format!("{USER_KEY}:{username}"), 0, -1)
 }
 
-// Initialises user with user_id
-// Only for users with current key being username
-// In no other circumstance, do we delete a user
-pub fn initialize_user(username: &str, user_id: &str) -> redis::RedisResult<()> {
+// Update user chats with a new chat
+// Automatically checks if chat is already inside
+pub fn update_user_chats(username: &str, chat_id: &str) -> redis::RedisResult<()> {
     let mut con = connect();
-    let user = get_user(username)?;
-    con.del(&format!("{USER_KEY}:{username}"))?;
-    let key = &format!("{USER_KEY}:{user_id}");
-    con.hset(key, "username", &user.username)?;
-    con.hset(key, "is_init", true)?;
-    con.hset(key, "chats", &user.chats)?;
-    Ok(())
-}
-
-// Update user chats with a new chat, given a user_id or a username
-pub fn update_user_chats(user_key: &str, chat_id: &str) -> redis::RedisResult<()> {
-    let mut con = connect();
-    let mut user = get_user(user_key)?;
-
-    // Remove empty chat if it exists
-    if user.chats == vec![""] {
-        user.chats = vec![];
+    let current_chats = get_user_chats(username)?;
+    if current_chats.contains(&chat_id.to_string()) {
+        return Ok(());
     }
 
-    user.chats.push(chat_id.to_string());
-    con.hset(&format!("{USER_KEY}:{user_key}"), "chats", &user.chats)?;
-    Ok(())
+    con.rpush(&format!("{USER_KEY}:{username}"), chat_id)
+}
+
+// Deletes a user from Redis
+// Mainly for testing purposes
+// In application, no real need to delete keys
+pub fn delete_user(username: &str) -> redis::RedisResult<()> {
+    let mut con = connect();
+    con.del(&format!("{USER_KEY}:{username}"))
+}
+
+/* User ID CRUD Operations */
+
+// Initialises user with user_id
+pub fn initialize_user(user_id: &str, username: &str) -> redis::RedisResult<()> {
+    let mut con = connect();
+    con.set(&format!("{USER_ID_KEY}:{user_id}"), username)
+}
+
+// Checks if user is initialised
+pub fn get_user_is_init(user_id: &str) -> redis::RedisResult<bool> {
+    let mut con = connect();
+    con.exists(&format!("{USER_ID_KEY}:{user_id}"))
+}
+
+// Gets username from a specified user_id
+pub fn get_username(user_id: &str) -> redis::RedisResult<String> {
+    let mut con = connect();
+    con.get(&format!("{USER_ID_KEY}:{user_id}"))
 }
 
 // Updates username for a specified user_id
@@ -138,15 +80,25 @@ pub fn update_user_chats(user_key: &str, chat_id: &str) -> redis::RedisResult<()
 // Otherwise, impossible to detect change in username without user_id
 pub fn update_username(user_id: &str, username: &str) -> redis::RedisResult<()> {
     let mut con = connect();
-    con.hset(&format!("{USER_KEY}:{user_id}"), "username", username)
+    con.set(&format!("{USER_ID_KEY}:{user_id}"), username)
+}
+
+// Deletes a user_id from Redis
+// Mainly for testing purposes
+// In application, no real need to delete keys
+pub fn delete_user_id(user_id: &str) -> redis::RedisResult<()> {
+    let mut con = connect();
+    con.del(&format!("{USER_ID_KEY}:{user_id}"))
 }
 
 // Tests
 #[cfg(test)]
 mod tests {
     use super::add_user;
-    use super::get_user;
+    use super::delete_user;
+    use super::delete_user_id;
     use super::get_user_chats;
+    use super::get_user_exists;
     use super::get_user_is_init;
     use super::get_username;
     use super::initialize_user;
@@ -157,105 +109,106 @@ mod tests {
     fn test_add_user_all() {
         let username = "test_user";
         let user_id = "123456789";
-        let chat_id = "987654321";
-        assert!(add_user(username, Some(user_id), Some(chat_id)).is_ok());
+        let chat_id = "9876543210";
+        assert!(add_user(username, chat_id, Some(user_id),).is_ok());
+        delete_user(username).unwrap();
     }
 
     #[test]
     fn test_add_user_no_id() {
         let username = "test_user";
-        let chat_id = "987654321";
-        assert!(add_user(username, None, Some(chat_id)).is_ok());
+        let chat_id = "9876543211";
+        assert!(add_user(username, chat_id, None).is_ok());
+        delete_user(username).unwrap();
     }
 
     #[test]
-    fn test_add_user_no_chat() {
+    fn test_get_user_exists() {
         let username = "test_user";
-        let user_id = "1234567890";
-        assert!(add_user(username, Some(user_id), None).is_ok());
-    }
-
-    #[test]
-    fn test_add_user_no_user_id_no_chat() {
-        let username = "test_user";
-        assert!(add_user(username, None, None).is_ok());
-    }
-
-    #[test]
-    fn test_get_user() {
-        let user_id = "1234567891";
-        let username = "test_user";
-        add_user(username, Some(&user_id), None).unwrap();
-        let user = get_user(user_id).unwrap();
-        assert_eq!(user.username, username);
-    }
-
-    #[test]
-    fn test_get_username_by_id() {
-        let user_id = "1234567892";
-        let username = "test_user_get_username";
-        add_user(username, Some(user_id), None).unwrap();
-        assert!(get_username(user_id).unwrap() == username);
-    }
-
-    #[test]
-    fn test_get_username_by_username() {
-        let username = "test_user_get_username_2";
-        add_user(username, None, None).unwrap();
-        assert!(get_username(username).unwrap() == username);
-    }
-
-    #[test]
-    fn test_get_user_is_init() {
-        let user_id = "1234567893";
-        let username = "test_user_get_is_init";
-        add_user(username, Some(user_id), None).unwrap();
-        assert!(get_user_is_init(user_id).unwrap());
-    }
-
-    #[test]
-    fn test_get_user_is_not_init() {
-        let username = "test_user_get_is_not_init";
-        add_user(username, None, None).unwrap();
-        assert!(!get_user_is_init(username).unwrap());
-    }
-
-    #[test]
-    fn test_get_user_chats_empty() {
-        let user_id = "1234567894";
-        let username = "test_user_get_chats";
-        add_user(username, Some(user_id), None).unwrap();
-        assert!(get_user_chats(user_id).unwrap() == vec![""]);
+        let chat_id = "9876543212";
+        add_user(username, chat_id, None).unwrap();
+        assert!(get_user_exists(username).unwrap());
+        delete_user(username).unwrap();
     }
 
     #[test]
     fn test_get_user_chats() {
-        let username = "test_user_get_chats_2";
-        let chat = "9876543210";
-        add_user(username, None, Some(chat)).unwrap();
-        assert!(get_user_chats(username).unwrap() == vec![chat]);
+        let username = "test_user_get_chats";
+        let chat_id = "9876543213";
+        add_user(username, chat_id, None).unwrap();
+        assert!(get_user_chats(username).unwrap() == vec![chat_id]);
+        delete_user(username).unwrap();
+    }
+
+    #[test]
+    fn test_update_chats() {
+        let username = "test_user_update_chats";
+        let chat_id = "9876543214";
+        let new_chat_id = "9876543215";
+        add_user(username, chat_id, None).unwrap();
+        assert_eq!(get_user_chats(username).unwrap(), vec![chat_id]);
+
+        update_user_chats(username, new_chat_id).unwrap();
+        assert_eq!(
+            get_user_chats(username).unwrap(),
+            vec![chat_id, new_chat_id]
+        );
+        delete_user(username).unwrap();
+    }
+
+    #[test]
+    fn test_delete_user() {
+        let username = "test_user_delete";
+        let chat_id = "9876543216";
+        add_user(username, chat_id, None).unwrap();
+        assert!(get_user_exists(username).unwrap());
+        delete_user(username).unwrap();
+        assert!(!get_user_exists(username).unwrap());
     }
 
     #[test]
     fn test_initialize_user() {
         let username = "test_user_initialize";
         let user_id = "1234567895";
-        add_user(username, None, None).unwrap();
-        assert!(!get_user_is_init(username).unwrap());
-
-        initialize_user(username, user_id).unwrap();
-        assert!(get_user_is_init(user_id).unwrap());
+        assert!(initialize_user(user_id, username).is_ok());
+        delete_user_id(user_id).unwrap();
     }
 
     #[test]
-    fn test_update_chats() {
-        let username = "test_user_update_chats";
-        let chat_id = "9876543211";
-        add_user(username, None, None).unwrap();
-        assert_eq!(get_user_chats(username).unwrap(), vec![""]);
+    fn test_get_username() {
+        let user_id = "1234567892";
+        let username = "test_user_get_username";
+        initialize_user(user_id, username).unwrap();
+        assert!(get_username(user_id).unwrap() == username);
+        delete_user_id(user_id).unwrap();
+    }
 
-        update_user_chats(username, chat_id).unwrap();
-        assert_eq!(get_user_chats(username).unwrap(), vec![chat_id]);
+    #[test]
+    fn test_get_user_is_init() {
+        let user_id = "1234567893";
+        let username = "test_user_get_is_init";
+        initialize_user(user_id, username).unwrap();
+        assert!(get_user_is_init(user_id).unwrap());
+        delete_user_id(user_id).unwrap();
+    }
+
+    #[test]
+    fn test_get_user_is_not_init() {
+        let username = "test_user_get_is_not_init";
+        let chat_id = "9876543217";
+        add_user(username, chat_id, None).unwrap();
+        assert!(!get_user_is_init(username).unwrap());
+        delete_user(username).unwrap();
+    }
+
+    #[test]
+    fn test_get_user_auto_init() {
+        let username = "test_user_auto_init";
+        let user_id = "1234567894";
+        let chat_id = "9876543218";
+        add_user(username, chat_id, Some(user_id)).unwrap();
+        assert!(get_user_is_init(user_id).unwrap());
+        delete_user_id(user_id).unwrap();
     }
 
     #[test]
@@ -263,10 +216,21 @@ mod tests {
         let user_id = "1234567896";
         let old_username = "test_user_update_username";
         let new_username = "test_user_update_username_new";
-        add_user(old_username, Some(user_id), None).unwrap();
+        initialize_user(user_id, old_username).unwrap();
         assert_eq!(get_username(user_id).unwrap(), old_username);
 
         update_username(user_id, new_username).unwrap();
         assert_eq!(get_username(user_id).unwrap(), new_username);
+        delete_user_id(user_id).unwrap();
+    }
+
+    #[test]
+    fn test_delete_user_id() {
+        let user_id = "1234567897";
+        let username = "test_user_delete_user_id";
+        initialize_user(user_id, username).unwrap();
+        assert!(get_user_is_init(user_id).unwrap());
+        delete_user_id(user_id).unwrap();
+        assert!(!get_user_is_init(user_id).unwrap());
     }
 }
