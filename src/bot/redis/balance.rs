@@ -56,11 +56,7 @@ pub fn delete_balance(con: &mut Connection, chat_id: &str, user_id: &str) -> Red
 // Tests
 #[cfg(test)]
 mod tests {
-    use super::add_balance;
-    use super::delete_balance;
-    use super::get_balance;
-    use super::get_balance_exists;
-    use super::update_balance;
+    use super::*;
     use crate::bot::redis::connect::connect;
 
     #[test]

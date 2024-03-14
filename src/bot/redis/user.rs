@@ -89,16 +89,7 @@ pub fn delete_user_id(con: &mut Connection, user_id: &str) -> RedisResult<()> {
 // Tests
 #[cfg(test)]
 mod tests {
-    use super::add_user;
-    use super::delete_user;
-    use super::delete_user_id;
-    use super::get_user_chats;
-    use super::get_user_exists;
-    use super::get_user_is_init;
-    use super::get_username;
-    use super::initialize_user;
-    use super::update_user_chats;
-    use super::update_username;
+    use super::*;
     use crate::bot::redis::connect::connect;
 
     #[test]

@@ -93,17 +93,7 @@ pub fn delete_all_chat_payment(con: &mut Connection, chat_id: &str) -> RedisResu
 
 #[cfg(test)]
 mod tests {
-    use super::add_chat;
-    use super::add_chat_payment;
-    use super::add_chat_user;
-    use super::add_chat_user_multiple;
-    use super::delete_all_chat_payment;
-    use super::delete_chat;
-    use super::delete_chat_payment;
-    use super::get_chat_exists;
-    use super::get_chat_payment_exists;
-    use super::get_chat_payments;
-    use super::get_chat_users;
+    use super::*;
     use crate::bot::redis::connect::connect;
 
     #[test]

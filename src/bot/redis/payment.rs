@@ -17,11 +17,11 @@ pub type Debt = (String, i32);
 // Payment contains all fields stored in Redis related to a single payment entry
 #[derive(Debug, PartialEq)]
 pub struct Payment {
-    description: String,
-    datetime: String,
-    creditor: String,
-    total: i32,
-    debts: Vec<Debt>,
+    pub description: String,
+    pub datetime: String,
+    pub creditor: String,
+    pub total: i32,
+    pub debts: Vec<Debt>,
 }
 
 // Adds a new payment to Redis
@@ -108,11 +108,7 @@ pub fn delete_payment(con: &mut Connection, payment_id: &str) -> RedisResult<()>
 // Tests
 #[cfg(test)]
 mod tests {
-    use super::add_payment;
-    use super::delete_payment;
-    use super::get_payment;
-    use super::update_payment;
-    use super::Payment;
+    use super::*;
     use crate::bot::redis::connect::connect;
 
     #[test]
