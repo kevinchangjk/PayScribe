@@ -1,16 +1,16 @@
-use redis::Commands;
+use redis::{Client, Commands, Connection, RedisResult};
 
 const REDIS_URL: &str = "redis://127.0.0.1/";
 
-pub fn connect() -> redis::Connection {
-    let client = redis::Client::open(REDIS_URL).expect("Failed to connect to Redis");
+pub fn connect() -> Connection {
+    let client = Client::open(REDIS_URL).expect("Failed to connect to Redis");
     client
         .get_connection()
         .expect("Failed to get Redis connection")
 }
 
 // Tests connection to Redis
-pub fn test_redis_connection() -> redis::RedisResult<bool> {
+pub fn test_redis_connection() -> RedisResult<bool> {
     let mut con = connect();
     let _: () = con.set("my_key", 42)?;
     let res: i32 = con.get("my_key")?;

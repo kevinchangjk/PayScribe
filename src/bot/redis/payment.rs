@@ -1,5 +1,4 @@
-use super::connect::connect;
-use redis::Commands;
+use redis::{Commands, Connection, RedisResult};
 use uuid::Uuid;
 
 /* Payment CRUD Operations
@@ -20,14 +19,13 @@ type Payment = (String, String, String, i32, Vec<Debt>);
 
 // Adds a new payment to Redis
 pub fn add_payment(
+    con: &mut Connection,
     description: &str,
     datetime: &str,
     creditor: &str,
     total: i32,
     debts: Vec<Debt>,
-) -> redis::RedisResult<String> {
-    let mut con = connect();
-
+) -> RedisResult<String> {
     // Add main fields
     let id = Uuid::new_v4().to_string();
     let main_key = format!("{PAYMENT_KEY}:{id}");
@@ -45,9 +43,7 @@ pub fn add_payment(
 }
 
 // Gets a payment from Redis
-pub fn get_payment(payment_id: &str) -> redis::RedisResult<Payment> {
-    let mut con = connect();
-
+pub fn get_payment(con: &mut Connection, payment_id: &str) -> RedisResult<Payment> {
     let main_key = format!("{PAYMENT_KEY}:{payment_id}");
     let description: String = con.hget(&main_key, "description")?;
     let datetime: String = con.hget(&main_key, "datetime")?;
@@ -62,14 +58,13 @@ pub fn get_payment(payment_id: &str) -> redis::RedisResult<Payment> {
 
 // Updates a payment in Redis
 pub fn update_payment(
+    con: &mut Connection,
     payment_id: &str,
     description: Option<&str>,
     creditor: Option<&str>,
     total: Option<&i32>,
     debts: Option<Vec<Debt>>,
-) -> redis::RedisResult<()> {
-    let mut con = connect();
-
+) -> RedisResult<()> {
     let main_key = format!("{PAYMENT_KEY}:{payment_id}");
     if let Some(desc) = description {
         con.hset(&main_key, "description", desc)?;
@@ -94,8 +89,7 @@ pub fn update_payment(
 }
 
 // Deletes a payment from Redis
-pub fn delete_payment(payment_id: &str) -> redis::RedisResult<()> {
-    let mut con = connect();
+pub fn delete_payment(con: &mut Connection, payment_id: &str) -> RedisResult<()> {
     let main_key = format!("{PAYMENT_KEY}:{payment_id}");
     let debt_key = format!("{PAYMENT_DEBT_KEY}:{payment_id}");
     con.del(&main_key)?;
@@ -111,20 +105,30 @@ mod tests {
     use super::delete_payment;
     use super::get_payment;
     use super::update_payment;
+    use crate::bot::redis::connect::connect;
 
     #[test]
     fn test_add_get_payment() {
+        let mut con = connect();
+
         let description = "test_payment";
         let datetime = "2020-01-01T00:00:00Z";
         let creditor = "test_creditor";
         let total = 100;
         let debts = vec![("test_debtor".to_string(), 50)];
-        let payment_op = add_payment(description, datetime, creditor, total, debts.clone());
+        let payment_op = add_payment(
+            &mut con,
+            description,
+            datetime,
+            creditor,
+            total,
+            debts.clone(),
+        );
 
         assert!(payment_op.is_ok());
 
         let payment_id = payment_op.unwrap();
-        let payment = get_payment(&payment_id);
+        let payment = get_payment(&mut con, &payment_id);
         assert_eq!(
             payment.unwrap(),
             (
@@ -136,18 +140,27 @@ mod tests {
             )
         );
 
-        delete_payment(&payment_id).unwrap();
+        delete_payment(&mut con, &payment_id).unwrap();
     }
 
     #[test]
     fn test_update_payment() {
+        let mut con = connect();
+
         let description = "test_payment";
         let datetime = "2020-01-01T00:00:00Z";
         let creditor = "test_creditor";
         let total = 100;
         let debts = vec![("test_debtor".to_string(), 50)];
-        let payment_id =
-            add_payment(description, datetime, creditor, total, debts.clone()).unwrap();
+        let payment_id = add_payment(
+            &mut con,
+            description,
+            datetime,
+            creditor,
+            total,
+            debts.clone(),
+        )
+        .unwrap();
 
         let new_description = "new_test_payment";
         let new_creditor = "new_test_creditor";
@@ -155,6 +168,7 @@ mod tests {
         let new_debts = vec![("new_test_debtor".to_string(), 100)];
 
         let update_op = update_payment(
+            &mut con,
             &payment_id,
             Some(new_description),
             Some(new_creditor),
@@ -164,7 +178,7 @@ mod tests {
 
         assert!(update_op.is_ok());
 
-        let payment = get_payment(&payment_id);
+        let payment = get_payment(&mut con, &payment_id);
         assert_eq!(
             payment.unwrap(),
             (
@@ -176,18 +190,27 @@ mod tests {
             )
         );
 
-        delete_payment(&payment_id).unwrap();
+        delete_payment(&mut con, &payment_id).unwrap();
     }
 
     #[test]
     fn test_delete_payment() {
+        let mut con = connect();
+
         let description = "test_payment";
         let datetime = "2020-01-01T00:00:00Z";
         let creditor = "test_creditor";
         let total = 100;
         let debts = vec![("test_debtor".to_string(), 50)];
-        let payment_id =
-            add_payment(description, datetime, creditor, total, debts.clone()).unwrap();
-        assert!(delete_payment(&payment_id).is_ok());
+        let payment_id = add_payment(
+            &mut con,
+            description,
+            datetime,
+            creditor,
+            total,
+            debts.clone(),
+        )
+        .unwrap();
+        assert!(delete_payment(&mut con, &payment_id).is_ok());
     }
 }
