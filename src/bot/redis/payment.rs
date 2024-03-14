@@ -2,6 +2,13 @@ use super::connect::connect;
 use redis::Commands;
 use uuid::Uuid;
 
+/* Payment CRUD Operations
+ * Payment represents a payment entry, used in groups.
+ * Payment comprises of a description, immutable datetime, creditor, numeric total,
+ * and a list of debts (stored under a different key).
+ * Has add, exists, get, update, and delete operations.
+ */
+
 const PAYMENT_KEY: &str = "payment";
 const PAYMENT_DEBT_KEY: &str = "payment_debt";
 
@@ -87,8 +94,6 @@ pub fn update_payment(
 }
 
 // Deletes a payment from Redis
-// Mainly for testing purposes
-// In application, no real need to delete keys
 pub fn delete_payment(payment_id: &str) -> redis::RedisResult<()> {
     let mut con = connect();
     let main_key = format!("{PAYMENT_KEY}:{payment_id}");
@@ -170,6 +175,8 @@ mod tests {
                 new_debts
             )
         );
+
+        delete_payment(&payment_id).unwrap();
     }
 
     #[test]

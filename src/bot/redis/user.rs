@@ -9,7 +9,11 @@ const USER_ID_KEY: &str = "user_id";
  * `user_id` is used only to ensure the correctness of `user.username`
  */
 
-/* User CRUD Operations */
+/* User CRUD Operations
+ * User represents a user, most likely in a group chat on Telegram.
+ * User comprises a list of chats they are using PayScribe in.
+ * Has add, exists, get, update, and delete operations.
+ */
 
 // Adds a new user to Redis
 // Initialises user_id if provided
@@ -55,7 +59,10 @@ pub fn delete_user(username: &str) -> redis::RedisResult<()> {
     con.del(&format!("{USER_KEY}:{username}"))
 }
 
-/* User ID CRUD Operations */
+/* User ID CRUD Operations
+ * User ID represents a mapping of user_id to username.
+ * Has add, exists, get, update, and delete operations.
+ */
 
 // Initialises user with user_id
 pub fn initialize_user(user_id: &str, username: &str) -> redis::RedisResult<()> {
@@ -107,36 +114,32 @@ mod tests {
 
     #[test]
     fn test_add_user_all() {
-        let username = "test_user";
+        let username = "test_user_all";
         let user_id = "123456789";
         let chat_id = "9876543210";
         assert!(add_user(username, chat_id, Some(user_id),).is_ok());
+
         delete_user(username).unwrap();
+        delete_user_id(user_id).unwrap();
     }
 
     #[test]
     fn test_add_user_no_id() {
-        let username = "test_user";
+        let username = "test_user_no_id";
         let chat_id = "9876543211";
         assert!(add_user(username, chat_id, None).is_ok());
+
         delete_user(username).unwrap();
     }
 
     #[test]
-    fn test_get_user_exists() {
-        let username = "test_user";
+    fn test_get_user_exists_chat() {
+        let username = "test_user_exists";
         let chat_id = "9876543212";
         add_user(username, chat_id, None).unwrap();
         assert!(get_user_exists(username).unwrap());
-        delete_user(username).unwrap();
-    }
-
-    #[test]
-    fn test_get_user_chats() {
-        let username = "test_user_get_chats";
-        let chat_id = "9876543213";
-        add_user(username, chat_id, None).unwrap();
         assert!(get_user_chats(username).unwrap() == vec![chat_id]);
+
         delete_user(username).unwrap();
     }
 
@@ -153,6 +156,7 @@ mod tests {
             get_user_chats(username).unwrap(),
             vec![chat_id, new_chat_id]
         );
+
         delete_user(username).unwrap();
     }
 
@@ -167,28 +171,13 @@ mod tests {
     }
 
     #[test]
-    fn test_initialize_user() {
+    fn test_initialize_get_user() {
         let username = "test_user_initialize";
         let user_id = "1234567895";
         assert!(initialize_user(user_id, username).is_ok());
-        delete_user_id(user_id).unwrap();
-    }
-
-    #[test]
-    fn test_get_username() {
-        let user_id = "1234567892";
-        let username = "test_user_get_username";
-        initialize_user(user_id, username).unwrap();
         assert!(get_username(user_id).unwrap() == username);
-        delete_user_id(user_id).unwrap();
-    }
-
-    #[test]
-    fn test_get_user_is_init() {
-        let user_id = "1234567893";
-        let username = "test_user_get_is_init";
-        initialize_user(user_id, username).unwrap();
         assert!(get_user_is_init(user_id).unwrap());
+
         delete_user_id(user_id).unwrap();
     }
 
@@ -198,6 +187,7 @@ mod tests {
         let chat_id = "9876543217";
         add_user(username, chat_id, None).unwrap();
         assert!(!get_user_is_init(username).unwrap());
+
         delete_user(username).unwrap();
     }
 
@@ -208,7 +198,9 @@ mod tests {
         let chat_id = "9876543218";
         add_user(username, chat_id, Some(user_id)).unwrap();
         assert!(get_user_is_init(user_id).unwrap());
+
         delete_user_id(user_id).unwrap();
+        delete_user(username).unwrap();
     }
 
     #[test]
@@ -221,6 +213,7 @@ mod tests {
 
         update_username(user_id, new_username).unwrap();
         assert_eq!(get_username(user_id).unwrap(), new_username);
+
         delete_user_id(user_id).unwrap();
     }
 

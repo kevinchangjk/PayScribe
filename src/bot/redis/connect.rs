@@ -10,10 +10,13 @@ pub fn connect() -> redis::Connection {
 }
 
 // Tests connection to Redis
-pub fn test_redis_connection() -> redis::RedisResult<isize> {
+pub fn test_redis_connection() -> redis::RedisResult<bool> {
     let mut con = connect();
     let _: () = con.set("my_key", 42)?;
-    con.get("my_key")
+    let res: i32 = con.get("my_key")?;
+    con.del("my_key")?;
+
+    Ok(res == 42)
 }
 
 #[cfg(test)]
@@ -22,6 +25,6 @@ mod tests {
 
     #[test]
     fn test_connection() {
-        assert!(test_redis_connection().is_ok());
+        assert!(test_redis_connection().unwrap());
     }
 }
