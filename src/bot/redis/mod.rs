@@ -10,3 +10,4 @@ mod balance;
 mod chat;
 mod connect;
 mod user;
+mod payment;

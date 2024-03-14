@@ -3,6 +3,8 @@ use redis::Commands;
 
 const BALANCE_KEY: &str = "balance";
 
+type Balance = (i32, i32);
+
 // Adds a new balance to Redis
 pub fn add_balance(chat_id: &str, user_id: &str) -> redis::RedisResult<()> {
     let mut con = connect();
@@ -11,7 +13,7 @@ pub fn add_balance(chat_id: &str, user_id: &str) -> redis::RedisResult<()> {
 }
 
 // Gets a balance
-pub fn get_balance(chat_id: &str, user_id: &str) -> redis::RedisResult<(i32, i32)> {
+pub fn get_balance(chat_id: &str, user_id: &str) -> redis::RedisResult<Balance> {
     let mut con = connect();
     let amount_into: i32 = con.hget(format!("{BALANCE_KEY}:{chat_id}:{user_id}"), "amount_into")?;
     let amount_from: i32 = con.hget(format!("{BALANCE_KEY}:{chat_id}:{user_id}"), "amount_from")?;
