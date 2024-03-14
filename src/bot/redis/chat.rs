@@ -26,7 +26,7 @@ pub fn get_chat_exists(con: &mut Connection, chat_id: &str) -> RedisResult<bool>
     con.exists(format!("{CHAT_KEY}:{chat_id}"))
 }
 
-// Adds a single new user to the chat
+// Adds a single new user to the chat. Automatically checks if already added.
 pub fn add_chat_user(con: &mut Connection, chat_id: &str, username: &str) -> RedisResult<()> {
     let current_users: Vec<String> = get_chat_users(con, chat_id)?;
     if current_users.contains(&username.to_string()) {
@@ -35,8 +35,7 @@ pub fn add_chat_user(con: &mut Connection, chat_id: &str, username: &str) -> Red
     con.rpush(format!("{CHAT_KEY}:{chat_id}"), username)
 }
 
-// Adds more users to the chat
-// Users can be either user_id or username
+// Adds more users to the chat. Automatically checks if already added.
 pub fn add_chat_user_multiple(
     con: &mut Connection,
     chat_id: &str,

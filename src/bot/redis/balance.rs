@@ -9,7 +9,8 @@ use redis::{Commands, Connection, RedisResult};
 
 const BALANCE_KEY: &str = "balance";
 
-type Balance = (i32, i32);
+/* Balance represents (amount_into, amount_from) */
+pub type Balance = (i32, i32);
 
 // Adds a new balance to Redis
 pub fn add_balance(con: &mut Connection, chat_id: &str, user_id: &str) -> RedisResult<()> {

@@ -42,11 +42,6 @@ pub fn get_user_chats(con: &mut Connection, username: &str) -> RedisResult<Vec<S
 // Update user chats with a new chat
 // Automatically checks if chat is already inside
 pub fn update_user_chats(con: &mut Connection, username: &str, chat_id: &str) -> RedisResult<()> {
-    let current_chats = get_user_chats(con, username)?;
-    if current_chats.contains(&chat_id.to_string()) {
-        return Ok(());
-    }
-
     con.rpush(&format!("{USER_KEY}:{username}"), chat_id)
 }
 
