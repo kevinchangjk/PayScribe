@@ -1,7 +1,7 @@
 use redis::RedisResult;
 
 use super::{
-    balance::{add_balance, get_balance, get_balance_exists, update_balance, Balance},
+    balance::{get_balance, get_balance_exists, set_balance},
     chat::{
         add_chat, add_chat_payment, add_chat_user_multiple, delete_chat_payment, get_chat_exists,
         get_chat_payments, get_chat_users,
@@ -100,28 +100,25 @@ pub fn get_chat_payments_details(chat_id: &str) -> RedisResult<Vec<UserPayment>>
  * If yes, does nothing.
  * Basically ensures that the balance exists after the function call.
  * Called whenever a new payment is added.
- * Balance: (i32, i32), representing (amount_into, amount_from).
  */
-pub fn update_balance_amounts(chat_id: &str, username: &str, balance: Balance) -> RedisResult<()> {
+pub fn update_balance_amounts(chat_id: &str, username: &str, balance: f64) -> RedisResult<()> {
     let mut con = connect();
 
-    // Adds balance if not exists
-    if !get_balance_exists(&mut con, chat_id, username)? {
-        add_balance(&mut con, chat_id, username)?;
-    }
-
-    update_balance(&mut con, chat_id, username, balance.0, balance.1)
+    set_balance(&mut con, chat_id, username, balance)
 }
 
 /* Retrieves balances of all users in a chat.
  * Called whenever a user wants to view current balances.
  */
-pub fn retrieve_all_balances(chat_id: &str) -> RedisResult<Vec<(String, Balance)>> {
+pub fn retrieve_all_balances(chat_id: &str) -> RedisResult<Vec<(String, f64)>> {
     let mut con = connect();
 
     let usernames = get_chat_users(&mut con, chat_id)?;
-    let mut balances: Vec<(String, Balance)> = Vec::new();
+    let mut balances: Vec<(String, f64)> = Vec::new();
     for username in usernames {
+        if let Ok(false) = get_balance_exists(&mut con, chat_id, &username) {
+            continue;
+        }
         let balance = get_balance(&mut con, chat_id, &username)?;
         balances.push((username, balance));
     }
@@ -439,7 +436,7 @@ mod tests {
 
         let chat_id = "manager_1234567896";
         let username = "manager_test_user_16";
-        let balance = (50, 50);
+        let balance = 50.50;
 
         // Checks that balance doesn't exist
         assert!(!get_balance_exists(&mut con, chat_id, username).unwrap());
@@ -448,7 +445,7 @@ mod tests {
         assert!(update_balance_amounts(chat_id, username, balance).is_ok());
         assert_eq!(get_balance(&mut con, chat_id, username).unwrap(), balance);
 
-        let second_balance = (100, 0);
+        let second_balance = 100.4;
 
         // Updates balance
         assert!(update_balance_amounts(chat_id, username, second_balance).is_ok());
@@ -474,9 +471,9 @@ mod tests {
         assert!(update_chat(chat_id, usernames.clone()).is_ok());
 
         // Adds balances
-        let first_balance = (50, 50);
-        let second_balance = (100, 0);
-        let third_balance = (0, 100);
+        let first_balance = 50.0;
+        let second_balance = 100.1;
+        let third_balance = -100.2;
 
         assert!(update_balance_amounts(chat_id, &usernames[0], first_balance).is_ok());
         assert!(update_balance_amounts(chat_id, &usernames[1], second_balance).is_ok());
