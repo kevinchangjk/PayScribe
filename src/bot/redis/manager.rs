@@ -347,7 +347,6 @@ mod tests {
         delete_chat(&mut con, chat_id).unwrap();
     }
 
-    // TODO
     #[test]
     fn test_add_get_update_delete_payment_details() {
         let chat_id = "manager_1234567895";
