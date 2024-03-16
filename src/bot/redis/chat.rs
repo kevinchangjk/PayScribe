@@ -14,11 +14,11 @@ const CHAT_KEY: &str = "chat";
 const CHAT_PAYMENT_KEY: &str = "chat_payment";
 const CHAT_DEBT_KEY: &str = "chat_debt";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Debt {
-    debtor: String,
-    creditor: String,
-    amount: f64,
+    pub debtor: String,
+    pub creditor: String,
+    pub amount: f64,
 }
 
 pub type Debts = Vec<Debt>;
@@ -105,12 +105,25 @@ pub fn delete_all_chat_payment(con: &mut Connection, chat_id: &str) -> RedisResu
 }
 
 /* Chat Debts CRUD Operations */
+// Sets the optimized debts for a chat
 pub fn set_chat_debt(con: &mut Connection, chat_id: &str, debts: Vec<Debt>) -> RedisResult<()> {
-    con.del(format!("{CHAT_DEBT_KEY}:{chat_id}"))?;
-
     let serialized = serde_json::to_string(&debts).unwrap();
 
     con.set(format!("{CHAT_DEBT_KEY}:{chat_id}"), serialized)
+}
+
+// Retrieves the optimized debts for a chat
+pub fn get_chat_debt(con: &mut Connection, chat_id: &str) -> RedisResult<Debts> {
+    let serialized: String = con.get(format!("{CHAT_DEBT_KEY}:{chat_id}"))?;
+    let deserialized: Debts = serde_json::from_str(&serialized).unwrap();
+    Ok(deserialized)
+}
+
+// Deletes the optimized debts for a chat
+// Mainly for testing purposes
+// In application, no real need to delete keys
+pub fn delete_chat_debt(con: &mut Connection, chat_id: &str) -> RedisResult<()> {
+    con.del(format!("{CHAT_DEBT_KEY}:{chat_id}"))
 }
 
 #[cfg(test)]
@@ -254,5 +267,27 @@ mod tests {
         add_chat_payment(&mut con, chat_id, payment_id).unwrap();
         delete_all_chat_payment(&mut con, chat_id).unwrap();
         assert!(!get_chat_payment_exists(&mut con, chat_id).unwrap());
+    }
+
+    #[test]
+    fn test_set_get_chat_debt() {
+        let mut con = connect().unwrap();
+
+        let chat_id = "1234567898";
+        let debts = vec![
+            Debt {
+                debtor: "debtor1".to_string(),
+                creditor: "creditor1".to_string(),
+                amount: 10.0,
+            },
+            Debt {
+                debtor: "debtor2".to_string(),
+                creditor: "creditor2".to_string(),
+                amount: 20.0,
+            },
+        ];
+        assert!(set_chat_debt(&mut con, chat_id, debts.clone()).is_ok());
+        assert_eq!(get_chat_debt(&mut con, chat_id).unwrap(), debts);
+        assert!(delete_chat_debt(&mut con, chat_id).is_ok());
     }
 }
