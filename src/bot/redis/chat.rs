@@ -1,4 +1,5 @@
 use redis::{Commands, Connection, RedisResult};
+use serde::{Deserialize, Serialize};
 
 /* Chat CRUD Operations
  * Chat represents a chat, most likely a group chat on Telegram.
@@ -13,11 +14,14 @@ const CHAT_KEY: &str = "chat";
 const CHAT_PAYMENT_KEY: &str = "chat_payment";
 const CHAT_DEBT_KEY: &str = "chat_debt";
 
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Debt {
     debtor: String,
     creditor: String,
     amount: f64,
 }
+
+pub type Debts = Vec<Debt>;
 
 // Adds a new chat to Redis
 pub fn add_chat(con: &mut Connection, chat_id: &str, username: &str) -> RedisResult<()> {
@@ -101,6 +105,13 @@ pub fn delete_all_chat_payment(con: &mut Connection, chat_id: &str) -> RedisResu
 }
 
 /* Chat Debts CRUD Operations */
+pub fn set_chat_debt(con: &mut Connection, chat_id: &str, debts: Vec<Debt>) -> RedisResult<()> {
+    con.del(format!("{CHAT_DEBT_KEY}:{chat_id}"))?;
+
+    let serialized = serde_json::to_string(&debts).unwrap();
+
+    con.set(format!("{CHAT_DEBT_KEY}:{chat_id}"), serialized)
+}
 
 #[cfg(test)]
 mod tests {

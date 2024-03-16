@@ -37,7 +37,7 @@ pub fn connect() -> Result<Connection, DBError> {
 // Tests connection to Redis
 pub fn test_redis_connection() -> RedisResult<bool> {
     let mut con = connect()?;
-    let _: () = con.set("my_key", 42)?;
+    con.set("my_key", 42)?;
     let res: i32 = con.get("my_key")?;
     con.del("my_key")?;
 

@@ -815,6 +815,8 @@ dependencies = [
  "log",
  "pretty_env_logger",
  "redis",
+ "serde",
+ "serde_json",
  "teloxide",
  "thiserror",
  "tokio",
