@@ -14,6 +14,7 @@ pub use self::manager::update_user;
 pub use self::chat::Debt;
 pub use self::manager::CrudError;
 pub use self::manager::UserBalance;
+pub use self::manager::UserPayment;
 pub use self::payment::Payment;
 
 // Submodules
