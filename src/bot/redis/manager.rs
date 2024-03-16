@@ -4,8 +4,7 @@ use super::{
     balance::{get_balance, get_balance_exists, set_balance},
     chat::{
         add_chat, add_chat_payment, add_chat_user_multiple, delete_chat_payment, get_chat_debt,
-        get_chat_exists, get_chat_payment_exists, get_chat_payments, get_chat_users, set_chat_debt,
-        Debt,
+        get_chat_exists, get_chat_payment_exists, get_chat_payments, set_chat_debt, Debt,
     },
     connect::{connect, DBError},
     payment::{add_payment, delete_payment, get_payment, update_payment, Payment},
@@ -256,7 +255,7 @@ pub fn delete_payment_entry(chat_id: &str, payment_id: &str) -> Result<(), CrudE
 mod tests {
     use crate::bot::redis::{
         balance::delete_balance,
-        chat::{delete_chat, delete_chat_debt},
+        chat::{delete_chat, delete_chat_debt, get_chat_users},
         user::{delete_user, delete_user_id, get_user_chats},
     };
 
