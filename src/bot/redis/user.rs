@@ -26,30 +26,30 @@ pub fn add_user(
         initialize_user(con, id, username)?;
     }
 
-    con.rpush(&format!("{USER_KEY}:{username}"), chat_id)
+    con.rpush(format!("{USER_KEY}:{username}"), chat_id)
 }
 
 // Checks if user exists
 pub fn get_user_exists(con: &mut Connection, username: &str) -> RedisResult<bool> {
-    con.exists(&format!("{USER_KEY}:{username}"))
+    con.exists(format!("{USER_KEY}:{username}"))
 }
 
 // Gets user chats from a specified user
 pub fn get_user_chats(con: &mut Connection, username: &str) -> RedisResult<Vec<String>> {
-    con.lrange(&format!("{USER_KEY}:{username}"), 0, -1)
+    con.lrange(format!("{USER_KEY}:{username}"), 0, -1)
 }
 
 // Update user chats with a new chat
 // Automatically checks if chat is already inside
 pub fn update_user_chats(con: &mut Connection, username: &str, chat_id: &str) -> RedisResult<()> {
-    con.rpush(&format!("{USER_KEY}:{username}"), chat_id)
+    con.rpush(format!("{USER_KEY}:{username}"), chat_id)
 }
 
 // Deletes a user from Redis
 // Mainly for testing purposes
 // In application, no real need to delete keys
 pub fn delete_user(con: &mut Connection, username: &str) -> RedisResult<()> {
-    con.del(&format!("{USER_KEY}:{username}"))
+    con.del(format!("{USER_KEY}:{username}"))
 }
 
 /* User ID CRUD Operations
@@ -59,31 +59,31 @@ pub fn delete_user(con: &mut Connection, username: &str) -> RedisResult<()> {
 
 // Initialises user with user_id
 pub fn initialize_user(con: &mut Connection, user_id: &str, username: &str) -> RedisResult<()> {
-    con.set(&format!("{USER_ID_KEY}:{user_id}"), username)
+    con.set(format!("{USER_ID_KEY}:{user_id}"), username)
 }
 
 // Checks if user is initialised
 pub fn get_user_is_init(con: &mut Connection, user_id: &str) -> RedisResult<bool> {
-    con.exists(&format!("{USER_ID_KEY}:{user_id}"))
+    con.exists(format!("{USER_ID_KEY}:{user_id}"))
 }
 
 // Gets username from a specified user_id
 pub fn get_username(con: &mut Connection, user_id: &str) -> RedisResult<String> {
-    con.get(&format!("{USER_ID_KEY}:{user_id}"))
+    con.get(format!("{USER_ID_KEY}:{user_id}"))
 }
 
 // Updates username for a specified user_id
 // Only used when user_id is provided, activated when a change in username is detected
 // Otherwise, impossible to detect change in username without user_id
 pub fn update_username(con: &mut Connection, user_id: &str, username: &str) -> RedisResult<()> {
-    con.set(&format!("{USER_ID_KEY}:{user_id}"), username)
+    con.set(format!("{USER_ID_KEY}:{user_id}"), username)
 }
 
 // Deletes a user_id from Redis
 // Mainly for testing purposes
 // In application, no real need to delete keys
 pub fn delete_user_id(con: &mut Connection, user_id: &str) -> RedisResult<()> {
-    con.del(&format!("{USER_ID_KEY}:{user_id}"))
+    con.del(format!("{USER_ID_KEY}:{user_id}"))
 }
 
 // Tests
@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn test_add_user_all() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "test_user_all";
         let user_id = "123456789";
@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn test_add_user_no_id() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "test_user_no_id";
         let chat_id = "9876543211";
@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn test_get_user_exists_chat() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "test_user_exists";
         let chat_id = "9876543212";
@@ -131,7 +131,7 @@ mod tests {
 
     #[test]
     fn test_update_chats() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "test_user_update_chats";
         let chat_id = "9876543214";
@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn test_delete_user() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "test_user_delete";
         let chat_id = "9876543216";
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn test_initialize_get_user() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "test_user_initialize";
         let user_id = "1234567895";
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn test_get_user_is_not_init() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "test_user_get_is_not_init";
         let chat_id = "9876543217";
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn test_get_user_auto_init() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "test_user_auto_init";
         let user_id = "1234567894";
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     fn test_update_username() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let user_id = "1234567896";
         let old_username = "test_user_update_username";
@@ -217,7 +217,7 @@ mod tests {
 
     #[test]
     fn test_delete_user_id() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let user_id = "1234567897";
         let username = "test_user_delete_user_id";

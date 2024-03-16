@@ -1,12 +1,12 @@
-use redis::RedisResult;
+use redis::RedisError;
 
 use super::{
-    balance::{add_balance, get_balance, get_balance_exists, update_balance, Balance},
+    balance::{get_balance, get_balance_exists, set_balance},
     chat::{
-        add_chat, add_chat_payment, add_chat_user_multiple, delete_chat_payment, get_chat_exists,
-        get_chat_payments, get_chat_users,
+        add_chat, add_chat_payment, add_chat_user_multiple, delete_chat_payment, get_chat_debt,
+        get_chat_exists, get_chat_payment_exists, get_chat_payments, set_chat_debt, Debt,
     },
-    connect::connect,
+    connect::{connect, DBError},
     payment::{add_payment, delete_payment, get_payment, update_payment, Payment},
     user::{
         add_user, get_user_chats, get_user_exists, get_user_is_init, get_username, initialize_user,
@@ -14,11 +14,43 @@ use super::{
     },
 };
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct Balance {
+    pub username: String,
+    pub balance: f64,
+}
+
 #[derive(Debug, PartialEq)]
 pub struct UserPayment {
     pub chat_id: String,
     pub payment_id: String,
     pub payment: Payment,
+}
+
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub enum CrudError {
+    #[error("Redis operation error: {0}")]
+    RedisError(redis::RedisError),
+    #[error("Redis database error: {0}")]
+    DBError(DBError),
+    #[error("No payments found")]
+    NoPaymentsError(),
+    #[error("No such payment entry found")]
+    NoSuchPaymentError(),
+}
+
+// Implement the From trait to convert from RedisError to CrudError
+impl From<RedisError> for CrudError {
+    fn from(redis_error: RedisError) -> CrudError {
+        CrudError::RedisError(redis_error)
+    }
+}
+
+// Implement the From trait to convert from RedisError to CrudError
+impl From<DBError> for CrudError {
+    fn from(db_error: DBError) -> CrudError {
+        CrudError::DBError(db_error)
+    }
 }
 
 /* Redis Manager
@@ -32,8 +64,8 @@ pub struct UserPayment {
  * If the user exists, ensures that chats are updated. Inits user if not init.
  * Called whenever a new payment is added, and all relevant users are updated with this.
  */
-pub fn update_user(username: &str, chat_id: &str, user_id: Option<&str>) -> RedisResult<()> {
-    let mut con = connect();
+pub fn update_user(username: &str, chat_id: &str, user_id: Option<&str>) -> Result<(), CrudError> {
+    let mut con = connect()?;
 
     // Adds user if not exists
     if !get_user_exists(&mut con, username)? {
@@ -62,8 +94,8 @@ pub fn update_user(username: &str, chat_id: &str, user_id: Option<&str>) -> Redi
  * If the chat exists, ensures that it is updated with the usernames.
  * Called whenever a new payment is added.
  */
-pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> RedisResult<()> {
-    let mut con = connect();
+pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> Result<(), CrudError> {
+    let mut con = connect()?;
 
     // Adds chat if not exists
     if !get_chat_exists(&mut con, chat_id)? {
@@ -71,17 +103,100 @@ pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> RedisResult<()> {
     }
 
     // Adds all users, automatically checked if added
-    add_chat_user_multiple(&mut con, chat_id, usernames)
+    add_chat_user_multiple(&mut con, chat_id, usernames)?;
+
+    Ok(())
+}
+
+/* Updates balances for a chat based on given change amounts.
+ * If balance does not exist, creates it.
+ * Returns the updated balances.
+ */
+pub fn update_chat_balances(
+    chat_id: &str,
+    changes: Vec<Balance>,
+) -> Result<Vec<Balance>, CrudError> {
+    let mut con = connect()?;
+
+    let mut updated_balances = vec![];
+
+    for change in changes {
+        let username = change.username;
+        let balance = change.balance;
+        if let Ok(false) = get_balance_exists(&mut con, chat_id, &username) {
+            updated_balances.push(Balance {
+                username: username.clone(),
+                balance,
+            });
+            set_balance(&mut con, chat_id, &username, balance)?;
+        } else {
+            let current_balance = get_balance(&mut con, chat_id, &username)?;
+            let new_balance = current_balance + balance;
+            updated_balances.push(Balance {
+                username: username.clone(),
+                balance: new_balance,
+            });
+            set_balance(&mut con, chat_id, &username, new_balance)?;
+        }
+    }
+
+    Ok(updated_balances)
+}
+
+/* Sets the latest state of simplified debts for a chat.
+ */
+pub fn update_chat_debts(chat_id: &str, debts: Vec<Debt>) -> Result<(), CrudError> {
+    let mut con = connect()?;
+
+    set_chat_debt(&mut con, chat_id, debts)?;
+
+    Ok(())
+}
+
+/* Retrieves the latest state of simplified debts for a chat.
+ */
+pub fn retrieve_chat_debts(chat_id: &str) -> Result<Vec<Debt>, CrudError> {
+    let mut con = connect()?;
+
+    let debts = get_chat_debt(&mut con, chat_id)?;
+
+    Ok(debts)
+}
+
+/* Adds a payment.
+ * Sets a new key-value pair for the payment, and updates the payments list in chat.
+ * Called whenever a new payment is added.
+ */
+pub fn add_payment_entry(chat_id: &str, payment: &Payment) -> Result<(), CrudError> {
+    let mut con = connect()?;
+
+    // Adds payment
+    let payment_id = add_payment(&mut con, &payment)?;
+
+    // Adds payment to chat
+    add_chat_payment(&mut con, chat_id, &payment_id)?;
+
+    Ok(())
 }
 
 /* Retrieves all payments for a chat and their details.
  * Called whenever a user views past payments.
  */
-pub fn get_chat_payments_details(chat_id: &str) -> RedisResult<Vec<UserPayment>> {
-    let mut con = connect();
+pub fn get_chat_payments_details(chat_id: &str) -> Result<Vec<UserPayment>, CrudError> {
+    let mut con = connect()?;
+
+    if let Err(_) = get_chat_payment_exists(&mut con, chat_id) {
+        return Err(CrudError::NoPaymentsError());
+    }
 
     let payment_ids = get_chat_payments(&mut con, chat_id)?;
     let mut payments: Vec<UserPayment> = Vec::new();
+
+    if payment_ids.is_empty() {
+        log::info!("No payments found for chat {}", chat_id);
+        return Err(CrudError::NoPaymentsError());
+    }
+
     for payment_id in payment_ids {
         let payment = get_payment(&mut con, &payment_id)?;
         let user_payment = UserPayment {
@@ -95,54 +210,6 @@ pub fn get_chat_payments_details(chat_id: &str) -> RedisResult<Vec<UserPayment>>
     Ok(payments)
 }
 
-/* Checks if balance for chat and user is initialized.
- * If not, adds it.
- * If yes, does nothing.
- * Basically ensures that the balance exists after the function call.
- * Called whenever a new payment is added.
- * Balance: (i32, i32), representing (amount_into, amount_from).
- */
-pub fn update_balance_amounts(chat_id: &str, username: &str, balance: Balance) -> RedisResult<()> {
-    let mut con = connect();
-
-    // Adds balance if not exists
-    if !get_balance_exists(&mut con, chat_id, username)? {
-        add_balance(&mut con, chat_id, username)?;
-    }
-
-    update_balance(&mut con, chat_id, username, balance.0, balance.1)
-}
-
-/* Retrieves balances of all users in a chat.
- * Called whenever a user wants to view current balances.
- */
-pub fn retrieve_all_balances(chat_id: &str) -> RedisResult<Vec<(String, Balance)>> {
-    let mut con = connect();
-
-    let usernames = get_chat_users(&mut con, chat_id)?;
-    let mut balances: Vec<(String, Balance)> = Vec::new();
-    for username in usernames {
-        let balance = get_balance(&mut con, chat_id, &username)?;
-        balances.push((username, balance));
-    }
-
-    Ok(balances)
-}
-
-/* Adds a payment.
- * Sets a new key-value pair for the payment, and updates the payments list in chat.
- * Called whenever a new payment is added.
- */
-pub fn add_payment_entry(chat_id: &str, payment: &Payment) -> RedisResult<()> {
-    let mut con = connect();
-
-    // Adds payment
-    let payment_id = add_payment(&mut con, &payment)?;
-
-    // Adds payment to chat
-    add_chat_payment(&mut con, chat_id, &payment_id)
-}
-
 /* Updates a payment entry.
  * Called when a user edits payment details.
  */
@@ -150,39 +217,53 @@ pub fn update_payment_entry(
     payment_id: &str,
     description: Option<&str>,
     creditor: Option<&str>,
-    total: Option<&i32>,
-    debts: Option<Vec<(String, i32)>>,
-) -> RedisResult<()> {
-    let mut con = connect();
+    total: Option<&f64>,
+    debts: Option<Vec<(String, f64)>>,
+) -> Result<(), CrudError> {
+    let mut con = connect()?;
+
+    if let Err(_) = get_payment(&mut con, payment_id) {
+        log::info!("No such payment found for payment_id {}", payment_id);
+        return Err(CrudError::NoSuchPaymentError());
+    }
 
     // Updates payment
-    update_payment(&mut con, payment_id, description, creditor, total, debts)
+    update_payment(&mut con, payment_id, description, creditor, total, debts)?;
+
+    Ok(())
 }
 
 /* Deletes a payment entry.
  * Removes the main payment entry, and also from the list in chat.
  * Called when a user wants to remove a payment.
  */
-pub fn delete_payment_entry(chat_id: &str, payment_id: &str) -> RedisResult<()> {
-    let mut con = connect();
+pub fn delete_payment_entry(chat_id: &str, payment_id: &str) -> Result<(), CrudError> {
+    let mut con = connect()?;
+
+    if let Err(_) = get_payment(&mut con, payment_id) {
+        log::info!("No such payment found for payment_id {}", payment_id);
+        return Err(CrudError::NoSuchPaymentError());
+    }
 
     delete_payment(&mut con, payment_id)?;
-    delete_chat_payment(&mut con, chat_id, payment_id)
+    delete_chat_payment(&mut con, chat_id, payment_id)?;
+
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use crate::bot::redis::{
         balance::delete_balance,
-        chat::delete_chat,
-        user::{delete_user, delete_user_id},
+        chat::{delete_chat, delete_chat_debt, get_chat_users},
+        user::{delete_user, delete_user_id, get_user_chats},
     };
 
     use super::*;
 
     #[test]
     fn test_update_user_add_user() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "manager_test_user";
         let chat_id = "manager_123456789";
@@ -206,7 +287,7 @@ mod tests {
 
     #[test]
     fn test_update_user_add_chat() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "manager_test_user_0";
         let chat_id = "manager_1234567890";
@@ -236,7 +317,7 @@ mod tests {
 
     #[test]
     fn test_update_user_init_user() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "manager_test_user_1";
         let chat_id = "manager_1234567892";
@@ -260,11 +341,12 @@ mod tests {
 
         // Deletes user
         delete_user(&mut con, username).unwrap();
+        delete_user_id(&mut con, user_id).unwrap();
     }
 
     #[test]
     fn test_update_user_update_username() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "manager_test_user_2";
         let chat_id = "manager_1234567893";
@@ -281,12 +363,14 @@ mod tests {
         assert!(get_username(&mut con, user_id).unwrap() == second_username);
 
         // Deletes user
+        delete_user(&mut con, username).unwrap();
         delete_user(&mut con, second_username).unwrap();
+        delete_user_id(&mut con, user_id).unwrap();
     }
 
     #[test]
     fn test_update_chat_add_chat_users() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "manager_1234567894";
         let mut usernames = vec![
@@ -350,7 +434,6 @@ mod tests {
         delete_chat(&mut con, chat_id).unwrap();
     }
 
-    // TODO
     #[test]
     fn test_add_get_update_delete_payment_details() {
         let chat_id = "manager_1234567895";
@@ -358,10 +441,10 @@ mod tests {
             description: "manager_test_payment".to_string(),
             datetime: "2021-01-01T00:00:00".to_string(),
             creditor: "manager_test_user_10".to_string(),
-            total: 100,
+            total: 100.0,
             debts: vec![
-                ("manager_test_user_11".to_string(), 50),
-                ("manager_test_user_12".to_string(), 50),
+                ("manager_test_user_11".to_string(), 50.0),
+                ("manager_test_user_12".to_string(), 50.0),
             ],
         };
 
@@ -372,10 +455,10 @@ mod tests {
             description: "manager_test_payment_2".to_string(),
             datetime: "2021-01-01T00:00:01".to_string(),
             creditor: "manager_test_user_13".to_string(),
-            total: 200,
+            total: 200.0,
             debts: vec![
-                ("manager_test_user_14".to_string(), 100),
-                ("manager_test_user_15".to_string(), 100),
+                ("manager_test_user_14".to_string(), 100.0),
+                ("manager_test_user_15".to_string(), 100.0),
             ],
         };
 
@@ -384,15 +467,15 @@ mod tests {
 
         // Gets both payments
         let payments = get_chat_payments_details(chat_id).unwrap();
-        let second_id = payments[1].payment_id.clone();
+        let second_id = payments[0].payment_id.clone();
 
         // Updates second payment
         let updated_description = "manager_test_payment_3";
         let updated_creditor = "manager_test_user_16";
-        let updated_total = 300;
+        let updated_total = 300.0;
         let updated_debts = vec![
-            ("manager_test_user_17".to_string(), 150),
-            ("manager_test_user_18".to_string(), 150),
+            ("manager_test_user_17".to_string(), 150.0),
+            ("manager_test_user_18".to_string(), 150.0),
         ];
 
         assert!(update_payment_entry(
@@ -411,11 +494,6 @@ mod tests {
             vec![
                 UserPayment {
                     chat_id: chat_id.to_string(),
-                    payment_id: payments[0].payment_id.clone(),
-                    payment: payment,
-                },
-                UserPayment {
-                    chat_id: chat_id.to_string(),
                     payment_id: second_id.clone(),
                     payment: Payment {
                         description: updated_description.to_string(),
@@ -425,6 +503,11 @@ mod tests {
                         debts: updated_debts.clone(),
                     },
                 },
+                UserPayment {
+                    chat_id: chat_id.to_string(),
+                    payment_id: payments[1].payment_id.clone(),
+                    payment: payment,
+                },
             ]
         );
 
@@ -433,71 +516,204 @@ mod tests {
         assert!(delete_payment_entry(chat_id, &payments[1].payment_id).is_ok());
     }
 
+    // Test for empty payments
     #[test]
-    fn test_update_balance() {
-        let mut con = connect();
+    fn test_no_payments_found() {
+        let chat_id = "manager_1234567898";
 
-        let chat_id = "manager_1234567896";
-        let username = "manager_test_user_16";
-        let balance = (50, 50);
+        let payment = Payment {
+            description: "manager_test_user_20".to_string(),
+            datetime: "2021-01-01T00:00:00".to_string(),
+            creditor: "manager_test_user_21".to_string(),
+            total: 100.0,
+            debts: vec![
+                ("manager_test_user_22".to_string(), 50.0),
+                ("manager_test_user_23".to_string(), 50.0),
+            ],
+        };
 
-        // Checks that balance doesn't exist
-        assert!(!get_balance_exists(&mut con, chat_id, username).unwrap());
-
-        // Adds initial balance
-        assert!(update_balance_amounts(chat_id, username, balance).is_ok());
-        assert_eq!(get_balance(&mut con, chat_id, username).unwrap(), balance);
-
-        let second_balance = (100, 0);
-
-        // Updates balance
-        assert!(update_balance_amounts(chat_id, username, second_balance).is_ok());
+        // Checks that payments don't exist
         assert_eq!(
-            get_balance(&mut con, chat_id, username).unwrap(),
-            second_balance
+            get_chat_payments_details(chat_id).unwrap_err(),
+            CrudError::NoPaymentsError()
         );
 
-        // Deletes balance
-        delete_balance(&mut con, chat_id, username).unwrap();
+        // Adds chat payment
+        assert!(add_payment_entry(chat_id, &payment).is_ok());
+
+        // Updates fake payment, should fail
+        assert_eq!(
+            update_payment_entry(
+                "nonexistent_payment",
+                Some("manager_test_payment_3"),
+                Some("manager_test_user_16"),
+                Some(&300.0),
+                Some(vec![
+                    ("manager_test_user_17".to_string(), 150.0),
+                    ("manager_test_user_18".to_string(), 150.0),
+                ]),
+            )
+            .unwrap_err(),
+            CrudError::NoSuchPaymentError()
+        );
+
+        // Deletes fake payment, should fail
+        assert_eq!(
+            delete_payment_entry(chat_id, "nonexistent_payment").unwrap_err(),
+            CrudError::NoSuchPaymentError()
+        );
+
+        // Deletes actual payment
+        let payments = get_chat_payments_details(chat_id).unwrap();
+        assert!(delete_payment_entry(chat_id, &payments[0].payment_id).is_ok());
+
+        // Checks that payments don't exist
+        assert_eq!(
+            get_chat_payments_details(chat_id).unwrap_err(),
+            CrudError::NoPaymentsError()
+        );
     }
 
     #[test]
-    fn test_retrieve_all_balances() {
-        let chat_id = "manager_1234567897";
+    fn test_update_retrieve_balances() {
+        let mut con = connect().unwrap();
+
+        let chat_id = "manager_1234567898";
+
+        // Add users to chat
         let usernames = vec![
-            "manager_test_user_17".to_string(),
-            "manager_test_user_18".to_string(),
-            "manager_test_user_19".to_string(),
+            "manager_test_user_20".to_string(),
+            "manager_test_user_21".to_string(),
+            "manager_test_user_22".to_string(),
+        ];
+        update_chat(chat_id, usernames).unwrap();
+
+        let changes = vec![
+            Balance {
+                username: "manager_test_user_20".to_string(),
+                balance: 100.0,
+            },
+            Balance {
+                username: "manager_test_user_21".to_string(),
+                balance: -50.0,
+            },
+            Balance {
+                username: "manager_test_user_22".to_string(),
+                balance: -50.0,
+            },
         ];
 
-        // Adds chat with group of usernames
-        assert!(update_chat(chat_id, usernames.clone()).is_ok());
+        // Adds initial balances
+        let initial_balances = update_chat_balances(chat_id, changes.clone()).unwrap();
 
-        // Adds balances
-        let first_balance = (50, 50);
-        let second_balance = (100, 0);
-        let third_balance = (0, 100);
-
-        assert!(update_balance_amounts(chat_id, &usernames[0], first_balance).is_ok());
-        assert!(update_balance_amounts(chat_id, &usernames[1], second_balance).is_ok());
-        assert!(update_balance_amounts(chat_id, &usernames[2], third_balance).is_ok());
-
-        // Checks all balances
+        // Checks that balances are correct
         assert_eq!(
-            retrieve_all_balances(chat_id).unwrap(),
+            initial_balances,
             vec![
-                ("manager_test_user_17".to_string(), first_balance),
-                ("manager_test_user_18".to_string(), second_balance),
-                ("manager_test_user_19".to_string(), third_balance),
+                Balance {
+                    username: "manager_test_user_20".to_string(),
+                    balance: 100.0
+                },
+                Balance {
+                    username: "manager_test_user_21".to_string(),
+                    balance: -50.0
+                },
+                Balance {
+                    username: "manager_test_user_22".to_string(),
+                    balance: -50.0
+                },
             ]
         );
 
-        // Deletes all key-value pairs
-        for username in usernames {
-            delete_user(&mut connect(), &username).unwrap();
-            delete_balance(&mut connect(), chat_id, &username).unwrap();
+        // Updates balances
+        let new_changes = vec![
+            Balance {
+                username: "manager_test_user_20".to_string(),
+                balance: -50.0,
+            },
+            Balance {
+                username: "manager_test_user_21".to_string(),
+                balance: -50.0,
+            },
+            Balance {
+                username: "manager_test_user_22".to_string(),
+                balance: 50.0,
+            },
+        ];
+
+        let new_balances = update_chat_balances(chat_id, new_changes.clone()).unwrap();
+
+        // Checks that balances are correct
+        assert_eq!(
+            new_balances,
+            vec![
+                Balance {
+                    username: "manager_test_user_20".to_string(),
+                    balance: 50.0
+                },
+                Balance {
+                    username: "manager_test_user_21".to_string(),
+                    balance: -100.0
+                },
+                Balance {
+                    username: "manager_test_user_22".to_string(),
+                    balance: 0.0
+                },
+            ]
+        );
+
+        // Deletes balances
+        for balance in initial_balances {
+            delete_balance(&mut con, chat_id, &balance.username).unwrap();
         }
 
-        delete_chat(&mut connect(), chat_id).unwrap();
+        // Deletes chat
+        delete_chat(&mut con, chat_id).unwrap();
+    }
+
+    #[test]
+    fn test_update_chat_debt() {
+        let mut con = connect().unwrap();
+
+        let chat_id = "manager_12345678990";
+        let debts = vec![
+            Debt {
+                debtor: "manager_test_user_25".to_string(),
+                creditor: "manager_test_user_26".to_string(),
+                amount: 100.0,
+            },
+            Debt {
+                debtor: "manager_test_user_27".to_string(),
+                creditor: "manager_test_user_28".to_string(),
+                amount: 50.0,
+            },
+        ];
+
+        // Adds debts
+        assert!(update_chat_debts(chat_id, debts.clone()).is_ok());
+
+        // Checks that debts are correct
+        assert_eq!(retrieve_chat_debts(chat_id).unwrap(), debts);
+
+        // Updates debts
+        let new_debts = vec![
+            Debt {
+                debtor: "manager_test_user_25".to_string(),
+                creditor: "manager_test_user_26".to_string(),
+                amount: 50.0,
+            },
+            Debt {
+                debtor: "manager_test_user_27".to_string(),
+                creditor: "manager_test_user_28".to_string(),
+                amount: 100.0,
+            },
+        ];
+        assert!(update_chat_debts(chat_id, new_debts.clone()).is_ok());
+
+        // Checks that debts are correct
+        assert_eq!(retrieve_chat_debts(chat_id).unwrap(), new_debts);
+
+        // Deletes debts
+        delete_chat_debt(&mut con, chat_id).unwrap();
     }
 }
