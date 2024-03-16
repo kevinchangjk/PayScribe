@@ -15,7 +15,7 @@ use super::{
 };
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Balance {
+pub struct UserBalance {
     pub username: String,
     pub balance: f64,
 }
@@ -114,8 +114,8 @@ pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> Result<(), CrudErro
  */
 pub fn update_chat_balances(
     chat_id: &str,
-    changes: Vec<Balance>,
-) -> Result<Vec<Balance>, CrudError> {
+    changes: Vec<UserBalance>,
+) -> Result<Vec<UserBalance>, CrudError> {
     let mut con = connect()?;
 
     let mut updated_balances = vec![];
@@ -124,7 +124,7 @@ pub fn update_chat_balances(
         let username = change.username;
         let balance = change.balance;
         if let Ok(false) = get_balance_exists(&mut con, chat_id, &username) {
-            updated_balances.push(Balance {
+            updated_balances.push(UserBalance {
                 username: username.clone(),
                 balance,
             });
@@ -132,7 +132,7 @@ pub fn update_chat_balances(
         } else {
             let current_balance = get_balance(&mut con, chat_id, &username)?;
             let new_balance = current_balance + balance;
-            updated_balances.push(Balance {
+            updated_balances.push(UserBalance {
                 username: username.clone(),
                 balance: new_balance,
             });
@@ -589,15 +589,15 @@ mod tests {
         update_chat(chat_id, usernames).unwrap();
 
         let changes = vec![
-            Balance {
+            UserBalance {
                 username: "manager_test_user_20".to_string(),
                 balance: 100.0,
             },
-            Balance {
+            UserBalance {
                 username: "manager_test_user_21".to_string(),
                 balance: -50.0,
             },
-            Balance {
+            UserBalance {
                 username: "manager_test_user_22".to_string(),
                 balance: -50.0,
             },
@@ -610,15 +610,15 @@ mod tests {
         assert_eq!(
             initial_balances,
             vec![
-                Balance {
+                UserBalance {
                     username: "manager_test_user_20".to_string(),
                     balance: 100.0
                 },
-                Balance {
+                UserBalance {
                     username: "manager_test_user_21".to_string(),
                     balance: -50.0
                 },
-                Balance {
+                UserBalance {
                     username: "manager_test_user_22".to_string(),
                     balance: -50.0
                 },
@@ -627,15 +627,15 @@ mod tests {
 
         // Updates balances
         let new_changes = vec![
-            Balance {
+            UserBalance {
                 username: "manager_test_user_20".to_string(),
                 balance: -50.0,
             },
-            Balance {
+            UserBalance {
                 username: "manager_test_user_21".to_string(),
                 balance: -50.0,
             },
-            Balance {
+            UserBalance {
                 username: "manager_test_user_22".to_string(),
                 balance: 50.0,
             },
@@ -647,15 +647,15 @@ mod tests {
         assert_eq!(
             new_balances,
             vec![
-                Balance {
+                UserBalance {
                     username: "manager_test_user_20".to_string(),
                     balance: 50.0
                 },
-                Balance {
+                UserBalance {
                     username: "manager_test_user_21".to_string(),
                     balance: -100.0
                 },
-                Balance {
+                UserBalance {
                     username: "manager_test_user_22".to_string(),
                     balance: 0.0
                 },
