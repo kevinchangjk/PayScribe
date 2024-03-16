@@ -2,13 +2,22 @@ use redis::{Commands, Connection, RedisResult};
 
 /* Chat CRUD Operations
  * Chat represents a chat, most likely a group chat on Telegram.
- * Chat comprises a list of usernames and a list of payments.
+ * Chat comprises a list of usernames and a list of payments,
+ * and the latest state of optimized debts.
  * Has add, exists, get, update, and delete operations.
  * Except for update chat payment operation, as there is no need to do so in application.
+ * For debts, only set and get required, delete is purely for testing.
  */
 
 const CHAT_KEY: &str = "chat";
 const CHAT_PAYMENT_KEY: &str = "chat_payment";
+const CHAT_DEBT_KEY: &str = "chat_debt";
+
+pub struct Debt {
+    debtor: String,
+    creditor: String,
+    amount: f64,
+}
 
 // Adds a new chat to Redis
 pub fn add_chat(con: &mut Connection, chat_id: &str, username: &str) -> RedisResult<()> {
@@ -62,7 +71,7 @@ pub fn delete_chat(con: &mut Connection, chat_id: &str) -> RedisResult<()> {
 
 // Adds a new payment to a chat
 pub fn add_chat_payment(con: &mut Connection, chat_id: &str, payment_id: &str) -> RedisResult<()> {
-    con.rpush(format!("{CHAT_PAYMENT_KEY}:{chat_id}"), payment_id)
+    con.lpush(format!("{CHAT_PAYMENT_KEY}:{chat_id}"), payment_id)
 }
 
 // Checks if payments exist in a chat
@@ -90,6 +99,8 @@ pub fn delete_chat_payment(
 pub fn delete_all_chat_payment(con: &mut Connection, chat_id: &str) -> RedisResult<()> {
     con.del(format!("{CHAT_PAYMENT_KEY}:{chat_id}"))
 }
+
+/* Chat Debts CRUD Operations */
 
 #[cfg(test)]
 mod tests {
@@ -193,6 +204,13 @@ mod tests {
         assert!(add_chat_payment(&mut con, chat_id, payment_id).is_ok());
         assert!(get_chat_payment_exists(&mut con, chat_id).is_ok());
         assert!(get_chat_payments(&mut con, chat_id).unwrap() == vec![payment_id]);
+
+        let second_payment_id = "payment_id_2";
+        assert!(add_chat_payment(&mut con, chat_id, second_payment_id).is_ok());
+        assert!(
+            get_chat_payments(&mut con, chat_id).unwrap() == vec![second_payment_id, payment_id]
+        );
+
         delete_all_chat_payment(&mut con, chat_id).unwrap();
     }
 
@@ -211,7 +229,7 @@ mod tests {
 
         assert_eq!(
             get_chat_payments(&mut con, chat_id).unwrap(),
-            vec![payment_id, payment_id_third]
+            vec![payment_id_third, payment_id]
         );
         delete_all_chat_payment(&mut con, chat_id).unwrap();
     }

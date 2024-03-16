@@ -447,7 +447,7 @@ mod tests {
 
         // Gets both payments
         let payments = get_chat_payments_details(chat_id).unwrap();
-        let second_id = payments[1].payment_id.clone();
+        let second_id = payments[0].payment_id.clone();
 
         // Updates second payment
         let updated_description = "manager_test_payment_3";
@@ -474,11 +474,6 @@ mod tests {
             vec![
                 UserPayment {
                     chat_id: chat_id.to_string(),
-                    payment_id: payments[0].payment_id.clone(),
-                    payment: payment,
-                },
-                UserPayment {
-                    chat_id: chat_id.to_string(),
                     payment_id: second_id.clone(),
                     payment: Payment {
                         description: updated_description.to_string(),
@@ -487,6 +482,11 @@ mod tests {
                         total: updated_total,
                         debts: updated_debts.clone(),
                     },
+                },
+                UserPayment {
+                    chat_id: chat_id.to_string(),
+                    payment_id: payments[1].payment_id.clone(),
+                    payment: payment,
                 },
             ]
         );
