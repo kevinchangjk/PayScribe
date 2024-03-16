@@ -30,7 +30,7 @@ pub struct UserPayment {
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum CrudError {
     #[error("Redis operation error: {0}")]
-    RedisError(redis::RedisError),
+    RedisError(RedisError),
     #[error("Redis database error: {0}")]
     DBError(DBError),
     #[error("No payments found")]

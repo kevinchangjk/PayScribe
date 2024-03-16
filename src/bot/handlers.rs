@@ -5,6 +5,13 @@ use std::str::FromStr;
 use chrono::Duration;
 use teloxide::{prelude::*, utils::command::BotCommands};
 
+/* Handler is the front-facing agent of the bot.
+ * It receives messages and commands from the user, and handles user interaction.
+ * All user interaction, including sending and crafting of messages, is done here.
+ * It communicates only with the Processor, which executes the commands.
+ * User exceptions are handled in this module. Processor may propagate some errors here.
+ */
+
 #[derive(BotCommands, Clone)]
 #[command(
     rename_rule = "lowercase",
