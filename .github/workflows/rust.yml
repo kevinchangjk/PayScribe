@@ -8,6 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  TELOXIDE_TOKEN: ${{ secrets.TELOXIDE_TOKEN }}
+  REDIS_URL: ${{ vars.REDIS_URL }}
 
 jobs:
   build:
