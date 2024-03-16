@@ -11,8 +11,8 @@ use uuid::Uuid;
 const PAYMENT_KEY: &str = "payment";
 const PAYMENT_DEBT_KEY: &str = "payment_debt";
 
-// Debt is an abstraction containing a debtor (String) and the owed amount (i32)
-pub type Debt = (String, i32);
+// Debt is an abstraction containing a debtor (String) and the owed amount (f64)
+pub type Debt = (String, f64);
 
 // Payment contains all fields stored in Redis related to a single payment entry
 #[derive(Debug, PartialEq)]
@@ -20,7 +20,7 @@ pub struct Payment {
     pub description: String,
     pub datetime: String,
     pub creditor: String,
-    pub total: i32,
+    pub total: f64,
     pub debts: Vec<Debt>,
 }
 
@@ -47,7 +47,7 @@ pub fn get_payment(con: &mut Connection, payment_id: &str) -> RedisResult<Paymen
     let description: String = con.hget(&main_key, "description")?;
     let datetime: String = con.hget(&main_key, "datetime")?;
     let creditor: String = con.hget(&main_key, "creditor")?;
-    let total: i32 = con.hget(&main_key, "total")?;
+    let total: f64 = con.hget(&main_key, "total")?;
 
     let debt_key = format!("{PAYMENT_DEBT_KEY}:{payment_id}");
     let debts: Vec<Debt> = con.lrange(&debt_key, 0, -1)?;
@@ -69,7 +69,7 @@ pub fn update_payment(
     payment_id: &str,
     description: Option<&str>,
     creditor: Option<&str>,
-    total: Option<&i32>,
+    total: Option<&f64>,
     debts: Option<Vec<Debt>>,
 ) -> RedisResult<()> {
     let main_key = format!("{PAYMENT_KEY}:{payment_id}");
@@ -118,8 +118,8 @@ mod tests {
         let description = "test_payment";
         let datetime = "2020-01-01T00:00:00Z";
         let creditor = "test_creditor";
-        let total = 100;
-        let debts = vec![("test_debtor".to_string(), 50)];
+        let total = 100.0;
+        let debts = vec![("test_debtor".to_string(), 50.0)];
         let first_payment = Payment {
             description: description.to_string(),
             datetime: datetime.to_string(),
@@ -145,8 +145,8 @@ mod tests {
         let description = "test_payment";
         let datetime = "2020-01-01T00:00:00Z";
         let creditor = "test_creditor";
-        let total = 100;
-        let debts = vec![("test_debtor".to_string(), 50)];
+        let total = 100.0;
+        let debts = vec![("test_debtor".to_string(), 50.0)];
         let first_payment = Payment {
             description: description.to_string(),
             datetime: datetime.to_string(),
@@ -158,8 +158,8 @@ mod tests {
 
         let new_description = "new_test_payment";
         let new_creditor = "new_test_creditor";
-        let new_total = 200;
-        let new_debts = vec![("new_test_debtor".to_string(), 100)];
+        let new_total = 200.0;
+        let new_debts = vec![("new_test_debtor".to_string(), 100.0)];
 
         let update_op = update_payment(
             &mut con,
@@ -194,8 +194,8 @@ mod tests {
         let description = "test_payment";
         let datetime = "2020-01-01T00:00:00Z";
         let creditor = "test_creditor";
-        let total = 100;
-        let debts = vec![("test_debtor".to_string(), 50)];
+        let total = 100.0;
+        let debts = vec![("test_debtor".to_string(), 50.0)];
         let payment_id = add_payment(
             &mut con,
             &Payment {

@@ -200,8 +200,8 @@ pub fn update_payment_entry(
     payment_id: &str,
     description: Option<&str>,
     creditor: Option<&str>,
-    total: Option<&i32>,
-    debts: Option<Vec<(String, i32)>>,
+    total: Option<&f64>,
+    debts: Option<Vec<(String, f64)>>,
 ) -> Result<(), CrudError> {
     let mut con = connect()?;
 
@@ -419,10 +419,10 @@ mod tests {
             description: "manager_test_payment".to_string(),
             datetime: "2021-01-01T00:00:00".to_string(),
             creditor: "manager_test_user_10".to_string(),
-            total: 100,
+            total: 100.0,
             debts: vec![
-                ("manager_test_user_11".to_string(), 50),
-                ("manager_test_user_12".to_string(), 50),
+                ("manager_test_user_11".to_string(), 50.0),
+                ("manager_test_user_12".to_string(), 50.0),
             ],
         };
 
@@ -433,10 +433,10 @@ mod tests {
             description: "manager_test_payment_2".to_string(),
             datetime: "2021-01-01T00:00:01".to_string(),
             creditor: "manager_test_user_13".to_string(),
-            total: 200,
+            total: 200.0,
             debts: vec![
-                ("manager_test_user_14".to_string(), 100),
-                ("manager_test_user_15".to_string(), 100),
+                ("manager_test_user_14".to_string(), 100.0),
+                ("manager_test_user_15".to_string(), 100.0),
             ],
         };
 
@@ -450,10 +450,10 @@ mod tests {
         // Updates second payment
         let updated_description = "manager_test_payment_3";
         let updated_creditor = "manager_test_user_16";
-        let updated_total = 300;
+        let updated_total = 300.0;
         let updated_debts = vec![
-            ("manager_test_user_17".to_string(), 150),
-            ("manager_test_user_18".to_string(), 150),
+            ("manager_test_user_17".to_string(), 150.0),
+            ("manager_test_user_18".to_string(), 150.0),
         ];
 
         assert!(update_payment_entry(
@@ -504,10 +504,10 @@ mod tests {
             description: "manager_test_user_20".to_string(),
             datetime: "2021-01-01T00:00:00".to_string(),
             creditor: "manager_test_user_21".to_string(),
-            total: 100,
+            total: 100.0,
             debts: vec![
-                ("manager_test_user_22".to_string(), 50),
-                ("manager_test_user_23".to_string(), 50),
+                ("manager_test_user_22".to_string(), 50.0),
+                ("manager_test_user_23".to_string(), 50.0),
             ],
         };
 
@@ -527,10 +527,10 @@ mod tests {
                 "nonexistent_payment",
                 Some("manager_test_payment_3"),
                 Some("manager_test_user_16"),
-                Some(&300),
+                Some(&300.0),
                 Some(vec![
-                    ("manager_test_user_17".to_string(), 150),
-                    ("manager_test_user_18".to_string(), 150),
+                    ("manager_test_user_17".to_string(), 150.0),
+                    ("manager_test_user_18".to_string(), 150.0),
                 ]),
             )
             .unwrap_err(),
