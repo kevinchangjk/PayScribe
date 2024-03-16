@@ -27,7 +27,7 @@ fn sort_balances(balances: &mut Vec<UserBalance>) -> () {
 /* Main function of Optimizer.
 * Takes in a vector of balances and returns a vector of debts.
 * Important: implicitly assumed that all balances sum up to 0.
-* Important: debt amounts floating point errors, so round them to 2 decimal places.
+* Important: debt amounts have floating point errors, round them to 2 decimal places.
 */
 pub fn optimize_debts(balances: Vec<UserBalance>) -> Vec<Debt> {
     let mut sorted_balances = balances.clone();
