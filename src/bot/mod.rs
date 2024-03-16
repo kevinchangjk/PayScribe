@@ -1,11 +1,13 @@
 // bot/mod.rs
 
-// Re-export important items for external use
+// Re-export main functions
 pub use self::handlers::do_action;
+
+// Re-export other structs and types
 pub use self::handlers::Command;
-// Add other re-exports as needed
 
 // Declare submodules
 mod handlers;
+mod optimizer;
 mod processor;
 mod redis;
