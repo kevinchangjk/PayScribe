@@ -1,4 +1,4 @@
-use crate::bot::actions::{ban_user, kick_user, mute_user, test_redis};
+use crate::bot::processor::{ban_user, kick_user, mute_user, test_redis};
 
 use std::str::FromStr;
 

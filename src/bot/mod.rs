@@ -6,6 +6,6 @@ pub use self::handlers::Command;
 // Add other re-exports as needed
 
 // Declare submodules
-mod actions;
 mod handlers;
+mod processor;
 mod redis;

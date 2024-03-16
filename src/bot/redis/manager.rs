@@ -206,6 +206,7 @@ pub fn update_payment_entry(
     let mut con = connect()?;
 
     if let Err(_) = get_payment(&mut con, payment_id) {
+        log::info!("No such payment found for payment_id {}", payment_id);
         return Err(CrudError::NoSuchPaymentError());
     }
 
@@ -223,6 +224,7 @@ pub fn delete_payment_entry(chat_id: &str, payment_id: &str) -> Result<(), CrudE
     let mut con = connect()?;
 
     if let Err(_) = get_payment(&mut con, payment_id) {
+        log::info!("No such payment found for payment_id {}", payment_id);
         return Err(CrudError::NoSuchPaymentError());
     }
 
