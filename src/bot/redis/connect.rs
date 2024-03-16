@@ -1,7 +1,5 @@
 use redis::{Client, Commands, Connection, RedisError, RedisResult};
 
-const REDIS_URL: &str = "redis://127.0.0.1/";
-
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum DBError {
     #[error("Redis client error: {0}")]
@@ -25,7 +23,9 @@ impl From<DBError> for RedisError {
 }
 
 pub fn connect() -> Result<Connection, DBError> {
-    match Client::open(REDIS_URL) {
+    dotenv::dotenv().ok();
+    let url = std::env::var("REDIS_URL").expect("REDIS_URL token not set");
+    match Client::open(url) {
         Ok(client) => match client.get_connection() {
             Ok(con) => Ok(con),
             Err(e) => Err(DBError::RedisConnectionError(e)),
