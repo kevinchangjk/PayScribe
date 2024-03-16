@@ -1,12 +1,12 @@
-use redis::RedisResult;
+use redis::RedisError;
 
 use super::{
     balance::{get_balance, get_balance_exists, set_balance},
     chat::{
         add_chat, add_chat_payment, add_chat_user_multiple, delete_chat_payment, get_chat_exists,
-        get_chat_payments, get_chat_users,
+        get_chat_payment_exists, get_chat_payments, get_chat_users,
     },
-    connect::connect,
+    connect::{connect, DBError},
     payment::{add_payment, delete_payment, get_payment, update_payment, Payment},
     user::{
         add_user, get_user_chats, get_user_exists, get_user_is_init, get_username, initialize_user,
@@ -21,6 +21,34 @@ pub struct UserPayment {
     pub payment: Payment,
 }
 
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub enum CrudError {
+    #[error("Redis operation error: {0}")]
+    RedisError(redis::RedisError),
+    #[error("Redis database error: {0}")]
+    DBError(DBError),
+    #[error("No payments found")]
+    NoPaymentsError(),
+    #[error("No balances found")]
+    NoBalancesError(),
+    #[error("No such payment entry found")]
+    NoSuchPaymentError(),
+}
+
+// Implement the From trait to convert from RedisError to CrudError
+impl From<RedisError> for CrudError {
+    fn from(redis_error: RedisError) -> CrudError {
+        CrudError::RedisError(redis_error)
+    }
+}
+
+// Implement the From trait to convert from RedisError to CrudError
+impl From<DBError> for CrudError {
+    fn from(db_error: DBError) -> CrudError {
+        CrudError::DBError(db_error)
+    }
+}
+
 /* Redis Manager
  * Manager represents a module that manages all database operations.
  * No external package should call any of the database operations directly,
@@ -32,7 +60,7 @@ pub struct UserPayment {
  * If the user exists, ensures that chats are updated. Inits user if not init.
  * Called whenever a new payment is added, and all relevant users are updated with this.
  */
-pub fn update_user(username: &str, chat_id: &str, user_id: Option<&str>) -> RedisResult<()> {
+pub fn update_user(username: &str, chat_id: &str, user_id: Option<&str>) -> Result<(), CrudError> {
     let mut con = connect()?;
 
     // Adds user if not exists
@@ -62,7 +90,7 @@ pub fn update_user(username: &str, chat_id: &str, user_id: Option<&str>) -> Redi
  * If the chat exists, ensures that it is updated with the usernames.
  * Called whenever a new payment is added.
  */
-pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> RedisResult<()> {
+pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> Result<(), CrudError> {
     let mut con = connect()?;
 
     // Adds chat if not exists
@@ -71,17 +99,29 @@ pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> RedisResult<()> {
     }
 
     // Adds all users, automatically checked if added
-    add_chat_user_multiple(&mut con, chat_id, usernames)
+    add_chat_user_multiple(&mut con, chat_id, usernames)?;
+
+    Ok(())
 }
 
 /* Retrieves all payments for a chat and their details.
  * Called whenever a user views past payments.
  */
-pub fn get_chat_payments_details(chat_id: &str) -> RedisResult<Vec<UserPayment>> {
+pub fn get_chat_payments_details(chat_id: &str) -> Result<Vec<UserPayment>, CrudError> {
     let mut con = connect()?;
+
+    if let Err(_) = get_chat_payment_exists(&mut con, chat_id) {
+        return Err(CrudError::NoPaymentsError());
+    }
 
     let payment_ids = get_chat_payments(&mut con, chat_id)?;
     let mut payments: Vec<UserPayment> = Vec::new();
+
+    if payment_ids.is_empty() {
+        log::info!("No payments found for chat {}", chat_id);
+        return Err(CrudError::NoPaymentsError());
+    }
+
     for payment_id in payment_ids {
         let payment = get_payment(&mut con, &payment_id)?;
         let user_payment = UserPayment {
@@ -97,20 +137,26 @@ pub fn get_chat_payments_details(chat_id: &str) -> RedisResult<Vec<UserPayment>>
 
 /* Checks if balance for chat and user is initialized.
  * If not, adds it.
- * If yes, does nothing.
+ * If yes, updates it.
  * Basically ensures that the balance exists after the function call.
  * Called whenever a new payment is added.
  */
-pub fn update_balance_amounts(chat_id: &str, username: &str, balance: f64) -> RedisResult<()> {
+pub fn update_balance_amounts(
+    chat_id: &str,
+    username: &str,
+    balance: f64,
+) -> Result<(), CrudError> {
     let mut con = connect()?;
 
-    set_balance(&mut con, chat_id, username, balance)
+    set_balance(&mut con, chat_id, username, balance)?;
+
+    Ok(())
 }
 
 /* Retrieves balances of all users in a chat.
  * Called whenever a user wants to view current balances.
  */
-pub fn retrieve_all_balances(chat_id: &str) -> RedisResult<Vec<(String, f64)>> {
+pub fn retrieve_all_balances(chat_id: &str) -> Result<Vec<(String, f64)>, CrudError> {
     let mut con = connect()?;
 
     let usernames = get_chat_users(&mut con, chat_id)?;
@@ -123,6 +169,11 @@ pub fn retrieve_all_balances(chat_id: &str) -> RedisResult<Vec<(String, f64)>> {
         balances.push((username, balance));
     }
 
+    if balances.is_empty() {
+        log::info!("No balances found for chat {}", chat_id);
+        return Err(CrudError::NoBalancesError());
+    }
+
     Ok(balances)
 }
 
@@ -130,14 +181,16 @@ pub fn retrieve_all_balances(chat_id: &str) -> RedisResult<Vec<(String, f64)>> {
  * Sets a new key-value pair for the payment, and updates the payments list in chat.
  * Called whenever a new payment is added.
  */
-pub fn add_payment_entry(chat_id: &str, payment: &Payment) -> RedisResult<()> {
+pub fn add_payment_entry(chat_id: &str, payment: &Payment) -> Result<(), CrudError> {
     let mut con = connect()?;
 
     // Adds payment
     let payment_id = add_payment(&mut con, &payment)?;
 
     // Adds payment to chat
-    add_chat_payment(&mut con, chat_id, &payment_id)
+    add_chat_payment(&mut con, chat_id, &payment_id)?;
+
+    Ok(())
 }
 
 /* Updates a payment entry.
@@ -149,22 +202,34 @@ pub fn update_payment_entry(
     creditor: Option<&str>,
     total: Option<&i32>,
     debts: Option<Vec<(String, i32)>>,
-) -> RedisResult<()> {
+) -> Result<(), CrudError> {
     let mut con = connect()?;
 
+    if let Err(_) = get_payment(&mut con, payment_id) {
+        return Err(CrudError::NoSuchPaymentError());
+    }
+
     // Updates payment
-    update_payment(&mut con, payment_id, description, creditor, total, debts)
+    update_payment(&mut con, payment_id, description, creditor, total, debts)?;
+
+    Ok(())
 }
 
 /* Deletes a payment entry.
  * Removes the main payment entry, and also from the list in chat.
  * Called when a user wants to remove a payment.
  */
-pub fn delete_payment_entry(chat_id: &str, payment_id: &str) -> RedisResult<()> {
+pub fn delete_payment_entry(chat_id: &str, payment_id: &str) -> Result<(), CrudError> {
     let mut con = connect()?;
 
+    if let Err(_) = get_payment(&mut con, payment_id) {
+        return Err(CrudError::NoSuchPaymentError());
+    }
+
     delete_payment(&mut con, payment_id)?;
-    delete_chat_payment(&mut con, chat_id, payment_id)
+    delete_chat_payment(&mut con, chat_id, payment_id)?;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -172,7 +237,7 @@ mod tests {
     use crate::bot::redis::{
         balance::delete_balance,
         chat::delete_chat,
-        user::{delete_user, delete_user_id},
+        user::{delete_user, delete_user_id, get_user_chats},
     };
 
     use super::*;
@@ -429,6 +494,66 @@ mod tests {
         assert!(delete_payment_entry(chat_id, &payments[1].payment_id).is_ok());
     }
 
+    // Test for empty payments
+    #[test]
+    fn test_no_payments_found() {
+        let chat_id = "manager_1234567898";
+        let username = "manager_test_user_20";
+
+        let payment = Payment {
+            description: "manager_test_user_20".to_string(),
+            datetime: "2021-01-01T00:00:00".to_string(),
+            creditor: "manager_test_user_21".to_string(),
+            total: 100,
+            debts: vec![
+                ("manager_test_user_22".to_string(), 50),
+                ("manager_test_user_23".to_string(), 50),
+            ],
+        };
+
+        // Checks that payments don't exist
+        assert_eq!(
+            get_chat_payments_details(chat_id).unwrap_err(),
+            CrudError::NoPaymentsError()
+        );
+
+        // Adds chat payment
+        assert!(update_chat(chat_id, vec![username.to_string()]).is_ok());
+        assert!(add_payment_entry(chat_id, &payment).is_ok());
+
+        // Updates fake payment, should fail
+        assert_eq!(
+            update_payment_entry(
+                "nonexistent_payment",
+                Some("manager_test_payment_3"),
+                Some("manager_test_user_16"),
+                Some(&300),
+                Some(vec![
+                    ("manager_test_user_17".to_string(), 150),
+                    ("manager_test_user_18".to_string(), 150),
+                ]),
+            )
+            .unwrap_err(),
+            CrudError::NoSuchPaymentError()
+        );
+
+        // Deletes fake payment, should fail
+        assert_eq!(
+            delete_payment_entry(chat_id, "nonexistent_payment").unwrap_err(),
+            CrudError::NoSuchPaymentError()
+        );
+
+        // Deletes actual payment
+        let payments = get_chat_payments_details(chat_id).unwrap();
+        assert!(delete_payment_entry(chat_id, &payments[0].payment_id).is_ok());
+
+        // Checks that payments don't exist
+        assert_eq!(
+            get_chat_payments_details(chat_id).unwrap_err(),
+            CrudError::NoPaymentsError()
+        );
+    }
+
     #[test]
     fn test_update_balance() {
         let mut con = connect().unwrap();
@@ -497,5 +622,26 @@ mod tests {
         }
 
         delete_chat(&mut con, chat_id).unwrap();
+    }
+
+    #[test]
+    fn test_no_balances_found() {
+        let chat_id = "manager_1234567899";
+        let username = "manager_test_user_24";
+
+        // Checks that balances don't exist
+        assert_eq!(
+            retrieve_all_balances(chat_id).unwrap_err(),
+            CrudError::NoBalancesError()
+        );
+
+        // Adds chat with username
+        assert!(update_chat(chat_id, vec![username.to_string()]).is_ok());
+
+        // Checks that balances still don't exist
+        assert_eq!(
+            retrieve_all_balances(chat_id).unwrap_err(),
+            CrudError::NoBalancesError()
+        );
     }
 }

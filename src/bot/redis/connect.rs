@@ -2,7 +2,7 @@ use redis::{Client, Commands, Connection, RedisError, RedisResult};
 
 const REDIS_URL: &str = "redis://127.0.0.1/";
 
-#[derive(thiserror::Error, Debug)]
+#[derive(thiserror::Error, Debug, PartialEq)]
 pub enum DBError {
     #[error("Redis client error: {0}")]
     RedisClientError(redis::RedisError),
@@ -13,7 +13,6 @@ pub enum DBError {
 // Implement the From trait to convert from DBError to RedisError
 impl From<DBError> for RedisError {
     fn from(db_error: DBError) -> RedisError {
-        // Convert DBError to RedisError as needed
         match db_error {
             DBError::RedisClientError(_) => {
                 RedisError::from((redis::ErrorKind::ClientError, "Redis client error"))
