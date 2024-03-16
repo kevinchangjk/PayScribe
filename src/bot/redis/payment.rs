@@ -113,7 +113,7 @@ mod tests {
 
     #[test]
     fn test_add_get_payment() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let description = "test_payment";
         let datetime = "2020-01-01T00:00:00Z";
@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn test_update_payment() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let description = "test_payment";
         let datetime = "2020-01-01T00:00:00Z";
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_delete_payment() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let description = "test_payment";
         let datetime = "2020-01-01T00:00:00Z";

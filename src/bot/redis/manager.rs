@@ -33,7 +33,7 @@ pub struct UserPayment {
  * Called whenever a new payment is added, and all relevant users are updated with this.
  */
 pub fn update_user(username: &str, chat_id: &str, user_id: Option<&str>) -> RedisResult<()> {
-    let mut con = connect();
+    let mut con = connect()?;
 
     // Adds user if not exists
     if !get_user_exists(&mut con, username)? {
@@ -63,7 +63,7 @@ pub fn update_user(username: &str, chat_id: &str, user_id: Option<&str>) -> Redi
  * Called whenever a new payment is added.
  */
 pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> RedisResult<()> {
-    let mut con = connect();
+    let mut con = connect()?;
 
     // Adds chat if not exists
     if !get_chat_exists(&mut con, chat_id)? {
@@ -78,7 +78,7 @@ pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> RedisResult<()> {
  * Called whenever a user views past payments.
  */
 pub fn get_chat_payments_details(chat_id: &str) -> RedisResult<Vec<UserPayment>> {
-    let mut con = connect();
+    let mut con = connect()?;
 
     let payment_ids = get_chat_payments(&mut con, chat_id)?;
     let mut payments: Vec<UserPayment> = Vec::new();
@@ -102,7 +102,7 @@ pub fn get_chat_payments_details(chat_id: &str) -> RedisResult<Vec<UserPayment>>
  * Called whenever a new payment is added.
  */
 pub fn update_balance_amounts(chat_id: &str, username: &str, balance: f64) -> RedisResult<()> {
-    let mut con = connect();
+    let mut con = connect()?;
 
     set_balance(&mut con, chat_id, username, balance)
 }
@@ -111,7 +111,7 @@ pub fn update_balance_amounts(chat_id: &str, username: &str, balance: f64) -> Re
  * Called whenever a user wants to view current balances.
  */
 pub fn retrieve_all_balances(chat_id: &str) -> RedisResult<Vec<(String, f64)>> {
-    let mut con = connect();
+    let mut con = connect()?;
 
     let usernames = get_chat_users(&mut con, chat_id)?;
     let mut balances: Vec<(String, f64)> = Vec::new();
@@ -131,7 +131,7 @@ pub fn retrieve_all_balances(chat_id: &str) -> RedisResult<Vec<(String, f64)>> {
  * Called whenever a new payment is added.
  */
 pub fn add_payment_entry(chat_id: &str, payment: &Payment) -> RedisResult<()> {
-    let mut con = connect();
+    let mut con = connect()?;
 
     // Adds payment
     let payment_id = add_payment(&mut con, &payment)?;
@@ -150,7 +150,7 @@ pub fn update_payment_entry(
     total: Option<&i32>,
     debts: Option<Vec<(String, i32)>>,
 ) -> RedisResult<()> {
-    let mut con = connect();
+    let mut con = connect()?;
 
     // Updates payment
     update_payment(&mut con, payment_id, description, creditor, total, debts)
@@ -161,7 +161,7 @@ pub fn update_payment_entry(
  * Called when a user wants to remove a payment.
  */
 pub fn delete_payment_entry(chat_id: &str, payment_id: &str) -> RedisResult<()> {
-    let mut con = connect();
+    let mut con = connect()?;
 
     delete_payment(&mut con, payment_id)?;
     delete_chat_payment(&mut con, chat_id, payment_id)
@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn test_update_user_add_user() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "manager_test_user";
         let chat_id = "manager_123456789";
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_update_user_add_chat() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "manager_test_user_0";
         let chat_id = "manager_1234567890";
@@ -233,7 +233,7 @@ mod tests {
 
     #[test]
     fn test_update_user_init_user() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "manager_test_user_1";
         let chat_id = "manager_1234567892";
@@ -261,7 +261,7 @@ mod tests {
 
     #[test]
     fn test_update_user_update_username() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let username = "manager_test_user_2";
         let chat_id = "manager_1234567893";
@@ -283,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_update_chat_add_chat_users() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "manager_1234567894";
         let mut usernames = vec![
@@ -431,7 +431,7 @@ mod tests {
 
     #[test]
     fn test_update_balance() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "manager_1234567896";
         let username = "manager_test_user_16";
@@ -459,6 +459,8 @@ mod tests {
 
     #[test]
     fn test_retrieve_all_balances() {
+        let mut con = connect().unwrap();
+
         let chat_id = "manager_1234567897";
         let usernames = vec![
             "manager_test_user_17".to_string(),
@@ -490,10 +492,10 @@ mod tests {
 
         // Deletes all key-value pairs
         for username in usernames {
-            delete_user(&mut connect(), &username).unwrap();
-            delete_balance(&mut connect(), chat_id, &username).unwrap();
+            delete_user(&mut con, &username).unwrap();
+            delete_balance(&mut con, chat_id, &username).unwrap();
         }
 
-        delete_chat(&mut connect(), chat_id).unwrap();
+        delete_chat(&mut con, chat_id).unwrap();
     }
 }

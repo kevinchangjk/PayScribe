@@ -44,7 +44,7 @@ mod tests {
 
     #[test]
     fn test_add_get_balance() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "123456789";
         let user_id = "987654321";
@@ -57,7 +57,7 @@ mod tests {
 
     #[test]
     fn test_update_balance() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "1234567891";
         let user_id = "9876543211";
@@ -70,7 +70,7 @@ mod tests {
 
     #[test]
     fn test_delete_balance() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "1234567892";
         let user_id = "9876543212";

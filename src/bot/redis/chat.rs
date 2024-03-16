@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn test_add_chat() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "123456789";
         let username = "987654321";
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_get_chat_exists() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "1234567891";
         let username = "9876543211";
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn test_get_chat_users() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "1234567890";
         let username = "9876543210";
@@ -135,7 +135,7 @@ mod tests {
 
     #[test]
     fn test_add_user_to_chat() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "1234567892";
         let username = "9876543212";
@@ -148,7 +148,7 @@ mod tests {
 
     #[test]
     fn test_add_users_to_chat() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "1234567893";
         let first_user = "987654321";
@@ -174,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_delete_chat() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "1234567894";
         let username = "9876543216";
@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn test_add_get_chat_payment() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "1234567895";
         let payment_id = "payment_id_1";
@@ -198,7 +198,7 @@ mod tests {
 
     #[test]
     fn test_delete_chat_payment() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "1234567896";
         let payment_id = "payment_id_2";
@@ -218,7 +218,7 @@ mod tests {
 
     #[test]
     fn test_delete_all_chat_payment() {
-        let mut con = connect();
+        let mut con = connect().unwrap();
 
         let chat_id = "1234567897";
         let payment_id = "payment_id_5";
