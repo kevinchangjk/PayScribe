@@ -1,9 +1,9 @@
-use crate::bot::processor::{ban_user, kick_user, mute_user, test_redis};
-
 use std::str::FromStr;
 
 use chrono::Duration;
-use teloxide::{prelude::*, utils::command::BotCommands};
+use teloxide::{prelude::*, types::ChatPermissions, utils::command::BotCommands};
+
+use super::redis::test_redis_connection;
 
 /* Handler is the front-facing agent of the bot.
  * It receives messages and commands from the user, and handles user interaction.
@@ -71,5 +71,77 @@ pub async fn do_action(bot: Bot, msg: Message, cmd: Command) -> ResponseResult<(
         Command::Redis => test_redis(bot, msg).await?,
     };
 
+    Ok(())
+}
+
+// Test the Redis cache
+pub async fn test_redis(bot: Bot, msg: Message) -> ResponseResult<()> {
+    let result = test_redis_connection();
+    if result.is_ok() {
+        bot.send_message(msg.chat.id, "Redis connected").await?;
+    } else {
+        bot.send_message(msg.chat.id, "Redis disconnected").await?;
+    }
+    Ok(())
+}
+
+// Kick a user with a replied message.
+pub async fn kick_user(bot: Bot, msg: Message) -> ResponseResult<()> {
+    match msg.reply_to_message() {
+        Some(replied) => {
+            // bot.unban_chat_member can also kicks a user from a group chat.
+            bot.unban_chat_member(msg.chat.id, replied.from().unwrap().id)
+                .await?;
+        }
+        None => {
+            bot.send_message(msg.chat.id, "Use this command in reply to another message")
+                .await?;
+        }
+    }
+    Ok(())
+}
+
+// Ban a user with replied message.
+pub async fn ban_user(bot: Bot, msg: Message, time: Duration) -> ResponseResult<()> {
+    match msg.reply_to_message() {
+        Some(replied) => {
+            bot.kick_chat_member(
+                msg.chat.id,
+                replied.from().expect("Must be MessageKind::Common").id,
+            )
+            .until_date(msg.date + time)
+            .await?;
+        }
+        None => {
+            bot.send_message(
+                msg.chat.id,
+                "Use this command in a reply to another message!",
+            )
+            .await?;
+        }
+    }
+    Ok(())
+}
+
+// Mute a user with a replied message.
+pub async fn mute_user(bot: Bot, msg: Message, time: Duration) -> ResponseResult<()> {
+    match msg.reply_to_message() {
+        Some(replied) => {
+            bot.restrict_chat_member(
+                msg.chat.id,
+                replied.from().expect("Must be MessageKind::Common").id,
+                ChatPermissions::empty(),
+            )
+            .until_date(msg.date + time)
+            .await?;
+        }
+        None => {
+            bot.send_message(
+                msg.chat.id,
+                "Use this command in a reply to another message!",
+            )
+            .await?;
+        }
+    }
     Ok(())
 }
