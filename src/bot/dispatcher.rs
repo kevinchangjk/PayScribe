@@ -11,8 +11,8 @@ use teloxide::{
 
 use super::handler::{
     action_add_confirm, action_add_creditor, action_add_debt, action_add_description,
-    action_add_edit, action_add_payment, action_add_total, action_help, action_start,
-    invalid_state,
+    action_add_edit, action_add_edit_menu, action_add_payment, action_add_total, action_help,
+    action_start, invalid_state,
 };
 use super::processor::ProcessError;
 
@@ -57,6 +57,14 @@ pub struct AddPaymentParams {
     pub debts: Option<Vec<(String, f64)>>,
 }
 
+#[derive(Clone, Debug)]
+pub enum AddPaymentEdit {
+    Description,
+    Creditor,
+    Total,
+    Debts,
+}
+
 #[derive(Clone, Default)]
 pub enum State {
     #[default]
@@ -77,8 +85,12 @@ pub enum State {
     AddConfirm {
         payment: AddPaymentParams,
     },
+    AddEditMenu {
+        payment: AddPaymentParams,
+    },
     AddEdit {
         payment: AddPaymentParams,
+        edit: AddPaymentEdit,
     },
 }
 
@@ -110,11 +122,12 @@ pub async fn run_dispatcher(bot: Bot) {
         .branch(case![State::AddCreditor { payment }].endpoint(action_add_creditor))
         .branch(case![State::AddTotal { payment }].endpoint(action_add_total))
         .branch(case![State::AddDebt { payment }].endpoint(action_add_debt))
+        .branch(case![State::AddEdit { payment, edit }].endpoint(action_add_edit))
         .branch(dptree::endpoint(invalid_state));
 
     let callback_query_handler = Update::filter_callback_query()
         .branch(case![State::AddConfirm { payment }].endpoint(action_add_confirm))
-        .branch(case![State::AddEdit { payment }].endpoint(action_add_edit));
+        .branch(case![State::AddEditMenu { payment }].endpoint(action_add_edit_menu));
 
     let schema = dialogue::enter::<Update, InMemStorage<State>, State, _>()
         .branch(message_handler)
