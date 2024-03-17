@@ -1,5 +1,4 @@
 // Exported functions
-pub use self::connect::test_redis_connection;
 pub use self::manager::add_payment_entry;
 pub use self::manager::delete_payment_entry;
 pub use self::manager::get_chat_payments_details;
