@@ -1,14 +1,13 @@
 use std::ops::Neg;
 
-use chrono::Duration;
-use teloxide::{prelude::*, types::ChatPermissions};
+use teloxide::prelude::*;
 
 use super::{
     optimizer::optimize_debts,
     redis::{
         add_payment_entry, delete_payment_entry, get_chat_payments_details, retrieve_chat_debts,
-        test_redis_connection, update_chat, update_chat_balances, update_chat_debts,
-        update_payment_entry, update_user, CrudError, Debt, Payment, UserBalance, UserPayment,
+        update_chat, update_chat_balances, update_chat_debts, update_payment_entry, update_user,
+        CrudError, Debt, Payment, UserBalance, UserPayment,
     },
 };
 
