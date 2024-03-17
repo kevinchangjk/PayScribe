@@ -59,6 +59,7 @@ fn update_balances_debts(
 /* Add a new payment entry in a group chat.
  * Execution flow: Updates relevant users, updates chat.
  * Adds payment entry, updates balances, updates group debts.
+ * Important: assumes that debts sum up to total. Creditor's share included.
  */
 pub fn add_payment(
     msg: Message,

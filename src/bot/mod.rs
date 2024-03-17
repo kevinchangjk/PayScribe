@@ -5,7 +5,7 @@ pub use self::dispatcher::run_dispatcher;
 
 // Exported structs and types
 pub use self::dispatcher::{
-    AddPaymentEdit, AddPaymentParams, Command, HandlerResult, State, UserDialogue,
+    AddPaymentEdit, AddPaymentParams, BotError, Command, HandlerResult, State, UserDialogue,
 };
 
 // Declare submodules
