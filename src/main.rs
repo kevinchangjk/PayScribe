@@ -1,8 +1,6 @@
 mod bot;
 
-use bot::handler;
-use payscribe::bot::State;
-use teloxide::{dispatching::dialogue::InMemStorage, prelude::*};
+use payscribe::bot::run_dispatcher;
 
 #[tokio::main]
 async fn main() {
@@ -14,10 +12,5 @@ async fn main() {
 
     log::info!("PayScribe bot started successfully!");
 
-    Dispatcher::builder(bot, handler())
-        .dependencies(dptree::deps![InMemStorage::<State>::new()])
-        .enable_ctrlc_handler()
-        .build()
-        .dispatch()
-        .await;
+    run_dispatcher(bot).await;
 }
