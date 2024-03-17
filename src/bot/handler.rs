@@ -393,7 +393,7 @@ pub async fn action_add_debt(
                 return Ok(());
             }
 
-            display_add_overview(bot, dialogue, msg, new_payment).await?;
+            display_add_overview(bot, dialogue, msg.chat.id.to_string(), new_payment).await?;
         }
         None => {
             bot.send_message(msg.chat.id, "Please enter the username and the amount (without symbols) as follows: \n\nUSERNAME AMOUNT")
@@ -410,7 +410,7 @@ pub async fn action_add_debt(
 pub async fn display_add_overview(
     bot: Bot,
     dialogue: UserDialogue,
-    msg: Message,
+    chat_id: String,
     payment: AddPaymentParams,
 ) -> HandlerResult {
     let payment_clone = payment.clone();
@@ -420,7 +420,7 @@ pub async fn display_add_overview(
         .collect()];
 
     bot.send_message(
-                msg.chat.id,
+        chat_id,
                 format!(
                     "Overview of the payment entry:\n\nDescription: {}\nCreditor: {}\nTotal: {}\nDebts: {:?}",
                     payment.description.unwrap(),
@@ -516,52 +516,53 @@ pub async fn display_add_edit_menu(
 pub async fn action_add_edit(
     bot: Bot,
     dialogue: UserDialogue,
-    msg: Message,
     payment: AddPaymentParams,
     query: CallbackQuery,
 ) -> HandlerResult {
     if let Some(button) = &query.data {
         bot.answer_callback_query(format!("{}", query.id)).await?;
 
-        match button.as_str() {
-            /*
-            "Description" => {
-                bot.send_message(
-                    msg.chat.id,
-                    "Enter a new description for the payment: ",
-                )
-                .await?;
-                dialogue.update(State::AddDescription).await?;
+        if let Some(Message { id, chat, .. }) = query.message {
+            match button.as_str() {
+                /*
+                "Description" => {
+                    bot.send_message(
+                        msg.chat.id,
+                        "Enter a new description for the payment: ",
+                    )
+                    .await?;
+                    dialogue.update(State::AddDescription).await?;
+                }
+                "Creditor" => {
+                    bot.send_message(
+                        msg.chat.id,
+                        "Enter the username of the one who paid the total: ",
+                    )
+                    .await?;
+                    dialogue.update(State::AddCreditor { payment }).await?;
+                }
+                "Total" => {
+                    bot.send_message(
+                        msg.chat.id,
+                        "Enter the total amount paid (without currency): ",
+                    )
+                    .await?;
+                    dialogue.update(State::AddTotal { payment }).await?;
+                }
+                "Debts" => {
+                    bot.send_message(
+                        msg.chat.id,
+                        "Who are we splitting this with? Enter the username and the amount (without currency) as follows: \n\nUSERNAME AMOUNT",
+                    )
+                    .await?;
+                    dialogue.update(State::AddDebt { payment }).await?;
+                }
+                */
+                "Back" => {
+                    display_add_overview(bot, dialogue, chat.id.to_string(), payment).await?;
+                }
+                _ => {}
             }
-            "Creditor" => {
-                bot.send_message(
-                    msg.chat.id,
-                    "Enter the username of the one who paid the total: ",
-                )
-                .await?;
-                dialogue.update(State::AddCreditor { payment }).await?;
-            }
-            "Total" => {
-                bot.send_message(
-                    msg.chat.id,
-                    "Enter the total amount paid (without currency): ",
-                )
-                .await?;
-                dialogue.update(State::AddTotal { payment }).await?;
-            }
-            "Debts" => {
-                bot.send_message(
-                    msg.chat.id,
-                    "Who are we splitting this with? Enter the username and the amount (without currency) as follows: \n\nUSERNAME AMOUNT",
-                )
-                .await?;
-                dialogue.update(State::AddDebt { payment }).await?;
-            }
-            */
-            "Back" => {
-                display_add_overview(bot, dialogue, msg, payment).await?;
-            }
-            _ => {}
         }
     }
 
