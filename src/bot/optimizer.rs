@@ -85,6 +85,11 @@ mod tests {
         }
 
         for debt in debts {
+            // Owed amount cannot be negative
+            if debt.amount < 0.0 {
+                return false;
+            }
+
             let new_debtor_balance =
                 resulting_balances.get(&debt.debtor).unwrap_or(&0.0) + debt.amount;
             let new_creditor_balance =

@@ -106,8 +106,8 @@ pub fn delete_all_chat_payment(con: &mut Connection, chat_id: &str) -> RedisResu
 
 /* Chat Debts CRUD Operations */
 // Sets the optimized debts for a chat
-pub fn set_chat_debt(con: &mut Connection, chat_id: &str, debts: Vec<Debt>) -> RedisResult<()> {
-    let serialized = serde_json::to_string(&debts).unwrap();
+pub fn set_chat_debt(con: &mut Connection, chat_id: &str, debts: &Vec<Debt>) -> RedisResult<()> {
+    let serialized = serde_json::to_string(debts).unwrap();
 
     con.set(format!("{CHAT_DEBT_KEY}:{chat_id}"), serialized)
 }
@@ -286,7 +286,7 @@ mod tests {
                 amount: 20.0,
             },
         ];
-        assert!(set_chat_debt(&mut con, chat_id, debts.clone()).is_ok());
+        assert!(set_chat_debt(&mut con, chat_id, &debts).is_ok());
         assert_eq!(get_chat_debt(&mut con, chat_id).unwrap(), debts);
         assert!(delete_chat_debt(&mut con, chat_id).is_ok());
     }

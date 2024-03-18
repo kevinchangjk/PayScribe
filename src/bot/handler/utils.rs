@@ -9,7 +9,7 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
     let mut message = String::new();
     for debt in debts {
         message.push_str(&format!(
-            "{} owes {}: {}\n",
+            "{} owes {}: {:.2}\n",
             debt.debtor, debt.creditor, debt.amount
         ));
     }
@@ -20,7 +20,7 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
 pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
     let mut message = String::new();
     for debt in debts {
-        message.push_str(&format!("{}: {}\n", debt.0, debt.1));
+        message.push_str(&format!("{}: {:.2}\n", debt.0, debt.1));
     }
     message
 }
@@ -98,6 +98,7 @@ pub fn parse_debts(
             if debt.0 == username {
                 debt.1 += amount;
                 found = true;
+                break;
             }
         }
 

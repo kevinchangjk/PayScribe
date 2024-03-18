@@ -51,7 +51,7 @@ fn update_balances_debts(
 
     // Update group debts
     let debts = optimize_debts(balances);
-    update_chat_debts(&chat_id, debts.clone())?;
+    update_chat_debts(&chat_id, &debts)?;
 
     Ok(debts)
 }
@@ -109,6 +109,7 @@ pub fn add_payment(
             balance: amount.neg(),
         })
         .collect();
+
     changes.push(UserBalance {
         username: creditor.to_string(),
         balance: total,
