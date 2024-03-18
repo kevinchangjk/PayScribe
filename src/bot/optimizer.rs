@@ -45,12 +45,14 @@ pub fn optimize_debts(balances: Vec<UserBalance>) -> Vec<Debt> {
             .min(sorted_balances[right].balance);
 
         // Add debt to the list
-        let debt = Debt {
-            debtor: sorted_balances[left].username.clone(),
-            creditor: sorted_balances[right].username.clone(),
-            amount,
-        };
-        debts.push(debt);
+        if amount >= 0.01 {
+            let debt = Debt {
+                debtor: sorted_balances[left].username.clone(),
+                creditor: sorted_balances[right].username.clone(),
+                amount,
+            };
+            debts.push(debt);
+        }
 
         // If debtor pays in full, move left pointer
         // If creditor is fully paid, move right pointer

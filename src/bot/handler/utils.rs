@@ -67,7 +67,7 @@ pub fn parse_amount(text: &str) -> Result<f64, BotError> {
         },
     };
 
-    if amount < 0.0 {
+    if amount <= 0.0 {
         Err(BotError::UserError("Amount must be positive.".to_string()))
     } else {
         Ok(amount)

@@ -114,6 +114,9 @@ pub fn set_chat_debt(con: &mut Connection, chat_id: &str, debts: &Vec<Debt>) -> 
 
 // Retrieves the optimized debts for a chat
 pub fn get_chat_debt(con: &mut Connection, chat_id: &str) -> RedisResult<Debts> {
+    if !con.exists(format!("{CHAT_DEBT_KEY}:{chat_id}"))? {
+        return Ok(vec![]);
+    }
     let serialized: String = con.get(format!("{CHAT_DEBT_KEY}:{chat_id}"))?;
     let deserialized: Debts = serde_json::from_str(&serialized).unwrap();
     Ok(deserialized)

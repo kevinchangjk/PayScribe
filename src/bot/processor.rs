@@ -32,12 +32,13 @@ impl From<CrudError> for ProcessError {
 }
 
 /* Utility functions */
-fn auto_update_user(msg: Message) -> Result<(), ProcessError> {
-    let chat_id = msg.chat.id.to_string();
-    if let Some(user) = msg.from() {
-        if let Some(username) = &user.username {
-            update_user(username, &chat_id, Some(&user.id.to_string()))?;
-        }
+fn auto_update_user(
+    chat_id: &str,
+    sender_id: &str,
+    sender_username: Option<&str>,
+) -> Result<(), ProcessError> {
+    if let Some(username) = sender_username {
+        update_user(&username, chat_id, Some(sender_id))?;
     }
     Ok(())
 }
@@ -122,10 +123,13 @@ pub fn add_payment(
  * Execution flow: Retrieve chat payment details.
  * Called only once per command. Pagination handled by Handler.
  */
-pub fn view_payments(msg: Message) -> Result<Vec<UserPayment>, ProcessError> {
-    auto_update_user(msg.clone())?;
+pub fn view_payments(
+    chat_id: &str,
+    sender_id: &str,
+    sender_username: Option<&str>,
+) -> Result<Vec<UserPayment>, ProcessError> {
+    auto_update_user(chat_id, sender_id, sender_username)?;
 
-    let chat_id = msg.chat.id.to_string();
     let payments = get_chat_payments_details(&chat_id)?;
     Ok(payments)
 }
@@ -224,10 +228,13 @@ pub fn delete_payment(
 /* View all debts (balances) of a group chat.
  * Execution flow: Retrieve all debts.
  */
-pub fn view_debts(msg: Message) -> Result<Vec<Debt>, ProcessError> {
-    auto_update_user(msg.clone())?;
+pub fn view_debts(
+    chat_id: &str,
+    sender_id: &str,
+    sender_username: Option<&str>,
+) -> Result<Vec<Debt>, ProcessError> {
+    auto_update_user(chat_id, sender_id, sender_username)?;
 
-    let chat_id = msg.chat.id.to_string();
     let debts = retrieve_chat_debts(&chat_id)?;
     Ok(debts)
 }

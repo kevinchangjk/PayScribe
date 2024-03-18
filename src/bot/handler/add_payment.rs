@@ -250,6 +250,17 @@ pub async fn cancel_add_payment(bot: Bot, dialogue: UserDialogue, msg: Message) 
     Ok(())
 }
 
+/* Blocks user command.
+ * Called when user attempts to start another operation in the middle of adding a payment.
+ */
+pub async fn block_add_payment(bot: Bot, msg: Message) -> HandlerResult {
+    bot.send_message(
+        msg.chat.id,
+        "You are currently adding a payment entry! Please complete or cancel the current payment entry before another command.",
+    ).await?;
+    Ok(())
+}
+
 /* Add a payment entry in a group chat.
  * Bot will ask for user to send messages to fill in required information,
  * before presenting the compiled information for confirmation with a menu.
