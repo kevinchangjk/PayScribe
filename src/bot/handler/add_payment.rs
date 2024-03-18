@@ -6,13 +6,15 @@ use teloxide::{
 
 use super::{
     super::dispatcher::{AddPaymentEdit, AddPaymentParams, HandlerResult, State, UserDialogue},
-    utils::{make_keyboard, parse_amount, parse_username},
+    utils::{make_keyboard, parse_amount, parse_debts, parse_username},
 };
 
 /* Utilities */
 const HEADER_MESSAGE: &str = "Adding a new payment entry!\n\n";
 const FOOTER_MESSAGE: &str = "\n\n";
 const NO_TEXT_MESSAGE: &str = "Please reply in text.\n\n";
+const DEBT_INSTRUCTIONS_MESSAGE: &str =
+    "Enter the usernames and the amounts as follows: \n\n@user1 amount1, @user2 amount2, etc.\n\n";
 
 /* Add a payment entry in a group chat.
  * Displays an overview of the current details provided.
@@ -26,7 +28,7 @@ pub async fn display_add_overview(
 ) -> HandlerResult {
     let payment_clone = payment.clone();
     let buttons = vec!["Cancel", "Edit", "Confirm"];
-    let keyboard = make_keyboard(buttons, None);
+    let keyboard = make_keyboard(buttons, Some(3));
 
     bot.send_message(
         chat_id,
@@ -71,6 +73,40 @@ async fn display_add_edit_menu(
     }
     Ok(())
 }
+
+/* Parses a string representing debts, and handles it accordingly
+ */
+async fn handle_debts(
+    bot: Bot,
+    dialogue: UserDialogue,
+    msg: Message,
+    payment: AddPaymentParams,
+    error_msg: String,
+) -> HandlerResult {
+    match msg.text() {
+        Some(text) => {
+            let debts = parse_debts(text, &payment.creditor, payment.total);
+            if let Err(err) = debts {
+                bot.send_message(msg.chat.id, format!("{}\n\nWho are we splitting this with?\n{DEBT_INSTRUCTIONS_MESSAGE}{FOOTER_MESSAGE}", err.to_string())).await?;
+                return Ok(());
+            }
+
+            let new_payment = AddPaymentParams {
+                description: payment.description,
+                creditor: payment.creditor,
+                total: payment.total,
+                debts: Some(debts?),
+            };
+            display_add_overview(bot, dialogue, msg.chat.id.to_string(), new_payment).await?;
+        }
+        None => {
+            bot.send_message(msg.chat.id, error_msg).await?;
+        }
+    }
+    Ok(())
+}
+
+/* Action handler functions */
 
 /* Add a payment entry in a group chat.
  * Bot will ask for user to send messages to fill in required information,
@@ -205,7 +241,7 @@ pub async fn action_add_total(
             };
             bot.send_message(
                 msg.chat.id,
-                format!("{HEADER_MESSAGE}Who are we splitting this with? Enter the username and the amount (without currency) as follows: \n\nUSERNAME AMOUNT{FOOTER_MESSAGE}"),
+                format!("{HEADER_MESSAGE}Who are we splitting this with?\n{DEBT_INSTRUCTIONS_MESSAGE}{FOOTER_MESSAGE}"),
             )
             .await?;
             dialogue
@@ -235,75 +271,14 @@ pub async fn action_add_debt(
     msg: Message,
     payment: AddPaymentParams,
 ) -> HandlerResult {
-    match msg.text() {
-        Some(text) => {
-            // Parse the text to get username and amount
-            let text: Vec<&str> = text.split(' ').collect();
-            if text.len() != 2 {
-                bot.send_message(
-                    msg.chat.id,
-                    "Please enter the username and the amount (without currency) as follows: \n\nUSERNAME AMOUNT",
-                )
-                .await?;
-                return Ok(());
-            }
-
-            let username = parse_username(text[0]);
-
-            let amount = parse_amount(text[1]);
-
-            if let Err(err) = amount {
-                bot.send_message(msg.chat.id, format!("{}\n\nPlease enter the amount as a valid number without any symbols.{FOOTER_MESSAGE}", err.to_string())).await?;
-                return Ok(());
-            }
-
-            let new_debts = match payment.debts {
-                Some(mut debts) => {
-                    debts.push((username, amount?));
-                    Some(debts)
-                }
-                None => Some(vec![(username, amount?)]),
-            };
-
-            let sum = new_debts
-                .as_ref()
-                .unwrap()
-                .iter()
-                .fold(0.0, |acc, (_, amount)| acc + amount);
-
-            let new_payment = AddPaymentParams {
-                description: payment.description,
-                creditor: payment.creditor,
-                total: payment.total,
-                debts: new_debts,
-            };
-
-            if sum != payment.total.unwrap() {
-                bot.send_message(
-                    msg.chat.id,
-                    format!(
-                "Who else are we splitting this with? Please enter the username and the amount (without currency) as follows: \n\nUSERNAME AMOUNT\n\nTotal amount paid: {}\nTotal amount of debts: {}",
-                payment.total.unwrap(),
-                sum
-                    ),
-                )
-                .await?;
-                dialogue
-                    .update(State::AddDebt {
-                        payment: new_payment,
-                    })
-                    .await?;
-                return Ok(());
-            }
-
-            display_add_overview(bot, dialogue, msg.chat.id.to_string(), new_payment).await?;
-        }
-        None => {
-            bot.send_message(msg.chat.id, format!("{HEADER_MESSAGE}Please enter the username and the amount (without symbols) as follows: \n\nUSERNAME AMOUNT{FOOTER_MESSAGE}"))
-                .await?;
-        }
-    }
-    Ok(())
+    handle_debts(
+        bot,
+        dialogue,
+        msg,
+        payment,
+        format!("{HEADER_MESSAGE}{DEBT_INSTRUCTIONS_MESSAGE}{FOOTER_MESSAGE}"),
+    )
+    .await
 }
 
 /* Add a payment entry in a group chat.
@@ -415,7 +390,7 @@ pub async fn action_add_edit_menu(
                         chat.id,
                         id,
                         format!(
-                            "Current debts: {:?}\n\nWhat should the debts be?\nEnter the username and the amount as follows: \n\nUSERNAME AMOUNT",
+                            "Current debts: {:?}\n\n{DEBT_INSTRUCTIONS_MESSAGE}",
                             payment.clone().debts.unwrap()
                         ),
                     )
@@ -491,8 +466,9 @@ pub async fn action_add_edit(
 
                 bot.send_message(
                     msg.chat.id,
-                    "Who are we splitting this with? Enter the username and the amount (without currency) as follows: \n\nUSERNAME AMOUNT",
-                ).await?;
+                    format!("Who are we splitting this with?\n{DEBT_INSTRUCTIONS_MESSAGE}"),
+                )
+                .await?;
                 dialogue
                     .update(State::AddEdit {
                         payment: new_payment,
@@ -501,83 +477,14 @@ pub async fn action_add_edit(
                     .await?;
             }
             AddPaymentEdit::Debts => {
-                let text: Vec<&str> = text.split(' ').collect();
-                if text.len() != 2 {
-                    bot.send_message(
-                        msg.chat.id,
-                        "Please enter the username and the amount (without currency) as follows: \n\nUSERNAME AMOUNT",
-                    )
-                    .await?;
-                    return Ok(());
-                }
-
-                let username: String = if text[0].chars().next() == Some('@') {
-                    text[0].to_string()
-                } else {
-                    format!("@{}", text[0])
-                };
-
-                let amount = match text[1].parse::<f64>() {
-                    Ok(val) => val,
-                    Err(_) => {
-                        if let Ok(val) = text[1].parse::<i32>() {
-                            val as f64
-                        } else {
-                            bot.send_message(
-                                msg.chat.id,
-                                "Please enter the amount as a valid number without any symbols: ",
-                            )
-                            .await?;
-                            return Ok(());
-                        }
-                    }
-                };
-
-                let new_debts = match payment.debts {
-                    Some(mut debts) => {
-                        debts.push((username, amount));
-                        Some(debts)
-                    }
-                    None => Some(vec![(username, amount)]),
-                };
-
-                let new_payment = AddPaymentParams {
-                    description: payment.description,
-                    creditor: payment.creditor,
-                    total: payment.total,
-                    debts: new_debts.clone(),
-                };
-
-                if new_debts
-                    .as_ref()
-                    .unwrap()
-                    .iter()
-                    .fold(0.0, |acc, (_, amount)| acc + amount)
-                    != payment.total.unwrap()
-                {
-                    bot.send_message(
-                        msg.chat.id,
-                        format!(
-                            "Who else are we splitting this with? Please enter the username and the amount (without currency) as follows: \n\nUSERNAME AMOUNT\n\nTotal amount paid: {}\nTotal amount of debts: {}",
-                            payment.total.unwrap(),
-                            new_debts
-                    .as_ref()
-                    .unwrap()
-                    .iter()
-                    .fold(0.0, |acc, (_, amount)| acc + amount)
-                        ),
-                    )
-                    .await?;
-                    dialogue
-                        .update(State::AddEdit {
-                            payment: new_payment,
-                            edit: AddPaymentEdit::Debts,
-                        })
-                        .await?;
-                    return Ok(());
-                }
-
-                display_add_overview(bot, dialogue, msg.chat.id.to_string(), new_payment).await?;
+                handle_debts(
+                    bot,
+                    dialogue,
+                    msg,
+                    payment,
+                    format!("{DEBT_INSTRUCTIONS_MESSAGE}",),
+                )
+                .await?;
             }
         },
         None => {
