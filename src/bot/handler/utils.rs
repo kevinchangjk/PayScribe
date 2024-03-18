@@ -20,7 +20,7 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
 pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
     let mut message = String::new();
     for debt in debts {
-        message.push_str(&format!("{}: {:.2}\n", debt.0, debt.1));
+        message.push_str(&format!("    {}: {:.2}\n", debt.0, debt.1));
     }
     message
 }

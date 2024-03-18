@@ -155,6 +155,7 @@ async fn call_processor_add_payment(
     query: CallbackQuery,
 ) -> HandlerResult {
     if let Some(Message { id, chat, .. }) = query.message {
+        let payment_clone = payment.clone();
         let description = match payment.description {
             Some(desc) => desc,
             None => {
@@ -191,6 +192,7 @@ async fn call_processor_add_payment(
                 return Ok(());
             }
         };
+        let payment_overview = display_add_payment(&payment_clone);
         let updated_balances = add_payment(
             payment.chat_id,
             payment.sender_username,
@@ -213,7 +215,8 @@ async fn call_processor_add_payment(
                 chat.id,
                 id,
                 format!(
-                    "Payment entry added!\n\nCurrent balances:\n{}",
+                    "Payment entry added!\n\n{}Current balances:\n{}",
+                    payment_overview,
                     display_balances(&updated_balances?)
                 ),
             )
