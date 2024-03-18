@@ -108,6 +108,27 @@ async fn handle_debts(
 
 /* Action handler functions */
 
+/* Handles a repeated call to add payment entry.
+ * Does nothing, simply notifies the user.
+ */
+pub async fn handle_repeated_add_payment(bot: Bot, msg: Message) -> HandlerResult {
+    bot.send_message(
+        msg.chat.id,
+        "You are already adding a payment entry! Please complete or cancel the current operation before starting a new one.",
+    ).await?;
+    Ok(())
+}
+
+/* Cancels the add payment operation.
+ * Can be called at any step of the process.
+ */
+pub async fn cancel_add_payment(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+    bot.send_message(msg.chat.id, "Payment entry cancelled!")
+        .await?;
+    dialogue.exit().await?;
+    Ok(())
+}
+
 /* Add a payment entry in a group chat.
  * Bot will ask for user to send messages to fill in required information,
  * before presenting the compiled information for confirmation with a menu.

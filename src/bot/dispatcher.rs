@@ -9,10 +9,12 @@ use teloxide::{
     RequestError,
 };
 
+use crate::bot::handler::handle_repeated_add_payment;
+
 use super::handler::{
     action_add_confirm, action_add_creditor, action_add_debt, action_add_description,
-    action_add_edit, action_add_edit_menu, action_add_payment, action_add_total, action_help,
-    action_start, invalid_state,
+    action_add_edit, action_add_edit_menu, action_add_payment, action_add_total, action_cancel,
+    action_help, action_start, cancel_add_payment, invalid_state,
 };
 use super::processor::ProcessError;
 
@@ -103,18 +105,71 @@ pub enum Command {
     Start,
     #[command(description = "Add a payment entry for the group.")]
     AddPayment,
+    #[command(description = "Cancels an ongoing action.")]
+    Cancel,
 }
 
 /* Main Dispatch function */
 pub async fn run_dispatcher(bot: Bot) {
     use dptree::case;
 
-    let command_handler = teloxide::filter_command::<Command, _>().branch(
-        case![State::Start]
-            .branch(case![Command::Start].endpoint(action_start))
-            .branch(case![Command::Help].endpoint(action_help))
-            .branch(case![Command::AddPayment].endpoint(action_add_payment)),
-    );
+    let command_handler = teloxide::filter_command::<Command, _>()
+        .branch(
+            case![State::Start]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::AddPayment].endpoint(action_add_payment))
+                .branch(case![Command::Cancel].endpoint(action_cancel)),
+        )
+        .branch(
+            case![State::AddDescription]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
+                .branch(case![Command::Cancel].endpoint(cancel_add_payment)),
+        )
+        .branch(
+            case![State::AddCreditor { payment }]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
+                .branch(case![Command::Cancel].endpoint(cancel_add_payment)),
+        )
+        .branch(
+            case![State::AddTotal { payment }]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
+                .branch(case![Command::Cancel].endpoint(cancel_add_payment)),
+        )
+        .branch(
+            case![State::AddDebt { payment }]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
+                .branch(case![Command::Cancel].endpoint(cancel_add_payment)),
+        )
+        .branch(
+            case![State::AddConfirm { payment }]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
+                .branch(case![Command::Cancel].endpoint(cancel_add_payment)),
+        )
+        .branch(
+            case![State::AddEditMenu { payment }]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
+                .branch(case![Command::Cancel].endpoint(cancel_add_payment)),
+        )
+        .branch(
+            case![State::AddEdit { payment, edit }]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
+                .branch(case![Command::Cancel].endpoint(cancel_add_payment)),
+        );
 
     let message_handler = Update::filter_message()
         .branch(command_handler)

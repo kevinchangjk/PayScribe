@@ -18,7 +18,6 @@ pub async fn invalid_state(bot: Bot, dialogue: UserDialogue, msg: Message) -> Ha
  */
 pub async fn action_start(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
     bot.send_message(msg.chat.id, START_MESSAGE).await?;
-    dialogue.exit().await?;
     Ok(())
 }
 
@@ -28,6 +27,14 @@ pub async fn action_start(bot: Bot, dialogue: UserDialogue, msg: Message) -> Han
 pub async fn action_help(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
     bot.send_message(msg.chat.id, Command::descriptions().to_string())
         .await?;
+    Ok(())
+}
+
+/* Cancel command.
+ * Called when state is at start, thus nothing to cancel.
+ */
+pub async fn action_cancel(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+    bot.send_message(msg.chat.id, "Nothing to cancel!").await?;
     dialogue.exit().await?;
     Ok(())
 }
