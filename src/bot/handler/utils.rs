@@ -1,8 +1,29 @@
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 
-use crate::bot::BotError;
+use crate::bot::{redis::Debt, BotError};
 
 /* Common utilites for handlers. */
+
+// Displays balances in a more readable format.
+pub fn display_balances(debts: &Vec<Debt>) -> String {
+    let mut message = String::new();
+    for debt in debts {
+        message.push_str(&format!(
+            "{} owes {}: {}\n",
+            debt.debtor, debt.creditor, debt.amount
+        ));
+    }
+    message
+}
+
+// Displays debts in a more readable format.
+pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
+    let mut message = String::new();
+    for debt in debts {
+        message.push_str(&format!("{}: {}\n", debt.0, debt.1));
+    }
+    message
+}
 
 // Make a keyboard, button menu.
 pub fn make_keyboard(options: Vec<&str>, columns: Option<usize>) -> InlineKeyboardMarkup {

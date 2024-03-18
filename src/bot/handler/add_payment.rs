@@ -4,12 +4,12 @@ use teloxide::{
     types::{InlineKeyboardButton, InlineKeyboardMarkup, Message},
 };
 
-use crate::bot::processor::add_payment;
+use crate::bot::{handler::utils::display_debts, processor::add_payment};
 
 use super::{
     super::dispatcher::{HandlerResult, State, UserDialogue},
     general::UNKNOWN_ERROR_MESSAGE,
-    utils::{make_keyboard, parse_amount, parse_debts, parse_username},
+    utils::{display_balances, make_keyboard, parse_amount, parse_debts, parse_username},
 };
 
 /* Utilities */
@@ -39,36 +39,49 @@ pub enum AddPaymentEdit {
     Debts,
 }
 
+/* Displays a payment entry (being added) in String format.
+ */
+fn display_add_payment(payment: &AddPaymentParams) -> String {
+    let description = match &payment.description {
+        Some(desc) => format!("Description: {}\n", desc),
+        None => "".to_string(),
+    };
+    let creditor = match &payment.creditor {
+        Some(cred) => format!("Creditor: {}\n", cred),
+        None => "".to_string(),
+    };
+    let total = match &payment.total {
+        Some(total) => format!("Total: {}\n", total),
+        None => "".to_string(),
+    };
+    let debts = match &payment.debts {
+        Some(debts) => format!("Split amounts:\n{}", display_debts(&debts)),
+        None => "".to_string(),
+    };
+
+    format!(
+        "Payment Overview:\n{}{}{}{}\n",
+        description, creditor, total, debts
+    )
+}
+
 /* Add a payment entry in a group chat.
  * Displays an overview of the current details provided.
  * Is not a normal endpoint function, just a temporary transition function.
  */
-pub async fn display_add_overview(
+async fn display_add_overview(
     bot: Bot,
     dialogue: UserDialogue,
     chat_id: String,
     payment: AddPaymentParams,
 ) -> HandlerResult {
-    let payment_clone = payment.clone();
     let buttons = vec!["Cancel", "Edit", "Confirm"];
     let keyboard = make_keyboard(buttons, Some(3));
 
-    bot.send_message(
-        chat_id,
-                format!(
-                    "Overview of the payment entry:\n\nDescription: {}\nCreditor: {}\nTotal: {}\nDebts: {:?}",
-                    payment.description.unwrap(),
-                    payment.creditor.unwrap(),
-                    payment.total.unwrap(),
-                    payment.debts.unwrap()
-                ),
-            ).reply_markup(keyboard)
-            .await?;
-    dialogue
-        .update(State::AddConfirm {
-            payment: payment_clone,
-        })
+    bot.send_message(chat_id, display_add_payment(&payment))
+        .reply_markup(keyboard)
         .await?;
+    dialogue.update(State::AddConfirm { payment }).await?;
     Ok(())
 }
 
@@ -135,7 +148,7 @@ async fn handle_debts(
 
 /* Calls processor to execute the adding of the payment entry.
  */
-pub async fn call_processor_add_payment(
+async fn call_processor_add_payment(
     bot: Bot,
     dialogue: UserDialogue,
     payment: AddPaymentParams,
@@ -178,7 +191,7 @@ pub async fn call_processor_add_payment(
                 return Ok(());
             }
         };
-        add_payment(
+        let updated_balances = add_payment(
             payment.chat_id,
             payment.sender_username,
             payment.sender_id,
@@ -187,9 +200,25 @@ pub async fn call_processor_add_payment(
             &creditor,
             total,
             debts,
-        )?;
-        bot.edit_message_text(chat.id, id, "Payment entry added!")
+        );
+        if let Err(err) = updated_balances {
+            bot.edit_message_text(
+                chat.id,
+                id,
+                format!("{}\nPayment entry failed!", err.to_string()),
+            )
             .await?;
+        } else {
+            bot.edit_message_text(
+                chat.id,
+                id,
+                format!(
+                    "Payment entry added!\n\nCurrent balances:\n{}",
+                    display_balances(&updated_balances?)
+                ),
+            )
+            .await?;
+        }
         dialogue.exit().await?;
     }
     Ok(())
@@ -255,10 +284,13 @@ pub async fn action_add_description(
                     debts: None,
                 };
                 bot.send_message(
-                msg.chat.id,
-                format!("{HEADER_MESSAGE}Enter the username of the one who paid the total: {FOOTER_MESSAGE}"),
-            )
-            .await?;
+                    msg.chat.id,
+                    format!(
+                        "{}Enter the username of the one who paid the total: {FOOTER_MESSAGE}",
+                        display_add_payment(&payment)
+                    ),
+                )
+                .await?;
                 dialogue.update(State::AddCreditor { payment }).await?;
             }
         }
@@ -300,7 +332,10 @@ pub async fn action_add_creditor(
 
             bot.send_message(
                 msg.chat.id,
-                format!("{HEADER_MESSAGE}Enter the total amount paid (without currency):{FOOTER_MESSAGE}"),
+                format!(
+                    "{}Enter the total amount paid (without currency):{FOOTER_MESSAGE}",
+                    display_add_payment(&new_payment)
+                ),
             )
             .await?;
             dialogue
@@ -349,7 +384,7 @@ pub async fn action_add_total(
             };
             bot.send_message(
                 msg.chat.id,
-                format!("{HEADER_MESSAGE}Who are we splitting this with?\n{DEBT_INSTRUCTIONS_MESSAGE}{FOOTER_MESSAGE}"),
+                format!("{}Who are we splitting this with?\n{DEBT_INSTRUCTIONS_MESSAGE}{FOOTER_MESSAGE}", display_add_payment(&new_payment)),
             )
             .await?;
             dialogue
@@ -384,7 +419,7 @@ pub async fn action_add_debt(
         dialogue,
         msg,
         payment,
-        format!("{HEADER_MESSAGE}{DEBT_INSTRUCTIONS_MESSAGE}{FOOTER_MESSAGE}"),
+        format!("{NO_TEXT_MESSAGE}{DEBT_INSTRUCTIONS_MESSAGE}{FOOTER_MESSAGE}"),
     )
     .await
 }
@@ -494,8 +529,8 @@ pub async fn action_add_edit_menu(
                         chat.id,
                         id,
                         format!(
-                            "Current debts: {:?}\n\n{DEBT_INSTRUCTIONS_MESSAGE}",
-                            payment.clone().debts.unwrap()
+                            "Current debts:\n{}\n{DEBT_INSTRUCTIONS_MESSAGE}",
+                            display_debts(&payment.clone().debts.unwrap())
                         ),
                     )
                     .await?;
