@@ -4,8 +4,11 @@ use teloxide::{
     types::{InlineKeyboardButton, InlineKeyboardMarkup, Message},
 };
 
+use crate::bot::processor::add_payment;
+
 use super::{
-    super::dispatcher::{AddPaymentEdit, AddPaymentParams, HandlerResult, State, UserDialogue},
+    super::dispatcher::{HandlerResult, State, UserDialogue},
+    general::UNKNOWN_ERROR_MESSAGE,
     utils::{make_keyboard, parse_amount, parse_debts, parse_username},
 };
 
@@ -15,6 +18,26 @@ const FOOTER_MESSAGE: &str = "\n\n";
 const NO_TEXT_MESSAGE: &str = "Please reply in text.\n\n";
 const DEBT_INSTRUCTIONS_MESSAGE: &str =
     "Enter the usernames and the amounts as follows: \n\n@user1 amount1, @user2 amount2, etc.\n\n";
+
+#[derive(Clone, Debug)]
+pub struct AddPaymentParams {
+    chat_id: String,
+    sender_id: String,
+    sender_username: Option<String>,
+    datetime: String,
+    description: Option<String>,
+    creditor: Option<String>,
+    total: Option<f64>,
+    debts: Option<Vec<(String, f64)>>,
+}
+
+#[derive(Clone, Debug)]
+pub enum AddPaymentEdit {
+    Description,
+    Creditor,
+    Total,
+    Debts,
+}
 
 /* Add a payment entry in a group chat.
  * Displays an overview of the current details provided.
@@ -92,6 +115,10 @@ async fn handle_debts(
             }
 
             let new_payment = AddPaymentParams {
+                chat_id: payment.chat_id,
+                sender_id: payment.sender_id,
+                sender_username: payment.sender_username,
+                datetime: payment.datetime,
                 description: payment.description,
                 creditor: payment.creditor,
                 total: payment.total,
@@ -102,6 +129,68 @@ async fn handle_debts(
         None => {
             bot.send_message(msg.chat.id, error_msg).await?;
         }
+    }
+    Ok(())
+}
+
+/* Calls processor to execute the adding of the payment entry.
+ */
+pub async fn call_processor_add_payment(
+    bot: Bot,
+    dialogue: UserDialogue,
+    payment: AddPaymentParams,
+    query: CallbackQuery,
+) -> HandlerResult {
+    if let Some(Message { id, chat, .. }) = query.message {
+        let description = match payment.description {
+            Some(desc) => desc,
+            None => {
+                bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
+                    .await?;
+                dialogue.exit().await?;
+                return Ok(());
+            }
+        };
+        let creditor = match payment.creditor {
+            Some(cred) => cred,
+            None => {
+                bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
+                    .await?;
+                dialogue.exit().await?;
+                return Ok(());
+            }
+        };
+        let total = match payment.total {
+            Some(tot) => tot,
+            None => {
+                bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
+                    .await?;
+                dialogue.exit().await?;
+                return Ok(());
+            }
+        };
+        let debts = match payment.debts {
+            Some(debts) => debts,
+            None => {
+                bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
+                    .await?;
+                dialogue.exit().await?;
+                return Ok(());
+            }
+        };
+        add_payment(
+            payment.chat_id,
+            payment.sender_username,
+            payment.sender_id,
+            payment.datetime,
+            &description,
+            &creditor,
+            total,
+            debts,
+        )?;
+        bot.edit_message_text(chat.id, id, "Payment entry added!")
+            .await?;
+        dialogue.exit().await?;
     }
     Ok(())
 }
@@ -153,18 +242,25 @@ pub async fn action_add_description(
 ) -> HandlerResult {
     match msg.text() {
         Some(text) => {
-            let payment = AddPaymentParams {
-                description: Some(text.to_string()),
-                creditor: None,
-                total: None,
-                debts: None,
-            };
-            bot.send_message(
+            let user = msg.from();
+            if let Some(user) = user {
+                let payment = AddPaymentParams {
+                    chat_id: msg.chat.id.to_string(),
+                    sender_id: user.id.to_string(),
+                    sender_username: user.username.clone(),
+                    datetime: msg.date.to_string(),
+                    description: Some(text.to_string()),
+                    creditor: None,
+                    total: None,
+                    debts: None,
+                };
+                bot.send_message(
                 msg.chat.id,
                 format!("{HEADER_MESSAGE}Enter the username of the one who paid the total: {FOOTER_MESSAGE}"),
             )
             .await?;
-            dialogue.update(State::AddCreditor { payment }).await?;
+                dialogue.update(State::AddCreditor { payment }).await?;
+            }
         }
         None => {
             bot.send_message(
@@ -192,6 +288,10 @@ pub async fn action_add_creditor(
         Some(text) => {
             let text: String = parse_username(text);
             let new_payment = AddPaymentParams {
+                chat_id: payment.chat_id,
+                sender_id: payment.sender_id,
+                sender_username: payment.sender_username,
+                datetime: payment.datetime,
                 description: payment.description,
                 creditor: Some(text),
                 total: None,
@@ -231,23 +331,6 @@ pub async fn action_add_total(
 ) -> HandlerResult {
     match msg.text() {
         Some(text) => {
-            // Check if can parse the text to f64
-            let total = match text.parse::<f64>() {
-                Ok(val) => val,
-                Err(_) => {
-                    if let Ok(val) = text.parse::<i32>() {
-                        val as f64
-                    } else {
-                        bot.send_message(
-                            msg.chat.id,
-                            "Please enter the total amount paid as a valid number without any symbols: ",
-                        )
-                        .await?;
-                        return Ok(());
-                    }
-                }
-            };
-
             let total = parse_amount(text);
             if let Err(err) = total {
                 bot.send_message(msg.chat.id, format!("{}\n\nWhat is the total amount paid? Please enter the number without any symbols.{FOOTER_MESSAGE}", err.to_string())).await?;
@@ -255,6 +338,10 @@ pub async fn action_add_total(
             }
 
             let new_payment = AddPaymentParams {
+                chat_id: payment.chat_id,
+                sender_id: payment.sender_id,
+                sender_username: payment.sender_username,
+                datetime: payment.datetime,
                 description: payment.description,
                 creditor: payment.creditor,
                 total: Some(total?),
@@ -328,11 +415,7 @@ pub async fn action_add_confirm(
                 display_add_edit_menu(bot, dialogue, payment, query).await?;
             }
             "Confirm" => {
-                if let Some(Message { id, chat, .. }) = query.message {
-                    bot.edit_message_text(chat.id, id, "Payment entry added!")
-                        .await?;
-                    dialogue.exit().await?;
-                }
+                call_processor_add_payment(bot, dialogue, payment, query).await?;
             }
             _ => {}
         }
@@ -448,6 +531,10 @@ pub async fn action_add_edit(
         Some(text) => match edit {
             AddPaymentEdit::Description => {
                 let new_payment = AddPaymentParams {
+                    chat_id: payment.chat_id,
+                    sender_id: payment.sender_id,
+                    sender_username: payment.sender_username,
+                    datetime: payment.datetime,
                     description: Some(text.to_string()),
                     creditor: payment.creditor,
                     total: payment.total,
@@ -457,6 +544,10 @@ pub async fn action_add_edit(
             }
             AddPaymentEdit::Creditor => {
                 let new_payment = AddPaymentParams {
+                    chat_id: payment.chat_id,
+                    sender_id: payment.sender_id,
+                    sender_username: payment.sender_username,
+                    datetime: payment.datetime,
                     description: payment.description,
                     creditor: Some(text.to_string()),
                     total: payment.total,
@@ -479,6 +570,10 @@ pub async fn action_add_edit(
                 }
 
                 let new_payment = AddPaymentParams {
+                    chat_id: payment.chat_id,
+                    sender_id: payment.sender_id,
+                    sender_username: payment.sender_username,
+                    datetime: payment.datetime,
                     description: payment.description,
                     creditor: payment.creditor,
                     total: Some(total?),

@@ -2,7 +2,6 @@ use teloxide::{
     dispatching::{
         dialogue,
         dialogue::{InMemStorage, InMemStorageError},
-        UpdateHandler,
     },
     prelude::*,
     utils::command::BotCommands,
@@ -14,7 +13,7 @@ use crate::bot::handler::handle_repeated_add_payment;
 use super::handler::{
     action_add_confirm, action_add_creditor, action_add_debt, action_add_description,
     action_add_edit, action_add_edit_menu, action_add_payment, action_add_total, action_cancel,
-    action_help, action_start, cancel_add_payment, invalid_state,
+    action_help, action_start, cancel_add_payment, invalid_state, AddPaymentEdit, AddPaymentParams,
 };
 use super::processor::ProcessError;
 
@@ -51,20 +50,10 @@ impl From<InMemStorageError> for BotError {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct AddPaymentParams {
-    pub description: Option<String>,
-    pub creditor: Option<String>,
-    pub total: Option<f64>,
-    pub debts: Option<Vec<(String, f64)>>,
-}
-
-#[derive(Clone, Debug)]
-pub enum AddPaymentEdit {
-    Description,
-    Creditor,
-    Total,
-    Debts,
+impl From<ProcessError> for BotError {
+    fn from(process_error: ProcessError) -> BotError {
+        BotError::ProcessError(process_error)
+    }
 }
 
 #[derive(Clone, Default)]

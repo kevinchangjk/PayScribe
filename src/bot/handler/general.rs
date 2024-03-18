@@ -4,6 +4,7 @@ use super::super::dispatcher::{Command, HandlerResult, UserDialogue};
 
 const INVALID_STATE_MESSAGE: &str = "Unable to handle the message. Type /help to see the usage.";
 const START_MESSAGE: &str = "Hi, I'm PayScribe!";
+pub const UNKNOWN_ERROR_MESSAGE: &str = "An unknown error occurred. Please try again.";
 
 /* Invalid state.
  */

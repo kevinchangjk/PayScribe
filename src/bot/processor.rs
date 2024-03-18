@@ -62,13 +62,15 @@ fn update_balances_debts(
  * Important: assumes that debts sum up to total. Creditor's share included.
  */
 pub fn add_payment(
-    msg: Message,
+    chat_id: String,
+    sender_username: Option<String>,
+    sender_id: String,
+    datetime: String,
     description: &str,
     creditor: &str,
     total: f64,
     debts: Vec<(String, f64)>,
 ) -> Result<Vec<Debt>, ProcessError> {
-    let chat_id = msg.chat.id.to_string();
     let mut all_users = vec![creditor.to_string()];
 
     for (user, _) in debts.iter() {
@@ -81,11 +83,9 @@ pub fn add_payment(
     }
 
     // Add message sender to the list of users
-    if let Some(user) = msg.from() {
-        if let Some(username) = &user.username {
-            update_user(username, &chat_id, Some(&user.id.to_string()))?;
-            all_users.push(username.to_string());
-        }
+    if let Some(username) = sender_username {
+        update_user(&username, &chat_id, Some(&sender_id))?;
+        all_users.push(username.to_string());
     }
 
     // Update chat
@@ -94,7 +94,7 @@ pub fn add_payment(
     // Add payment entry
     let payment = Payment {
         description: description.to_string(),
-        datetime: msg.date.to_string(),
+        datetime,
         creditor: creditor.to_string(),
         total,
         debts: debts.clone(),
