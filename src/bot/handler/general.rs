@@ -10,7 +10,6 @@ pub const UNKNOWN_ERROR_MESSAGE: &str = "An unknown error occurred. Please try a
  */
 pub async fn invalid_state(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
     bot.send_message(msg.chat.id, INVALID_STATE_MESSAGE).await?;
-    dialogue.exit().await?;
     Ok(())
 }
 

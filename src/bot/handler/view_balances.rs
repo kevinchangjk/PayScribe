@@ -21,9 +21,16 @@ pub async fn action_view_balances(bot: Bot, dialogue: UserDialogue, msg: Message
         match debts {
             Ok(debts) => {
                 if debts.is_empty() {
-                    bot.send_message(msg.chat.id, format!("No balances found for this group!",))
+                    log::info!("View Balances - User {} viewed balances for group {}, but no balances found.", sender_id, chat_id);
+                    bot.send_message(msg.chat.id, format!("No balances found for this group!"))
                         .await?;
                 } else {
+                    log::info!(
+                        "View Balances - User {} viewed balances for group {}, found: {}",
+                        sender_id,
+                        chat_id,
+                        display_balances(&debts)
+                    );
                     bot.send_message(
                         msg.chat.id,
                         format!(
@@ -35,7 +42,12 @@ pub async fn action_view_balances(bot: Bot, dialogue: UserDialogue, msg: Message
                 }
             }
             Err(err) => {
-                log::error!("Unable to view balances: {}", err.to_string());
+                log::error!(
+                    "View Balances - User {} failed to view balances for group {}: {}",
+                    sender_id,
+                    chat_id,
+                    err.to_string()
+                );
                 bot.send_message(
                     msg.chat.id,
                     format!(

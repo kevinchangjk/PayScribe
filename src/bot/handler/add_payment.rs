@@ -123,6 +123,12 @@ async fn handle_debts(
         Some(text) => {
             let debts = parse_debts(text, &payment.creditor, payment.total);
             if let Err(err) = debts {
+                log::error!(
+                    "Add Payment - Debt parsing failed for user {} in chat {}: {}",
+                    payment.sender_id,
+                    payment.chat_id,
+                    err.to_string()
+                );
                 bot.send_message(msg.chat.id, format!("{}\n\nWho are we splitting this with?\n{DEBT_INSTRUCTIONS_MESSAGE}{FOOTER_MESSAGE}", err.to_string())).await?;
                 return Ok(());
             }
@@ -137,6 +143,13 @@ async fn handle_debts(
                 total: payment.total,
                 debts: Some(debts?),
             };
+
+            log::info!(
+                "Add Payment - Debt updated successfully by user {} in chat {}: {:?}",
+                new_payment.sender_id,
+                new_payment.chat_id,
+                new_payment
+            );
             display_add_overview(bot, dialogue, msg.chat.id.to_string(), new_payment).await?;
         }
         None => {
@@ -159,6 +172,10 @@ async fn call_processor_add_payment(
         let description = match payment.description {
             Some(desc) => desc,
             None => {
+                log::error!(
+                    "Add Payment Submission - Description not found for payment: {:?}",
+                    payment_clone
+                );
                 bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
                     .await?;
                 dialogue.exit().await?;
@@ -168,6 +185,10 @@ async fn call_processor_add_payment(
         let creditor = match payment.creditor {
             Some(cred) => cred,
             None => {
+                log::error!(
+                    "Add Payment Submission - Creditor not found for payment: {:?}",
+                    payment_clone
+                );
                 bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
                     .await?;
                 dialogue.exit().await?;
@@ -177,6 +198,10 @@ async fn call_processor_add_payment(
         let total = match payment.total {
             Some(tot) => tot,
             None => {
+                log::error!(
+                    "Add Payment Submission - Total not found for payment: {:?}",
+                    payment_clone
+                );
                 bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
                     .await?;
                 dialogue.exit().await?;
@@ -186,6 +211,10 @@ async fn call_processor_add_payment(
         let debts = match payment.debts {
             Some(debts) => debts,
             None => {
+                log::error!(
+                    "Add Payment Submission - Debts not found for payment: {:?}",
+                    payment_clone
+                );
                 bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
                     .await?;
                 dialogue.exit().await?;
@@ -203,24 +232,40 @@ async fn call_processor_add_payment(
             total,
             debts,
         );
-        if let Err(err) = updated_balances {
-            bot.edit_message_text(
-                chat.id,
-                id,
-                format!("{}\nPayment entry failed!", err.to_string()),
-            )
-            .await?;
-        } else {
-            bot.edit_message_text(
-                chat.id,
-                id,
-                format!(
-                    "Payment entry added!\n\n{}Current balances:\n{}",
-                    payment_overview,
-                    display_balances(&updated_balances?)
-                ),
-            )
-            .await?;
+        match updated_balances {
+            Err(err) => {
+                log::error!(
+                    "Add Payment Submission - Processor failed to update balances for user {} in chat {} with payment {:?}: {}",
+                    payment_clone.sender_id,
+                    payment_clone.chat_id,
+                    payment_clone,
+                    err.to_string()
+                );
+                bot.edit_message_text(
+                    chat.id,
+                    id,
+                    format!("{}\nPayment entry failed!", err.to_string()),
+                )
+                .await?;
+            }
+            Ok(balances) => {
+                log::info!(
+                    "Add Payment Submission - Processor updated balances successfully for user {} in chat {}: {:?}",
+                    payment_clone.sender_id,
+                    payment_clone.chat_id,
+                    payment_clone
+                );
+                bot.edit_message_text(
+                    chat.id,
+                    id,
+                    format!(
+                        "Payment entry added!\n\n{}Current balances:\n{}",
+                        payment_overview,
+                        display_balances(&balances)
+                    ),
+                )
+                .await?;
+            }
         }
         dialogue.exit().await?;
     }
@@ -297,6 +342,12 @@ pub async fn action_add_description(
                     total: None,
                     debts: None,
                 };
+                log::info!(
+                    "Add Payment - Description updated successfully for user {} in chat {}: {:?}",
+                    payment.sender_id,
+                    payment.chat_id,
+                    payment
+                );
                 bot.send_message(
                     msg.chat.id,
                     format!(
@@ -343,7 +394,12 @@ pub async fn action_add_creditor(
                 total: None,
                 debts: None,
             };
-
+            log::info!(
+                "Add Payment - Creditor updated successfully for user {} in chat {}: {:?}",
+                new_payment.sender_id,
+                new_payment.chat_id,
+                new_payment
+            );
             bot.send_message(
                 msg.chat.id,
                 format!(
@@ -385,7 +441,6 @@ pub async fn action_add_total(
                 bot.send_message(msg.chat.id, format!("{}\n\nWhat is the total amount paid? Please enter the number without any symbols.{FOOTER_MESSAGE}", err.to_string())).await?;
                 return Ok(());
             }
-
             let new_payment = AddPaymentParams {
                 chat_id: payment.chat_id,
                 sender_id: payment.sender_id,
@@ -396,6 +451,12 @@ pub async fn action_add_total(
                 total: Some(total?),
                 debts: None,
             };
+            log::info!(
+                "Add Payment - Total updated successfully for user {} in chat {}: {:?}",
+                new_payment.sender_id,
+                new_payment.chat_id,
+                new_payment.total
+            );
             bot.send_message(
                 msg.chat.id,
                 format!("{}Who are we splitting this with?\n{DEBT_INSTRUCTIONS_MESSAGE}{FOOTER_MESSAGE}", display_add_payment(&new_payment)),
@@ -466,7 +527,10 @@ pub async fn action_add_confirm(
             "Confirm" => {
                 call_processor_add_payment(bot, dialogue, payment, query).await?;
             }
-            _ => {}
+            _ => {
+                log::error!("Add Payment Confirm - Invalid button for user {} in chat {} with payment {:?}: {}",
+                            payment.sender_id, payment.chat_id, payment, button);
+            }
         }
     }
     Ok(())
@@ -486,6 +550,7 @@ pub async fn action_add_edit_menu(
         bot.answer_callback_query(format!("{}", query.id)).await?;
 
         if let Some(Message { id, chat, .. }) = query.message {
+            let payment_clone = payment.clone();
             match button.as_str() {
                 "Description" => {
                     bot.edit_message_text(
@@ -493,7 +558,7 @@ pub async fn action_add_edit_menu(
                         id,
                         format!(
                             "Current description: {}\n\nWhat do you want the new description to be?",
-                            payment.clone().description.unwrap()
+                            payment_clone.description.unwrap()
                         ),
                     )
                     .await?;
@@ -510,7 +575,7 @@ pub async fn action_add_edit_menu(
                         id,
                         format!(
                             "Current creditor: {}\n\nWho should the creditor be?",
-                            payment.clone().description.unwrap()
+                            payment_clone.description.unwrap()
                         ),
                     )
                     .await?;
@@ -527,7 +592,7 @@ pub async fn action_add_edit_menu(
                         id,
                         format!(
                             "Current total: {}\n\nWhat should the total be?",
-                            payment.clone().description.unwrap()
+                            payment_clone.description.unwrap()
                         ),
                     )
                     .await?;
@@ -544,7 +609,7 @@ pub async fn action_add_edit_menu(
                         id,
                         format!(
                             "Current debts:\n{}\n{DEBT_INSTRUCTIONS_MESSAGE}",
-                            display_debts(&payment.clone().debts.unwrap())
+                            display_debts(&payment_clone.debts.unwrap())
                         ),
                     )
                     .await?;
@@ -558,7 +623,10 @@ pub async fn action_add_edit_menu(
                 "Back" => {
                     display_add_overview(bot, dialogue, chat.id.to_string(), payment).await?;
                 }
-                _ => {}
+                _ => {
+                    log::error!("Add Payment Edit Menu - Invalid button for user {} in chat {} with payment {:?}: {}",
+                                payment_clone.sender_id, payment_clone.chat_id, payment_clone, button);
+                }
             }
         }
     }
@@ -589,6 +657,12 @@ pub async fn action_add_edit(
                     total: payment.total,
                     debts: payment.debts,
                 };
+                log::info!(
+                    "Add Payment - Description updated successfully for user {} in chat {}: {:?}",
+                    new_payment.sender_id,
+                    new_payment.chat_id,
+                    new_payment
+                );
                 display_add_overview(bot, dialogue, msg.chat.id.to_string(), new_payment).await?;
             }
             AddPaymentEdit::Creditor => {
@@ -602,6 +676,12 @@ pub async fn action_add_edit(
                     total: payment.total,
                     debts: payment.debts,
                 };
+                log::info!(
+                    "Add Payment - Creditor updated successfully for user {} in chat {}: {:?}",
+                    new_payment.sender_id,
+                    new_payment.chat_id,
+                    new_payment
+                );
                 display_add_overview(bot, dialogue, msg.chat.id.to_string(), new_payment).await?;
             }
             AddPaymentEdit::Total => {
@@ -629,6 +709,12 @@ pub async fn action_add_edit(
                     debts: payment.debts,
                 };
 
+                log::info!(
+                    "Add Payment - Total updated successfully for user {} in chat {}: {:?}",
+                    new_payment.sender_id,
+                    new_payment.chat_id,
+                    new_payment
+                );
                 bot.send_message(
                     msg.chat.id,
                     format!("Who are we splitting this with?\n{DEBT_INSTRUCTIONS_MESSAGE}"),
