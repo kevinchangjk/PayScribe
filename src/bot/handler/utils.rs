@@ -136,9 +136,9 @@ pub fn process_debts(
     }
 }
 
+// Parses a string of debts and returns a vector of debts
 pub fn parse_debts(text: &str) -> Result<Vec<(String, f64)>, BotError> {
     let mut debts: Vec<(String, f64)> = Vec::new();
-    let mut sum: f64 = 0.0;
     let pairs: Vec<&str> = text.split(',').collect();
     for pair in pairs {
         let pair = pair.split_whitespace().collect::<Vec<&str>>();
@@ -148,7 +148,6 @@ pub fn parse_debts(text: &str) -> Result<Vec<(String, f64)>, BotError> {
 
         let username = parse_username(pair[0]);
         let amount = parse_amount(pair[1])?;
-        sum += amount;
 
         let mut found = false;
         for debt in &mut debts {
@@ -163,4 +162,6 @@ pub fn parse_debts(text: &str) -> Result<Vec<(String, f64)>, BotError> {
             debts.push((username, amount));
         }
     }
+
+    Ok(debts)
 }

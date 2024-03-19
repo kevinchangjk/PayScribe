@@ -64,7 +64,7 @@ fn update_balances_debts(
  */
 pub fn add_payment(
     chat_id: String,
-    sender_username: Option<String>,
+    sender_username: String,
     sender_id: String,
     datetime: String,
     description: &str,
@@ -84,10 +84,8 @@ pub fn add_payment(
     }
 
     // Add message sender to the list of users
-    if let Some(username) = sender_username {
-        update_user(&username, &chat_id, Some(&sender_id))?;
-        all_users.push(username.to_string());
-    }
+    update_user(&sender_username, &chat_id, Some(&sender_id))?;
+    all_users.push(sender_username);
 
     // Update chat
     update_chat(&chat_id, all_users)?;

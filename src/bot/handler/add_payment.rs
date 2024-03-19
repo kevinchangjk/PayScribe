@@ -1,15 +1,16 @@
-use teloxide::{
-    payloads::SendMessageSetters,
-    prelude::*,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup, Message},
-};
+use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
 
-use crate::bot::{handler::utils::display_debts, processor::add_payment};
-
-use super::{
-    super::dispatcher::{HandlerResult, State, UserDialogue},
-    general::{NO_TEXT_MESSAGE, UNKNOWN_ERROR_MESSAGE},
-    utils::{display_balances, make_keyboard, parse_amount, parse_debts, parse_username},
+use crate::bot::{
+    dispatcher::{HandlerResult, State, UserDialogue},
+    handler::{
+        general::{NO_TEXT_MESSAGE, UNKNOWN_ERROR_MESSAGE},
+        utils::{
+            display_balances, display_debts, make_keyboard, parse_amount, parse_username,
+            process_debts,
+        },
+    },
+    processor::add_payment,
+    BotError,
 };
 
 /* Utilities */
@@ -22,7 +23,7 @@ const DEBT_INSTRUCTIONS_MESSAGE: &str =
 pub struct AddPaymentParams {
     chat_id: String,
     sender_id: String,
-    sender_username: Option<String>,
+    sender_username: String,
     datetime: String,
     description: Option<String>,
     creditor: Option<String>,
@@ -71,13 +72,12 @@ fn display_add_payment(payment: &AddPaymentParams) -> String {
 async fn display_add_overview(
     bot: Bot,
     dialogue: UserDialogue,
-    chat_id: String,
     payment: AddPaymentParams,
 ) -> HandlerResult {
     let buttons = vec!["Cancel", "Edit", "Confirm"];
     let keyboard = make_keyboard(buttons, Some(3));
 
-    bot.send_message(chat_id, display_add_payment(&payment))
+    bot.send_message(payment.chat_id.clone(), display_add_payment(&payment))
         .reply_markup(keyboard)
         .await?;
     dialogue.update(State::AddConfirm { payment }).await?;
@@ -120,7 +120,7 @@ async fn handle_debts(
 ) -> HandlerResult {
     match msg.text() {
         Some(text) => {
-            let debts = parse_debts(text, &payment.creditor, payment.total);
+            let debts = process_debts(text, &payment.creditor, payment.total);
             if let Err(err) = debts {
                 log::error!(
                     "Add Payment - Debt parsing failed for user {} in chat {}: {}",
@@ -149,7 +149,7 @@ async fn handle_debts(
                 new_payment.chat_id,
                 new_payment
             );
-            display_add_overview(bot, dialogue, msg.chat.id.to_string(), new_payment).await?;
+            display_add_overview(bot, dialogue, new_payment).await?;
         }
         None => {
             bot.send_message(msg.chat.id, error_msg).await?;
@@ -331,10 +331,19 @@ pub async fn action_add_description(
         Some(text) => {
             let user = msg.from();
             if let Some(user) = user {
+                let username = match &user.username {
+                    Some(user) => parse_username(user),
+                    None => {
+                        return Err(BotError::UserError(format!(
+                            "Add Payment - Username not found for user ID {}",
+                            user.id.to_string()
+                        )));
+                    }
+                };
                 let payment = AddPaymentParams {
                     chat_id: msg.chat.id.to_string(),
                     sender_id: user.id.to_string(),
-                    sender_username: user.username.clone(),
+                    sender_username: username,
                     datetime: msg.date.to_string(),
                     description: Some(text.to_string()),
                     creditor: None,
@@ -620,7 +629,7 @@ pub async fn action_add_edit_menu(
                         .await?;
                 }
                 "Back" => {
-                    display_add_overview(bot, dialogue, chat.id.to_string(), payment).await?;
+                    display_add_overview(bot, dialogue, payment).await?;
                 }
                 _ => {
                     log::error!("Add Payment Edit Menu - Invalid button for user {} in chat {} with payment {:?}: {}",
@@ -662,7 +671,7 @@ pub async fn action_add_edit(
                     new_payment.chat_id,
                     new_payment
                 );
-                display_add_overview(bot, dialogue, msg.chat.id.to_string(), new_payment).await?;
+                display_add_overview(bot, dialogue, new_payment).await?;
             }
             AddPaymentEdit::Creditor => {
                 let new_payment = AddPaymentParams {
@@ -681,7 +690,7 @@ pub async fn action_add_edit(
                     new_payment.chat_id,
                     new_payment
                 );
-                display_add_overview(bot, dialogue, msg.chat.id.to_string(), new_payment).await?;
+                display_add_overview(bot, dialogue, new_payment).await?;
             }
             AddPaymentEdit::Total => {
                 let total = parse_amount(text);
