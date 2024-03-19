@@ -102,7 +102,7 @@ async fn call_processor_pay_back(
                     chat.id,
                     id,
                     format!(
-                        "Pay back added!\n\n{}Current balances:\n{}",
+                        "Pay back added!\n\n{}\nCurrent balances:\n{}",
                         payment_overview,
                         display_balances(&balances)
                     ),
