@@ -79,13 +79,20 @@ pub fn add_payment(
     }
 
     // Update all users included in payment
+    let mut is_sender_included = false;
     for user in all_users.iter() {
+        if user == &sender_username {
+            is_sender_included = true;
+            continue;
+        }
         update_user(user, &chat_id, None)?;
     }
 
     // Add message sender to the list of users
     update_user(&sender_username, &chat_id, Some(&sender_id))?;
-    all_users.push(sender_username);
+    if !is_sender_included {
+        all_users.push(sender_username);
+    }
 
     // Update chat
     update_chat(&chat_id, all_users)?;

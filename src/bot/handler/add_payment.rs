@@ -583,7 +583,7 @@ pub async fn action_add_edit_menu(
                         id,
                         format!(
                             "Current creditor: {}\n\nWho should the creditor be?",
-                            payment_clone.description.unwrap()
+                            payment_clone.creditor.unwrap()
                         ),
                     )
                     .await?;
@@ -600,7 +600,7 @@ pub async fn action_add_edit_menu(
                         id,
                         format!(
                             "Current total: {}\n\nWhat should the total be?",
-                            payment_clone.description.unwrap()
+                            payment_clone.total.unwrap()
                         ),
                     )
                     .await?;
@@ -680,7 +680,7 @@ pub async fn action_add_edit(
                     sender_username: payment.sender_username,
                     datetime: payment.datetime,
                     description: payment.description,
-                    creditor: Some(text.to_string()),
+                    creditor: Some(parse_username(text)),
                     total: payment.total,
                     debts: payment.debts,
                 };
