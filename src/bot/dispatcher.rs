@@ -8,12 +8,17 @@ use teloxide::{
     RequestError,
 };
 
-use crate::bot::handler::{action_view_balances, block_add_payment, handle_repeated_add_payment};
+use crate::bot::handler::{
+    action_pay_back, action_pay_back_confirm, action_pay_back_debts, action_view_balances,
+    block_add_payment, block_pay_back, cancel_pay_back, handle_repeated_add_payment,
+    handle_repeated_pay_back,
+};
 
 use super::handler::{
     action_add_confirm, action_add_creditor, action_add_debt, action_add_description,
     action_add_edit, action_add_edit_menu, action_add_payment, action_add_total, action_cancel,
     action_help, action_start, cancel_add_payment, invalid_state, AddPaymentEdit, AddPaymentParams,
+    PayBackParams,
 };
 use super::processor::ProcessError;
 
@@ -83,6 +88,10 @@ pub enum State {
         payment: AddPaymentParams,
         edit: AddPaymentEdit,
     },
+    PayBackDebts,
+    PayBackConfirm {
+        payment: PayBackParams,
+    },
 }
 
 #[derive(BotCommands, Clone)]
@@ -98,6 +107,8 @@ pub enum Command {
     AddPayment,
     #[command(description = "View the current balances for the group.")]
     ViewBalances,
+    #[command(description = "Add a entry paying back other members in the group.")]
+    PayBack,
 }
 
 /* Main Dispatch function */
@@ -111,7 +122,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::Help].endpoint(action_help))
                 .branch(case![Command::AddPayment].endpoint(action_add_payment))
                 .branch(case![Command::Cancel].endpoint(action_cancel))
-                .branch(case![Command::ViewBalances].endpoint(action_view_balances)),
+                .branch(case![Command::ViewBalances].endpoint(action_view_balances))
+                .branch(case![Command::PayBack].endpoint(action_pay_back)),
         )
         .branch(
             case![State::AddDescription]
@@ -119,7 +131,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::Help].endpoint(action_help))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
-                .branch(case![Command::ViewBalances].endpoint(block_add_payment)),
+                .branch(case![Command::ViewBalances].endpoint(block_add_payment))
+                .branch(case![Command::PayBack].endpoint(block_add_payment)),
         )
         .branch(
             case![State::AddCreditor { payment }]
@@ -127,7 +140,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::Help].endpoint(action_help))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
-                .branch(case![Command::ViewBalances].endpoint(block_add_payment)),
+                .branch(case![Command::ViewBalances].endpoint(block_add_payment))
+                .branch(case![Command::PayBack].endpoint(block_add_payment)),
         )
         .branch(
             case![State::AddTotal { payment }]
@@ -135,7 +149,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::Help].endpoint(action_help))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
-                .branch(case![Command::ViewBalances].endpoint(block_add_payment)),
+                .branch(case![Command::ViewBalances].endpoint(block_add_payment))
+                .branch(case![Command::PayBack].endpoint(block_add_payment)),
         )
         .branch(
             case![State::AddDebt { payment }]
@@ -143,7 +158,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::Help].endpoint(action_help))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
-                .branch(case![Command::ViewBalances].endpoint(block_add_payment)),
+                .branch(case![Command::ViewBalances].endpoint(block_add_payment))
+                .branch(case![Command::PayBack].endpoint(block_add_payment)),
         )
         .branch(
             case![State::AddConfirm { payment }]
@@ -151,7 +167,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::Help].endpoint(action_help))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
-                .branch(case![Command::ViewBalances].endpoint(block_add_payment)),
+                .branch(case![Command::ViewBalances].endpoint(block_add_payment))
+                .branch(case![Command::PayBack].endpoint(block_add_payment)),
         )
         .branch(
             case![State::AddEditMenu { payment }]
@@ -159,7 +176,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::Help].endpoint(action_help))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
-                .branch(case![Command::ViewBalances].endpoint(block_add_payment)),
+                .branch(case![Command::ViewBalances].endpoint(block_add_payment))
+                .branch(case![Command::PayBack].endpoint(block_add_payment)),
         )
         .branch(
             case![State::AddEdit { payment, edit }]
@@ -167,7 +185,26 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::Help].endpoint(action_help))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
-                .branch(case![Command::ViewBalances].endpoint(block_add_payment)),
+                .branch(case![Command::ViewBalances].endpoint(block_add_payment))
+                .branch(case![Command::PayBack].endpoint(block_add_payment)),
+        )
+        .branch(
+            case![State::PayBackDebts]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::AddPayment].endpoint(block_pay_back))
+                .branch(case![Command::Cancel].endpoint(cancel_pay_back))
+                .branch(case![Command::ViewBalances].endpoint(block_pay_back))
+                .branch(case![Command::PayBack].endpoint(handle_repeated_pay_back)),
+        )
+        .branch(
+            case![State::PayBackConfirm { payment }]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::AddPayment].endpoint(block_pay_back))
+                .branch(case![Command::Cancel].endpoint(cancel_pay_back))
+                .branch(case![Command::ViewBalances].endpoint(block_pay_back))
+                .branch(case![Command::PayBack].endpoint(handle_repeated_pay_back)),
         );
 
     let message_handler = Update::filter_message()
@@ -177,11 +214,13 @@ pub async fn run_dispatcher(bot: Bot) {
         .branch(case![State::AddTotal { payment }].endpoint(action_add_total))
         .branch(case![State::AddDebt { payment }].endpoint(action_add_debt))
         .branch(case![State::AddEdit { payment, edit }].endpoint(action_add_edit))
+        .branch(case![State::PayBackDebts].endpoint(action_pay_back_debts))
         .branch(dptree::endpoint(invalid_state));
 
     let callback_query_handler = Update::filter_callback_query()
         .branch(case![State::AddConfirm { payment }].endpoint(action_add_confirm))
-        .branch(case![State::AddEditMenu { payment }].endpoint(action_add_edit_menu));
+        .branch(case![State::AddEditMenu { payment }].endpoint(action_add_edit_menu))
+        .branch(case![State::PayBackConfirm { payment }].endpoint(action_pay_back_confirm));
 
     let schema = dialogue::enter::<Update, InMemStorage<State>, State, _>()
         .branch(message_handler)

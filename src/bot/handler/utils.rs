@@ -41,7 +41,7 @@ pub fn make_keyboard(options: Vec<&str>, columns: Option<usize>) -> InlineKeyboa
         }
     } else {
         for option in options {
-            keyboard.push(vec![InlineKeyboardButton::callback(option.clone(), option)]);
+            keyboard.push(vec![InlineKeyboardButton::callback(option, option)]);
         }
     }
 
@@ -74,8 +74,8 @@ pub fn parse_amount(text: &str) -> Result<f64, BotError> {
     }
 }
 
-// Parse a string to retrieve a list of debts, returns Vec<Debt>.
-pub fn parse_debts(
+// Parse and process a string to retrieve a list of debts, returns Vec<Debt>.
+pub fn process_debts(
     text: &str,
     creditor: &Option<String>,
     total: Option<f64>,
@@ -133,5 +133,34 @@ pub fn parse_debts(
         }
     } else {
         Err(BotError::UserError("Creditor not provided.".to_string()))
+    }
+}
+
+pub fn parse_debts(text: &str) -> Result<Vec<(String, f64)>, BotError> {
+    let mut debts: Vec<(String, f64)> = Vec::new();
+    let mut sum: f64 = 0.0;
+    let pairs: Vec<&str> = text.split(',').collect();
+    for pair in pairs {
+        let pair = pair.split_whitespace().collect::<Vec<&str>>();
+        if pair.len() != 2 {
+            return Err(BotError::UserError("Invalid format for debts.".to_string()));
+        }
+
+        let username = parse_username(pair[0]);
+        let amount = parse_amount(pair[1])?;
+        sum += amount;
+
+        let mut found = false;
+        for debt in &mut debts {
+            if debt.0 == username {
+                debt.1 += amount;
+                found = true;
+                break;
+            }
+        }
+
+        if !found {
+            debts.push((username, amount));
+        }
     }
 }

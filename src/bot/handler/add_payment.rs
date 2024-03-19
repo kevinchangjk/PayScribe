@@ -8,14 +8,13 @@ use crate::bot::{handler::utils::display_debts, processor::add_payment};
 
 use super::{
     super::dispatcher::{HandlerResult, State, UserDialogue},
-    general::UNKNOWN_ERROR_MESSAGE,
+    general::{NO_TEXT_MESSAGE, UNKNOWN_ERROR_MESSAGE},
     utils::{display_balances, make_keyboard, parse_amount, parse_debts, parse_username},
 };
 
 /* Utilities */
 const HEADER_MESSAGE: &str = "Adding a new payment entry!\n\n";
 const FOOTER_MESSAGE: &str = "\n\n";
-const NO_TEXT_MESSAGE: &str = "Please reply in text.\n\n";
 const DEBT_INSTRUCTIONS_MESSAGE: &str =
     "Enter the usernames and the amounts as follows: \n\n@user1 amount1, @user2 amount2, etc.\n\n";
 
@@ -301,7 +300,7 @@ pub async fn cancel_add_payment(bot: Bot, dialogue: UserDialogue, msg: Message) 
 pub async fn block_add_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "You are currently adding a payment entry! Please complete or cancel the current payment entry before another command.",
+        "You are currently adding a payment entry! Please complete or cancel the current payment entry before starting another command.",
     ).await?;
     Ok(())
 }
