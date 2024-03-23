@@ -5,9 +5,9 @@ use teloxide::prelude::*;
 use super::{
     optimizer::optimize_debts,
     redis::{
-        add_payment_entry, delete_payment_entry, get_chat_payments_details, retrieve_chat_debts,
-        update_chat, update_chat_balances, update_chat_debts, update_payment_entry, update_user,
-        CrudError, Debt, Payment, UserBalance, UserPayment,
+        add_payment_entry, delete_payment_entry, get_chat_payments_details, get_payment_entry,
+        retrieve_chat_debts, update_chat, update_chat_balances, update_chat_debts,
+        update_payment_entry, update_user, CrudError, Debt, Payment, UserBalance, UserPayment,
     },
 };
 
@@ -204,17 +204,15 @@ pub fn edit_payment(
  * Update balances, update group debts.
  * Has to be called after self::view_payments.
  */
-pub fn delete_payment(
-    msg: Message,
-    payment_id: &str,
-    current_payment: Payment,
-) -> Result<Vec<Debt>, ProcessError> {
+pub fn delete_payment(chat_id: &str, payment_id: &str) -> Result<Vec<Debt>, ProcessError> {
+    // Get payment entry
+    let payment = get_payment_entry(payment_id)?;
+
     // Delete payment entry
-    let chat_id = msg.chat.id.to_string();
     delete_payment_entry(&chat_id, payment_id)?;
 
     // Update balances
-    let mut changes: Vec<UserBalance> = current_payment
+    let mut changes: Vec<UserBalance> = payment
         .debts
         .iter()
         .map(|debt| UserBalance {
@@ -223,8 +221,8 @@ pub fn delete_payment(
         })
         .collect();
     changes.push(UserBalance {
-        username: current_payment.creditor,
-        balance: current_payment.total.neg(),
+        username: payment.creditor,
+        balance: payment.total.neg(),
     });
 
     update_balances_debts(&chat_id, changes)

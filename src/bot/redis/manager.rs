@@ -215,6 +215,23 @@ pub fn get_chat_payments_details(chat_id: &str) -> Result<Vec<UserPayment>, Crud
     Ok(payments)
 }
 
+/* Retrieves a specific payment entry by ID.
+ * Called when a user wants to edit or delete a payment.
+ */
+pub fn get_payment_entry(payment_id: &str) -> Result<Payment, CrudError> {
+    let mut con = connect()?;
+
+    let payment = get_payment(&mut con, payment_id);
+
+    match payment {
+        Err(_) => {
+            log::info!("No such payment found for payment_id {}", payment_id);
+            Err(CrudError::NoSuchPaymentError())
+        }
+        Ok(payment) => Ok(payment),
+    }
+}
+
 /* Updates a payment entry.
  * Called when a user edits payment details.
  */
@@ -473,6 +490,10 @@ mod tests {
         // Gets both payments
         let payments = get_chat_payments_details(chat_id).unwrap();
         let second_id = payments[0].payment_id.clone();
+
+        // Gets second payment by ID
+        let second_payment_values = get_payment_entry(&second_id);
+        assert_eq!(second_payment_values.unwrap(), second_payment);
 
         // Updates second payment
         let updated_description = "manager_test_payment_3";
