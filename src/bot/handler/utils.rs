@@ -1,3 +1,4 @@
+use chrono::{DateTime, Local, NaiveDateTime};
 use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 
 use crate::bot::{redis::Debt, BotError};
@@ -164,4 +165,29 @@ pub fn parse_debts(text: &str) -> Result<Vec<(String, f64)>, BotError> {
     }
 
     Ok(debts)
+}
+
+// Parses a string representing a datetime, and returns the Datetime object
+pub fn parse_datetime(text: &str) -> DateTime<Local> {
+    // Checks if text contains "UTC" at the end
+    let mut new_text = text.to_string();
+    if text.ends_with(" UTC") {
+        new_text = new_text.replace(" UTC", "");
+    }
+    let datetime = NaiveDateTime::parse_from_str(&new_text, "%Y-%m-%d %H:%M:%S");
+    log::info!("Datetime: {:?}", datetime);
+    match datetime {
+        Ok(val) => val.and_utc().with_timezone(&Local),
+        Err(_) => Local::now(),
+    }
+}
+
+// Formats a Datetime object into an easy to read string
+pub fn format_datetime(datetime: &DateTime<Local>) -> String {
+    datetime.format("%v %R").to_string()
+}
+
+// Combines both datetime functions to essentially reformat a string into an easier format
+pub fn reformat_datetime(text: &str) -> String {
+    format_datetime(&parse_datetime(text))
 }

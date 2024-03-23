@@ -10,7 +10,7 @@ use crate::bot::{
         general::{NO_TEXT_MESSAGE, UNKNOWN_ERROR_MESSAGE},
         utils::{
             display_balances, display_debts, make_keyboard, parse_amount, parse_username,
-            process_debts,
+            process_debts, reformat_datetime,
         },
     },
     processor::{add_payment, view_payments},
@@ -19,7 +19,7 @@ use crate::bot::{
 };
 
 /* Utilities */
-const HEADER_MESSAGE: &str = "Adding a new payment entry!\n\n";
+const HEADER_MESSAGE: &str = " payments tracked for this group!\n\n";
 const FOOTER_MESSAGE: &str = "\n\n";
 
 #[derive(Clone, Debug)]
@@ -45,11 +45,12 @@ fn unfold_payment(payment: UserPayment) -> Payment {
     }
 }
 
-fn display_payment(payment: &Payment) -> String {
+fn display_payment(payment: &Payment, serialNum: usize) -> String {
     format!(
-        "Date: {}\nDescription: {}\nCreditor: {}\nTotal: {}\nSplit amounts: {}\n",
-        payment.datetime,
+        "______________________________\nEntry No. {} — {}\nDate: {}\nCreditor: {}\nTotal: {:.2}\nSplit amounts:\n{}",
+        serialNum,
         payment.description,
+        reformat_datetime(&payment.datetime),
         payment.creditor,
         payment.total,
         display_debts(&payment.debts)
@@ -64,18 +65,18 @@ fn display_payments_paged(payments: &Vec<Payment>, page: usize) -> String {
     } else {
         displayed_payments = &payments[start_index..start_index + 5];
     }
-    format!(
-        "{}",
-        displayed_payments
-            .iter()
-            .map(|payment| display_payment(payment))
-            .collect::<Vec<String>>()
-            .join("\n")
-    )
+
+    let serial_num = start_index + 1;
+    let formatted_payments = displayed_payments
+        .iter()
+        .enumerate()
+        .map(|(index, payment)| display_payment(payment, serial_num + index));
+
+    format!("{}", formatted_payments.collect::<Vec<String>>().join("\n"))
 }
 
 fn get_navigation_menu() -> InlineKeyboardMarkup {
-    let buttons = vec!["Newer, Older"];
+    let buttons = vec!["Newer", "Older"];
     make_keyboard(buttons, Some(2))
 }
 
@@ -115,7 +116,8 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
                     bot.send_message(
                         msg.chat.id,
                         format!(
-                            "Here are the payments for this group!\n\n{}",
+                            "{}{HEADER_MESSAGE}{}",
+                            &payments.len(),
                             display_payments_paged(&payments, 0)
                         ),
                     )
@@ -144,6 +146,69 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
     ))
 }
 
-pub async fn action_view_more(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+pub async fn action_view_more(
+    bot: Bot,
+    dialogue: UserDialogue,
+    (payments, page): (Vec<Payment>, usize),
+    query: CallbackQuery,
+) -> HandlerResult {
+    if let Some(button) = &query.data {
+        bot.answer_callback_query(format!("{}", query.id)).await?;
+
+        if let Some(Message { id, chat, .. }) = query.message {
+            match button.as_str() {
+                "Newer" => {
+                    if page > 0 {
+                        bot.edit_message_text(
+                            chat.id,
+                            id,
+                            format!(
+                                "{}{HEADER_MESSAGE}{}",
+                                &payments.len(),
+                                display_payments_paged(&payments, page - 1)
+                            ),
+                        )
+                        .reply_markup(get_navigation_menu())
+                        .await?;
+                        dialogue
+                            .update(State::ViewPayments {
+                                payments,
+                                page: page - 1,
+                            })
+                            .await?;
+                    }
+                }
+                "Older" => {
+                    if (page + 1) * 5 < payments.len() {
+                        bot.edit_message_text(
+                            chat.id,
+                            id,
+                            format!(
+                                "{}{HEADER_MESSAGE}{}",
+                                &payments.len(),
+                                display_payments_paged(&payments, page + 1)
+                            ),
+                        )
+                        .reply_markup(get_navigation_menu())
+                        .await?;
+                        dialogue
+                            .update(State::ViewPayments {
+                                payments,
+                                page: page + 1,
+                            })
+                            .await?;
+                    }
+                }
+                _ => {
+                    log::error!(
+                        "View Payments Menu - Invalid button in chat {}: {}",
+                        chat.id,
+                        button
+                    );
+                }
+            }
+        }
+    }
+
     Ok(())
 }
