@@ -6,7 +6,7 @@ pub use self::add_payment::{
 };
 pub use self::delete_payment::{
     action_delete_payment, action_delete_payment_confirm, block_delete_payment,
-    cancel_delete_payment, handle_repeated_delete_payment, no_delete_payment, DeletePaymentParams,
+    cancel_delete_payment, handle_repeated_delete_payment, no_delete_payment,
 };
 pub use self::edit_payment::{
     action_edit_payment, action_edit_payment_confirm, action_edit_payment_edit, block_edit_payment,

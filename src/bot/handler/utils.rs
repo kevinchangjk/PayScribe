@@ -3,6 +3,8 @@ use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 
 use crate::bot::{redis::Debt, BotError};
 
+use super::Payment;
+
 /* Common utilites for handlers. */
 
 // Displays balances in a more readable format.
@@ -24,6 +26,19 @@ pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
         message.push_str(&format!("    {}: {:.2}\n", debt.0, debt.1));
     }
     message
+}
+
+// Displays a single payment entry in a user-friendly format.
+pub fn display_payment(payment: &Payment, serial_num: usize) -> String {
+    format!(
+        "______________________________\nEntry No. {} — {}\nDate: {}\nCreditor: {}\nTotal: {:.2}\nSplit amounts:\n{}",
+        serial_num,
+        payment.description,
+        reformat_datetime(&payment.datetime),
+        payment.creditor,
+        payment.total,
+        display_debts(&payment.debts)
+    )
 }
 
 // Make a keyboard, button menu.
@@ -175,7 +190,6 @@ pub fn parse_datetime(text: &str) -> DateTime<Local> {
         new_text = new_text.replace(" UTC", "");
     }
     let datetime = NaiveDateTime::parse_from_str(&new_text, "%Y-%m-%d %H:%M:%S");
-    log::info!("Datetime: {:?}", datetime);
     match datetime {
         Ok(val) => val.and_utc().with_timezone(&Local),
         Err(_) => Local::now(),

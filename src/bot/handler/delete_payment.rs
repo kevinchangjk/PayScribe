@@ -2,31 +2,16 @@ use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
 
 use crate::bot::{
     dispatcher::{HandlerResult, State, UserDialogue},
-    handler::{
-        general::{NO_TEXT_MESSAGE, UNKNOWN_ERROR_MESSAGE},
-        utils::{
-            display_balances, display_debts, make_keyboard, parse_amount, parse_username,
-            process_debts,
-        },
-    },
-    processor::add_payment,
+    handler::utils::{display_balances, make_keyboard},
+    processor::delete_payment,
     BotError,
 };
+
+use super::{utils::display_payment, Payment};
 
 /* Utilities */
 const HEADER_MESSAGE: &str = "Adding a new payment entry!\n\n";
 const FOOTER_MESSAGE: &str = "\n\n";
-
-#[derive(Clone, Debug)]
-pub struct DeletePaymentParams {
-    payment_id: String,
-    chat_id: String,
-    datetime: String,
-    description: Option<String>,
-    creditor: Option<String>,
-    total: Option<f64>,
-    debts: Option<Vec<(String, f64)>>,
-}
 
 /* Action handler functions */
 
@@ -78,22 +63,151 @@ pub async fn no_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
     Ok(())
 }
 
-/* Edits a specified payment.
- * Bot will ask user to choose which part to edit, and ask for new values,
+/* Deletes a specified payment.
+ * Bot will ask user for confirmation (or cancellation),
  * before confirming the changes and updating the balances.
  */
 pub async fn action_delete_payment(
     bot: Bot,
     dialogue: UserDialogue,
     msg: Message,
+    (payments, page): (Vec<Payment>, usize),
+    serial_num: String,
 ) -> HandlerResult {
-    Ok(())
+    let user = msg.from();
+    if let Some(_user) = user {
+        let parsed_serial = serial_num.parse::<usize>();
+        match parsed_serial {
+            Ok(serial_num) => {
+                if serial_num > payments.len() || serial_num == 0 {
+                    bot.send_message(
+                        msg.chat.id,
+                        format!(
+                            "Invalid serial number! Please choose a number between 1 and {}.",
+                            payments.len()
+                        ),
+                    )
+                    .await?;
+                    return Ok(());
+                }
+
+                let payment = payments[serial_num - 1].clone();
+                let keyboard = make_keyboard(vec!["Cancel", "Confirm"], Some(2));
+                bot.send_message(
+                    msg.chat.id,
+                    format!(
+                        "Are you sure you want to delete the following payment?\n\n{}",
+                        display_payment(&payment, serial_num)
+                    ),
+                )
+                .reply_markup(keyboard)
+                .await?;
+                dialogue
+                    .update(State::DeletePayment {
+                        payment,
+                        payments,
+                        page,
+                    })
+                    .await?;
+                return Ok(());
+            }
+            Err(_) => {
+                bot.send_message(
+                    msg.chat.id,
+                    format!(
+                        "Invalid serial number! Please choose a number between 1 and {}.",
+                        payments.len()
+                    ),
+                )
+                .await?;
+                return Ok(());
+            }
+        }
+    }
+    dialogue.exit().await?;
+    Err(BotError::UserError(
+        "Unable to delete payment: User not found".to_string(),
+    ))
 }
 
 pub async fn action_delete_payment_confirm(
     bot: Bot,
     dialogue: UserDialogue,
-    msg: Message,
+    (payment, payments, page): (Payment, Vec<Payment>, usize),
+    query: CallbackQuery,
 ) -> HandlerResult {
+    if let Some(button) = &query.data {
+        bot.answer_callback_query(format!("{}", query.id)).await?;
+
+        if let Some(Message { id, chat, .. }) = query.message {
+            match button.as_str() {
+                "Cancel" => {
+                    bot.edit_message_text(
+                        chat.id,
+                        id,
+                        format!("Payment deletion cancelled, no changes made!"),
+                    )
+                    .await?;
+                    dialogue
+                        .update(State::ViewPayments { payments, page })
+                        .await?;
+                }
+                "Confirm" => {
+                    let payment_id = &payment.payment_id;
+                    let deletion = delete_payment(&chat.id.to_string(), payment_id);
+
+                    match deletion {
+                        Ok(balances) => {
+                            log::info!(
+                                "Delete Payment Submission - payment deleted for chat {} with payment {}",
+                                chat.id,
+                                display_payment(&payment, 1)
+                            );
+                            bot.edit_message_text(
+                                chat.id,
+                                id,
+                                format!(
+                                    "Payment successfully deleted!\n\nCurrent balances:\n{}",
+                                    display_balances(&balances)
+                                ),
+                            )
+                            .await?;
+                            dialogue
+                                .update(State::ViewPayments { payments, page })
+                                .await?;
+                        }
+                        Err(err) => {
+                            log::error!(
+                                "Delete Payment Submission - Processor failed to delete payment for chat {} with payment {}: {}",
+                                chat.id,
+                                display_payment(&payment, 1),
+                                err.to_string()
+                            );
+                            bot.edit_message_text(
+                                chat.id,
+                                id,
+                                format!("{}\nPayment deletion failed!", err.to_string()),
+                            )
+                            .await?;
+                            dialogue
+                                .update(State::ViewPayments { payments, page })
+                                .await?;
+                        }
+                    }
+                }
+                _ => {
+                    log::error!(
+                        "View Payments Menu - Invalid button in chat {}: {}",
+                        chat.id,
+                        button
+                    );
+                    dialogue
+                        .update(State::ViewPayments { payments, page })
+                        .await?;
+                }
+            }
+        }
+    }
+
     Ok(())
 }

@@ -6,31 +6,24 @@ use teloxide::{
 
 use crate::bot::{
     dispatcher::{HandlerResult, State, UserDialogue},
-    handler::{
-        general::{NO_TEXT_MESSAGE, UNKNOWN_ERROR_MESSAGE},
-        utils::{
-            display_balances, display_debts, make_keyboard, parse_amount, parse_username,
-            process_debts, reformat_datetime,
-        },
-    },
-    processor::{add_payment, view_payments},
+    handler::utils::{display_payment, make_keyboard},
+    processor::view_payments,
     redis::UserPayment,
     BotError,
 };
 
 /* Utilities */
 const HEADER_MESSAGE: &str = " payments tracked for this group!\n\n";
-const FOOTER_MESSAGE: &str = "\n\n";
 
 #[derive(Clone, Debug)]
 pub struct Payment {
-    payment_id: String,
-    chat_id: String,
-    datetime: String,
-    description: String,
-    creditor: String,
-    total: f64,
-    debts: Vec<(String, f64)>,
+    pub payment_id: String,
+    pub chat_id: String,
+    pub datetime: String,
+    pub description: String,
+    pub creditor: String,
+    pub total: f64,
+    pub debts: Vec<(String, f64)>,
 }
 
 fn unfold_payment(payment: UserPayment) -> Payment {
@@ -43,18 +36,6 @@ fn unfold_payment(payment: UserPayment) -> Payment {
         total: payment.payment.total,
         debts: payment.payment.debts,
     }
-}
-
-fn display_payment(payment: &Payment, serialNum: usize) -> String {
-    format!(
-        "______________________________\nEntry No. {} — {}\nDate: {}\nCreditor: {}\nTotal: {:.2}\nSplit amounts:\n{}",
-        serialNum,
-        payment.description,
-        reformat_datetime(&payment.datetime),
-        payment.creditor,
-        payment.total,
-        display_debts(&payment.debts)
-    )
 }
 
 fn display_payments_paged(payments: &Vec<Payment>, page: usize) -> String {
