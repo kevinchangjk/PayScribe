@@ -89,3 +89,11 @@ pub async fn action_edit_payment_confirm(
 ) -> HandlerResult {
     Ok(())
 }
+
+pub async fn action_edit_payment_edit(
+    bot: Bot,
+    dialogue: UserDialogue,
+    msg: Message,
+) -> HandlerResult {
+    Ok(())
+}

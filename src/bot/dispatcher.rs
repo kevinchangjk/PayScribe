@@ -10,11 +10,11 @@ use teloxide::{
 
 use crate::bot::handler::{
     action_delete_payment, action_delete_payment_confirm, action_edit_payment,
-    action_edit_payment_confirm, action_pay_back, action_pay_back_confirm, action_pay_back_debts,
-    action_view_balances, action_view_more, action_view_payments, block_add_payment,
-    block_delete_payment, block_edit_payment, block_pay_back, cancel_delete_payment,
-    cancel_edit_payment, cancel_pay_back, handle_repeated_add_payment, handle_repeated_pay_back,
-    no_delete_payment,
+    action_edit_payment_confirm, action_edit_payment_edit, action_pay_back,
+    action_pay_back_confirm, action_pay_back_debts, action_view_balances, action_view_more,
+    action_view_payments, block_add_payment, block_delete_payment, block_edit_payment,
+    block_pay_back, cancel_delete_payment, cancel_edit_payment, cancel_pay_back,
+    handle_repeated_add_payment, handle_repeated_pay_back, no_delete_payment,
 };
 
 use super::handler::{
@@ -284,6 +284,18 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::DeletePayment].endpoint(block_edit_payment)),
         )
         .branch(
+            case![State::EditPaymentDetails { payment, edit }]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::AddPayment].endpoint(block_edit_payment))
+                .branch(case![Command::Cancel].endpoint(cancel_edit_payment))
+                .branch(case![Command::ViewBalances].endpoint(block_edit_payment))
+                .branch(case![Command::PayBack].endpoint(block_edit_payment))
+                .branch(case![Command::ViewPayments].endpoint(block_edit_payment))
+                .branch(case![Command::EditPayment].endpoint(action_edit_payment))
+                .branch(case![Command::DeletePayment].endpoint(block_edit_payment)),
+        )
+        .branch(
             case![State::DeletePayment { payment }]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
@@ -304,6 +316,9 @@ pub async fn run_dispatcher(bot: Bot) {
         .branch(case![State::AddDebt { payment }].endpoint(action_add_debt))
         .branch(case![State::AddEdit { payment, edit }].endpoint(action_add_edit))
         .branch(case![State::PayBackDebts].endpoint(action_pay_back_debts))
+        .branch(
+            case![State::EditPaymentDetails { payment, edit }].endpoint(action_edit_payment_edit),
+        )
         .branch(dptree::endpoint(invalid_state));
 
     let callback_query_handler = Update::filter_callback_query()

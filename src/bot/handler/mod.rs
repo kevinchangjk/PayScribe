@@ -9,8 +9,8 @@ pub use self::delete_payment::{
     cancel_delete_payment, handle_repeated_delete_payment, no_delete_payment, DeletePaymentParams,
 };
 pub use self::edit_payment::{
-    action_edit_payment, action_edit_payment_confirm, block_edit_payment, cancel_edit_payment,
-    handle_repeated_edit_payment, no_edit_payment, EditPaymentParams,
+    action_edit_payment, action_edit_payment_confirm, action_edit_payment_edit, block_edit_payment,
+    cancel_edit_payment, handle_repeated_edit_payment, no_edit_payment, EditPaymentParams,
 };
 pub use self::general::{action_cancel, action_help, action_start, invalid_state};
 pub use self::pay_back::{
