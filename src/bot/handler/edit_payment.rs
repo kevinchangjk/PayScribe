@@ -433,7 +433,7 @@ pub async fn action_edit_payment_edit(
             AddPaymentEdit::Creditor => {
                 let new_edited_payment = EditPaymentParams {
                     description: edited_payment.description,
-                    creditor: Some(text.to_string()),
+                    creditor: Some(parse_username(text)),
                     total: edited_payment.total,
                     debts: edited_payment.debts,
                 };

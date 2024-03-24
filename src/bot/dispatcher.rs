@@ -274,7 +274,7 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::Help].endpoint(action_help))
                 .branch(case![Command::AddPayment].endpoint(action_add_payment))
                 .branch(case![Command::Cancel].endpoint(action_cancel))
-                .branch(case![Command::ViewBalances].endpoint(action_view_payments))
+                .branch(case![Command::ViewBalances].endpoint(action_view_balances))
                 .branch(case![Command::PayBack].endpoint(action_pay_back))
                 .branch(case![Command::ViewPayments].endpoint(action_view_payments))
                 .branch(case![Command::EditPayment { serial_num }].endpoint(action_edit_payment))

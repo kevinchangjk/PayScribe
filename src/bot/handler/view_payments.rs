@@ -7,8 +7,8 @@ use teloxide::{
 use crate::bot::{
     dispatcher::{HandlerResult, State, UserDialogue},
     handler::utils::{display_payment, make_keyboard},
-    processor::view_payments,
-    redis::UserPayment,
+    processor::{view_payments, ProcessError},
+    redis::{CrudError, UserPayment},
     BotError,
 };
 
@@ -110,14 +110,26 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
                 }
                 return Ok(());
             }
-            Err(err) => {
+            Err(ProcessError::CrudError(CrudError::NoPaymentsError())) => {
+                bot.send_message(msg.chat.id, format!("No payments found for this group!"))
+                    .await?;
                 dialogue.exit().await?;
-                return Err(BotError::UserError(format!(
+            }
+            Err(err) => {
+                log::error!(
                     "View Payments - User {} failed to view payments for group {}: {}",
                     sender_id,
                     chat_id,
                     err.to_string()
-                )));
+                );
+                bot.send_message(
+                    msg.chat.id,
+                    format!(
+                        "{}\nUnable to view payments for this group!",
+                        err.to_string()
+                    ),
+                )
+                .await?;
             }
         }
     }
