@@ -13,6 +13,17 @@ pretty_env_logger = "0.4"
 tokio = { version =  "1.8", features = ["rt-multi-thread", "macros"] }
 chrono = "0.4.30"
 dotenv = "0.15.0"
+thiserror = "1.0.58"
+serde = "1.0.197"
+serde_json = "1.0.114"
+
+[dependencies.uuid]
+version = "1.7.0"
+features = [
+    "v4",                # Lets you generate random UUIDs
+    "fast-rng",          # Use a faster (but still sufficiently random) RNG
+    "macro-diagnostics", # Enable better diagnostics for compile-time UUIDs
+]
 
 [lib]
 name = "payscribe"

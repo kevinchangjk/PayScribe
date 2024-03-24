@@ -1,11 +1,14 @@
 // bot/mod.rs
 
-// Re-export important items for external use
-pub use self::handlers::do_action;
-pub use self::handlers::Command;
-// Add other re-exports as needed
+// Exported functions
+pub use self::dispatcher::run_dispatcher;
+
+// Exported structs and types
+pub use self::dispatcher::{BotError, Command, HandlerResult, State, UserDialogue};
 
 // Declare submodules
-mod actions;
-mod handlers;
+mod dispatcher;
+mod handler;
+mod optimizer;
+mod processor;
 mod redis;
