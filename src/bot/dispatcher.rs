@@ -123,24 +123,24 @@ pub enum State {
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
 pub enum Command {
-    #[command(description = "Show this help message.")]
+    #[command(description = "Show all commands, and how to use the bot")]
     Help,
-    #[command(description = "Start the bot.")]
+    #[command(description = "Starts the bot")]
     Start,
-    #[command(description = "Cancels an ongoing action.")]
+    #[command(description = "Cancels an ongoing action")]
     Cancel,
-    #[command(description = "Add a payment entry for the group.")]
+    #[command(description = "Add a payment entry for the group")]
     AddPayment,
-    #[command(description = "View the current balances for the group.")]
-    ViewBalances,
-    #[command(description = "View all payment records for the group.")]
-    ViewPayments,
-    #[command(description = "Edit a payment entry in the group.")]
-    EditPayment { serial_num: String },
-    #[command(description = "Delete a specified payment entry no.")]
-    DeletePayment { serial_num: String },
-    #[command(description = "Add a entry paying back other members in the group.")]
+    #[command(description = "Add a entry paying back other members in the group")]
     PayBack,
+    #[command(description = "View all payment records for the group")]
+    ViewPayments,
+    #[command(description = "Edit a payment record previously added")]
+    EditPayment { serial_num: String },
+    #[command(description = "Delete a payment record previously added")]
+    DeletePayment { serial_num: String },
+    #[command(description = "View the current balances for the group")]
+    ViewBalances,
 }
 
 /* Main Dispatch function */
