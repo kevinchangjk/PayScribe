@@ -1,7 +1,5 @@
 use std::ops::Neg;
 
-use teloxide::prelude::*;
-
 use super::{
     optimizer::optimize_debts,
     redis::{
@@ -145,55 +143,52 @@ pub fn view_payments(
  * Has to be called after self::view_payments.
  */
 pub fn edit_payment(
-    msg: Message,
+    chat_id: &str,
     payment_id: &str,
-    current_payment: Payment,
     description: Option<&str>,
     creditor: Option<&str>,
     total: Option<&f64>,
     debts: Option<Vec<(String, f64)>>,
 ) -> Result<Option<Vec<Debt>>, ProcessError> {
+    // Get current payment entry
+    let current_payment = get_payment_entry(payment_id)?;
+
     // Edit payment entry
     update_payment_entry(payment_id, description, creditor, total, debts.clone())?;
 
     // Update balances in two stages: first undo the previous payment, then set the new one
-    if let Some(creditor) = creditor {
-        if let Some(total) = total {
-            if let Some(debts) = debts {
-                let chat_id = msg.chat.id.to_string();
+    if creditor.is_some() || total.is_some() || debts.is_some() {
+        // First round of update
+        let mut prev_changes: Vec<UserBalance> = current_payment
+            .debts
+            .iter()
+            .map(|debt| UserBalance {
+                username: debt.0.to_string(),
+                balance: debt.1,
+            })
+            .collect();
+        prev_changes.push(UserBalance {
+            username: current_payment.creditor.clone(),
+            balance: current_payment.total.neg(),
+        });
+        update_chat_balances(&chat_id, prev_changes)?;
 
-                // First round of update
-                let mut prev_changes: Vec<UserBalance> = current_payment
-                    .debts
-                    .iter()
-                    .map(|debt| UserBalance {
-                        username: debt.0.to_string(),
-                        balance: debt.1,
-                    })
-                    .collect();
-                prev_changes.push(UserBalance {
-                    username: current_payment.creditor,
-                    balance: current_payment.total.neg(),
-                });
-                update_chat_balances(&chat_id, prev_changes)?;
+        // Second round of update
+        let mut changes: Vec<UserBalance> = debts
+            .unwrap_or(current_payment.debts)
+            .iter()
+            .map(|debt| UserBalance {
+                username: debt.0.to_string(),
+                balance: debt.1.neg(),
+            })
+            .collect();
+        changes.push(UserBalance {
+            username: creditor.unwrap_or(&current_payment.creditor).to_string(),
+            balance: *total.unwrap_or(&current_payment.total),
+        });
 
-                // Second round of update
-                let mut changes: Vec<UserBalance> = debts
-                    .iter()
-                    .map(|debt| UserBalance {
-                        username: debt.0.to_string(),
-                        balance: debt.1.neg(),
-                    })
-                    .collect();
-                changes.push(UserBalance {
-                    username: creditor.to_string(),
-                    balance: *total,
-                });
-
-                let res = update_balances_debts(&chat_id, changes)?;
-                return Ok(Some(res));
-            }
-        }
+        let res = update_balances_debts(&chat_id, changes)?;
+        return Ok(Some(res));
     }
 
     Ok(None)

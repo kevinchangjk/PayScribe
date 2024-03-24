@@ -4,6 +4,8 @@ use super::super::dispatcher::{Command, HandlerResult, UserDialogue};
 
 pub const UNKNOWN_ERROR_MESSAGE: &str = "An unknown error occurred. Please try again.";
 pub const NO_TEXT_MESSAGE: &str = "Please reply in text.\n\n";
+pub const DEBT_INSTRUCTIONS_MESSAGE: &str =
+    "Enter the usernames and the amounts as follows: \n\n@user1 amount1, @user2 amount2, etc.\n\n";
 const INVALID_STATE_MESSAGE: &str = "Unable to handle the message. Type /help to see the usage.";
 const START_MESSAGE: &str = "Hi, I'm PayScribe!";
 

@@ -7,7 +7,10 @@ use crate::bot::{
     BotError,
 };
 
-use super::{utils::display_payment, Payment};
+use super::{
+    utils::{display_payment, parse_serial_num},
+    Payment,
+};
 
 /* Utilities */
 const HEADER_MESSAGE: &str = "Adding a new payment entry!\n\n";
@@ -76,21 +79,9 @@ pub async fn action_delete_payment(
 ) -> HandlerResult {
     let user = msg.from();
     if let Some(_user) = user {
-        let parsed_serial = serial_num.parse::<usize>();
+        let parsed_serial = parse_serial_num(&serial_num, payments.len());
         match parsed_serial {
             Ok(serial_num) => {
-                if serial_num > payments.len() || serial_num == 0 {
-                    bot.send_message(
-                        msg.chat.id,
-                        format!(
-                            "Invalid serial number! Please choose a number between 1 and {}.",
-                            payments.len()
-                        ),
-                    )
-                    .await?;
-                    return Ok(());
-                }
-
                 let payment = payments[serial_num - 1].clone();
                 let keyboard = make_keyboard(vec!["Cancel", "Confirm"], Some(2));
                 bot.send_message(
@@ -111,11 +102,12 @@ pub async fn action_delete_payment(
                     .await?;
                 return Ok(());
             }
-            Err(_) => {
+            Err(err) => {
                 bot.send_message(
                     msg.chat.id,
                     format!(
-                        "Invalid serial number! Please choose a number between 1 and {}.",
+                        "{}\nPlease choose a number between 1 and {}.",
+                        err.to_string(),
                         payments.len()
                     ),
                 )
@@ -130,6 +122,9 @@ pub async fn action_delete_payment(
     ))
 }
 
+/* Deletes a specified payment.
+ * Bot receives a callback query from the user, and will either confirm or cancel the deletion.
+ */
 pub async fn action_delete_payment_confirm(
     bot: Bot,
     dialogue: UserDialogue,
@@ -197,7 +192,7 @@ pub async fn action_delete_payment_confirm(
                 }
                 _ => {
                     log::error!(
-                        "View Payments Menu - Invalid button in chat {}: {}",
+                        "Delete Payment Menu - Invalid button in chat {}: {}",
                         chat.id,
                         button
                     );

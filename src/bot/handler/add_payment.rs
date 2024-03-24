@@ -3,7 +3,7 @@ use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
 use crate::bot::{
     dispatcher::{HandlerResult, State, UserDialogue},
     handler::{
-        general::{NO_TEXT_MESSAGE, UNKNOWN_ERROR_MESSAGE},
+        general::{DEBT_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, UNKNOWN_ERROR_MESSAGE},
         utils::{
             display_balances, display_debts, make_keyboard, parse_amount, parse_username,
             process_debts,
@@ -16,8 +16,6 @@ use crate::bot::{
 /* Utilities */
 const HEADER_MESSAGE: &str = "Adding a new payment entry!\n\n";
 const FOOTER_MESSAGE: &str = "\n\n";
-const DEBT_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and the amounts as follows: \n\n@user1 amount1, @user2 amount2, etc.\n\n";
 
 #[derive(Clone, Debug)]
 pub struct AddPaymentParams {
