@@ -123,10 +123,10 @@ pub enum State {
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
 pub enum Command {
-    #[command(description = "Show all commands, and how to use the bot")]
-    Help,
     #[command(description = "Starts the bot")]
     Start,
+    #[command(description = "Show all commands, and how to use the bot")]
+    Help,
     #[command(description = "Cancels an ongoing action")]
     Cancel,
     #[command(description = "Add a payment entry for the group")]
