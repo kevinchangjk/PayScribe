@@ -127,8 +127,6 @@ pub enum Command {
     Start,
     #[command(description = "Show all commands, and how to use the bot")]
     Help,
-    #[command(description = "Cancels an ongoing action")]
-    Cancel,
     #[command(description = "Add a payment entry for the group")]
     AddPayment,
     #[command(description = "Add a entry paying back other members in the group")]
@@ -141,6 +139,8 @@ pub enum Command {
     DeletePayment { serial_num: String },
     #[command(description = "View the current balances for the group")]
     ViewBalances,
+    #[command(description = "Cancels an ongoing action")]
+    Cancel,
 }
 
 /* Main Dispatch function */
