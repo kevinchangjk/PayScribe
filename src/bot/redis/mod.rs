@@ -1,20 +1,13 @@
 // Exported functions
-pub use self::connect::test_redis_connection;
-pub use self::manager::add_payment_entry;
-pub use self::manager::delete_payment_entry;
-pub use self::manager::get_chat_payments_details;
-pub use self::manager::retrieve_chat_debts;
-pub use self::manager::update_chat;
-pub use self::manager::update_chat_balances;
-pub use self::manager::update_chat_debts;
-pub use self::manager::update_payment_entry;
-pub use self::manager::update_user;
+pub use self::manager::{
+    add_payment_entry, delete_payment_entry, get_chat_payments_details, get_payment_entry,
+    retrieve_chat_debts, update_chat, update_chat_balances, update_chat_debts,
+    update_payment_entry, update_user,
+};
 
 // Exported structs and types
 pub use self::chat::Debt;
-pub use self::manager::CrudError;
-pub use self::manager::UserBalance;
-pub use self::manager::UserPayment;
+pub use self::manager::{CrudError, UserBalance, UserPayment};
 pub use self::payment::Payment;
 
 // Submodules

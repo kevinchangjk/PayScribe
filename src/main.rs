@@ -1,17 +1,6 @@
 mod bot;
-use bot::do_action;
-use bot::Command;
-use teloxide::repls::CommandReplExt;
 
-// Derive BotCommands to parse text with a command into this enumeration.
-//
-// 1. `rename_rule = "lowercase"` turns all the commands into lowercase letters.
-// 2. `description = "..."` specifies a text before all the commands.
-//
-// That is, you can just call Command::descriptions() to get a description of
-// your commands in this format:
-// %GENERAL-DESCRIPTION%
-// %PREFIX%%COMMAND% - %DESCRIPTION%
+use payscribe::bot::run_dispatcher;
 
 #[tokio::main]
 async fn main() {
@@ -23,5 +12,5 @@ async fn main() {
 
     log::info!("PayScribe bot started successfully!");
 
-    Command::repl(bot, do_action).await;
+    run_dispatcher(bot).await;
 }

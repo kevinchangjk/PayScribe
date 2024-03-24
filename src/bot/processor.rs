@@ -1,13 +1,10 @@
 use std::ops::Neg;
 
-use chrono::Duration;
-use teloxide::{prelude::*, types::ChatPermissions};
-
 use super::{
     optimizer::optimize_debts,
     redis::{
-        add_payment_entry, delete_payment_entry, get_chat_payments_details, retrieve_chat_debts,
-        test_redis_connection, update_chat, update_chat_balances, update_chat_debts,
+        add_payment_entry, delete_payment_entry, get_chat_payments_details, get_payment_entry,
+        retrieve_chat_debts, update_chat, update_chat_balances, update_chat_debts,
         update_payment_entry, update_user, CrudError, Debt, Payment, UserBalance, UserPayment,
     },
 };
@@ -33,12 +30,13 @@ impl From<CrudError> for ProcessError {
 }
 
 /* Utility functions */
-fn auto_update_user(msg: Message) -> Result<(), ProcessError> {
-    let chat_id = msg.chat.id.to_string();
-    if let Some(user) = msg.from() {
-        if let Some(username) = &user.username {
-            update_user(username, &chat_id, Some(&user.id.to_string()))?;
-        }
+fn auto_update_user(
+    chat_id: &str,
+    sender_id: &str,
+    sender_username: Option<&str>,
+) -> Result<(), ProcessError> {
+    if let Some(username) = sender_username {
+        update_user(&username, chat_id, Some(sender_id))?;
     }
     Ok(())
 }
@@ -49,10 +47,11 @@ fn update_balances_debts(
 ) -> Result<Vec<Debt>, ProcessError> {
     // Update balances
     let balances = update_chat_balances(chat_id, changes)?;
+    log::info!("{:?}", balances);
 
     // Update group debts
     let debts = optimize_debts(balances);
-    update_chat_debts(&chat_id, debts.clone())?;
+    update_chat_debts(&chat_id, &debts)?;
 
     Ok(debts)
 }
@@ -60,32 +59,41 @@ fn update_balances_debts(
 /* Add a new payment entry in a group chat.
  * Execution flow: Updates relevant users, updates chat.
  * Adds payment entry, updates balances, updates group debts.
+ * Important: assumes that debts sum up to total. Creditor's share included.
  */
 pub fn add_payment(
-    msg: Message,
+    chat_id: String,
+    sender_username: String,
+    sender_id: String,
+    datetime: String,
     description: &str,
     creditor: &str,
     total: f64,
     debts: Vec<(String, f64)>,
 ) -> Result<Vec<Debt>, ProcessError> {
-    let chat_id = msg.chat.id.to_string();
     let mut all_users = vec![creditor.to_string()];
 
     for (user, _) in debts.iter() {
+        if user == &creditor {
+            continue;
+        }
         all_users.push(user.to_string());
     }
 
     // Update all users included in payment
+    let mut is_sender_included = false;
     for user in all_users.iter() {
+        if user == &sender_username {
+            is_sender_included = true;
+            continue;
+        }
         update_user(user, &chat_id, None)?;
     }
 
     // Add message sender to the list of users
-    if let Some(user) = msg.from() {
-        if let Some(username) = &user.username {
-            update_user(username, &chat_id, Some(&user.id.to_string()))?;
-            all_users.push(username.to_string());
-        }
+    update_user(&sender_username, &chat_id, Some(&sender_id))?;
+    if !is_sender_included {
+        all_users.push(sender_username);
     }
 
     // Update chat
@@ -94,7 +102,7 @@ pub fn add_payment(
     // Add payment entry
     let payment = Payment {
         description: description.to_string(),
-        datetime: msg.date.to_string(),
+        datetime,
         creditor: creditor.to_string(),
         total,
         debts: debts.clone(),
@@ -109,6 +117,7 @@ pub fn add_payment(
             balance: amount.neg(),
         })
         .collect();
+
     changes.push(UserBalance {
         username: creditor.to_string(),
         balance: total,
@@ -121,10 +130,13 @@ pub fn add_payment(
  * Execution flow: Retrieve chat payment details.
  * Called only once per command. Pagination handled by Handler.
  */
-pub fn view_payments(msg: Message) -> Result<Vec<UserPayment>, ProcessError> {
-    auto_update_user(msg.clone())?;
+pub fn view_payments(
+    chat_id: &str,
+    sender_id: &str,
+    sender_username: Option<&str>,
+) -> Result<Vec<UserPayment>, ProcessError> {
+    auto_update_user(chat_id, sender_id, sender_username)?;
 
-    let chat_id = msg.chat.id.to_string();
     let payments = get_chat_payments_details(&chat_id)?;
     Ok(payments)
 }
@@ -135,55 +147,56 @@ pub fn view_payments(msg: Message) -> Result<Vec<UserPayment>, ProcessError> {
  * Has to be called after self::view_payments.
  */
 pub fn edit_payment(
-    msg: Message,
+    chat_id: &str,
     payment_id: &str,
-    current_payment: Payment,
     description: Option<&str>,
     creditor: Option<&str>,
     total: Option<&f64>,
     debts: Option<Vec<(String, f64)>>,
 ) -> Result<Option<Vec<Debt>>, ProcessError> {
+    // Get current payment entry
+    let current_payment = get_payment_entry(payment_id)?;
+
     // Edit payment entry
     update_payment_entry(payment_id, description, creditor, total, debts.clone())?;
 
     // Update balances in two stages: first undo the previous payment, then set the new one
-    if let Some(creditor) = creditor {
-        if let Some(total) = total {
-            if let Some(debts) = debts {
-                let chat_id = msg.chat.id.to_string();
+    if creditor.is_some() || total.is_some() || debts.is_some() {
+        // First round of update
+        let mut prev_changes: Vec<UserBalance> = current_payment
+            .debts
+            .iter()
+            .map(|debt| UserBalance {
+                username: debt.0.to_string(),
+                balance: debt.1,
+            })
+            .collect();
+        prev_changes.push(UserBalance {
+            username: current_payment.creditor.clone(),
+            balance: current_payment.total.neg(),
+        });
+        update_chat_balances(&chat_id, prev_changes.clone())?;
 
-                // First round of update
-                let mut prev_changes: Vec<UserBalance> = current_payment
-                    .debts
-                    .iter()
-                    .map(|debt| UserBalance {
-                        username: debt.0.to_string(),
-                        balance: debt.1,
-                    })
-                    .collect();
-                prev_changes.push(UserBalance {
-                    username: current_payment.creditor,
-                    balance: current_payment.total.neg(),
-                });
-                update_chat_balances(&chat_id, prev_changes)?;
+        log::info!("{:?}", prev_changes);
 
-                // Second round of update
-                let mut changes: Vec<UserBalance> = debts
-                    .iter()
-                    .map(|debt| UserBalance {
-                        username: debt.0.to_string(),
-                        balance: debt.1.neg(),
-                    })
-                    .collect();
-                changes.push(UserBalance {
-                    username: creditor.to_string(),
-                    balance: *total,
-                });
+        // Second round of update
+        let mut changes: Vec<UserBalance> = debts
+            .unwrap_or(current_payment.debts)
+            .iter()
+            .map(|debt| UserBalance {
+                username: debt.0.to_string(),
+                balance: debt.1.neg(),
+            })
+            .collect();
+        changes.push(UserBalance {
+            username: creditor.unwrap_or(&current_payment.creditor).to_string(),
+            balance: *total.unwrap_or(&current_payment.total),
+        });
 
-                let res = update_balances_debts(&chat_id, changes)?;
-                return Ok(Some(res));
-            }
-        }
+        log::info!("{:?}", changes);
+
+        let res = update_balances_debts(&chat_id, changes)?;
+        return Ok(Some(res));
     }
 
     Ok(None)
@@ -194,17 +207,15 @@ pub fn edit_payment(
  * Update balances, update group debts.
  * Has to be called after self::view_payments.
  */
-pub fn delete_payment(
-    msg: Message,
-    payment_id: &str,
-    current_payment: Payment,
-) -> Result<Vec<Debt>, ProcessError> {
+pub fn delete_payment(chat_id: &str, payment_id: &str) -> Result<Vec<Debt>, ProcessError> {
+    // Get payment entry
+    let payment = get_payment_entry(payment_id)?;
+
     // Delete payment entry
-    let chat_id = msg.chat.id.to_string();
     delete_payment_entry(&chat_id, payment_id)?;
 
     // Update balances
-    let mut changes: Vec<UserBalance> = current_payment
+    let mut changes: Vec<UserBalance> = payment
         .debts
         .iter()
         .map(|debt| UserBalance {
@@ -213,8 +224,8 @@ pub fn delete_payment(
         })
         .collect();
     changes.push(UserBalance {
-        username: current_payment.creditor,
-        balance: current_payment.total.neg(),
+        username: payment.creditor,
+        balance: payment.total.neg(),
     });
 
     update_balances_debts(&chat_id, changes)
@@ -223,10 +234,13 @@ pub fn delete_payment(
 /* View all debts (balances) of a group chat.
  * Execution flow: Retrieve all debts.
  */
-pub fn view_debts(msg: Message) -> Result<Vec<Debt>, ProcessError> {
-    auto_update_user(msg.clone())?;
+pub fn view_debts(
+    chat_id: &str,
+    sender_id: &str,
+    sender_username: Option<&str>,
+) -> Result<Vec<Debt>, ProcessError> {
+    auto_update_user(chat_id, sender_id, sender_username)?;
 
-    let chat_id = msg.chat.id.to_string();
     let debts = retrieve_chat_debts(&chat_id)?;
     Ok(debts)
 }

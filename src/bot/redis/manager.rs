@@ -4,7 +4,8 @@ use super::{
     balance::{get_balance, get_balance_exists, set_balance},
     chat::{
         add_chat, add_chat_payment, add_chat_user_multiple, delete_chat_payment, get_chat_debt,
-        get_chat_exists, get_chat_payment_exists, get_chat_payments, set_chat_debt, Debt,
+        get_chat_exists, get_chat_payment_exists, get_chat_payments, get_chat_users, set_chat_debt,
+        Debt,
     },
     connect::{connect, DBError},
     payment::{add_payment, delete_payment, get_payment, update_payment, Payment},
@@ -118,25 +119,29 @@ pub fn update_chat_balances(
 ) -> Result<Vec<UserBalance>, CrudError> {
     let mut con = connect()?;
 
-    let mut updated_balances = vec![];
-
+    // Update balances through changes
     for change in changes {
         let username = change.username;
         let balance = change.balance;
         if let Ok(false) = get_balance_exists(&mut con, chat_id, &username) {
-            updated_balances.push(UserBalance {
-                username: username.clone(),
-                balance,
-            });
             set_balance(&mut con, chat_id, &username, balance)?;
         } else {
             let current_balance = get_balance(&mut con, chat_id, &username)?;
             let new_balance = current_balance + balance;
-            updated_balances.push(UserBalance {
-                username: username.clone(),
-                balance: new_balance,
-            });
             set_balance(&mut con, chat_id, &username, new_balance)?;
+        }
+    }
+
+    // Retrieve all balances
+    let mut updated_balances: Vec<UserBalance> = Vec::new();
+    let users = get_chat_users(&mut con, chat_id)?;
+    for user in users {
+        if get_balance_exists(&mut con, chat_id, &user)? {
+            let balance = get_balance(&mut con, chat_id, &user)?;
+            updated_balances.push(UserBalance {
+                username: user,
+                balance,
+            });
         }
     }
 
@@ -145,7 +150,7 @@ pub fn update_chat_balances(
 
 /* Sets the latest state of simplified debts for a chat.
  */
-pub fn update_chat_debts(chat_id: &str, debts: Vec<Debt>) -> Result<(), CrudError> {
+pub fn update_chat_debts(chat_id: &str, debts: &Vec<Debt>) -> Result<(), CrudError> {
     let mut con = connect()?;
 
     set_chat_debt(&mut con, chat_id, debts)?;
@@ -208,6 +213,23 @@ pub fn get_chat_payments_details(chat_id: &str) -> Result<Vec<UserPayment>, Crud
     }
 
     Ok(payments)
+}
+
+/* Retrieves a specific payment entry by ID.
+ * Called when a user wants to edit or delete a payment.
+ */
+pub fn get_payment_entry(payment_id: &str) -> Result<Payment, CrudError> {
+    let mut con = connect()?;
+
+    let payment = get_payment(&mut con, payment_id);
+
+    match payment {
+        Err(_) => {
+            log::info!("No such payment found for payment_id {}", payment_id);
+            Err(CrudError::NoSuchPaymentError())
+        }
+        Ok(payment) => Ok(payment),
+    }
 }
 
 /* Updates a payment entry.
@@ -469,6 +491,10 @@ mod tests {
         let payments = get_chat_payments_details(chat_id).unwrap();
         let second_id = payments[0].payment_id.clone();
 
+        // Gets second payment by ID
+        let second_payment_values = get_payment_entry(&second_id);
+        assert_eq!(second_payment_values.unwrap(), second_payment);
+
         // Updates second payment
         let updated_description = "manager_test_payment_3";
         let updated_creditor = "manager_test_user_16";
@@ -690,7 +716,7 @@ mod tests {
         ];
 
         // Adds debts
-        assert!(update_chat_debts(chat_id, debts.clone()).is_ok());
+        assert!(update_chat_debts(chat_id, &debts).is_ok());
 
         // Checks that debts are correct
         assert_eq!(retrieve_chat_debts(chat_id).unwrap(), debts);
@@ -708,7 +734,7 @@ mod tests {
                 amount: 100.0,
             },
         ];
-        assert!(update_chat_debts(chat_id, new_debts.clone()).is_ok());
+        assert!(update_chat_debts(chat_id, &new_debts).is_ok());
 
         // Checks that debts are correct
         assert_eq!(retrieve_chat_debts(chat_id).unwrap(), new_debts);
