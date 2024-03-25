@@ -13,8 +13,9 @@ use super::Payment;
 
 pub const MAX_VALUE: f64 = 10_000_000_000_000.00;
 pub const UNKNOWN_ERROR_MESSAGE: &str =
-    "Hmm, something went wrong! Sorry, I can't do that right now, please try again later!\n\n";
-pub const NO_TEXT_MESSAGE: &str = "Sorry, I can't understand that! Please reply to me in text.\n\n";
+    "❓ Hmm, something went wrong! Sorry, I can't do that right now, please try again later!\n\n";
+pub const NO_TEXT_MESSAGE: &str =
+    "❓ Sorry, I can't understand that! Please reply to me in text.\n\n";
 pub const DEBT_INSTRUCTIONS_MESSAGE: &str =
     "Enter the usernames and costs as follows: \n\n@user1 amount1, @user2 amount2, etc.\n\n";
 pub const COMMAND_START: &str = "/start";
@@ -69,7 +70,7 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
     }
 
     if message.is_empty() {
-        "No outstanding balances!".to_string()
+        "No outstanding balances! 👍".to_string()
     } else {
         message
     }
@@ -137,7 +138,7 @@ pub fn parse_amount(text: &str) -> Result<f64, BotError> {
             Ok(val) => val as f64,
             Err(_) => {
                 return Err(BotError::UserError(
-                    "Please provide a valid number!".to_string(),
+                    "❌ Please provide a valid number!".to_string(),
                 ))
             }
         },
@@ -145,11 +146,11 @@ pub fn parse_amount(text: &str) -> Result<f64, BotError> {
 
     if amount > MAX_VALUE {
         Err(BotError::UserError(
-            "This number is too large for me to process!".to_string(),
+            "❌ This number is too large for me to process!".to_string(),
         ))
     } else if amount <= 0.0 {
         Err(BotError::UserError(
-            "Please provide a positive value!".to_string(),
+            "❌ Please provide a positive value!".to_string(),
         ))
     } else {
         Ok(amount)
@@ -160,7 +161,7 @@ pub fn parse_amount(text: &str) -> Result<f64, BotError> {
 pub fn parse_serial_num(text: &str, length: usize) -> Result<usize, BotError> {
     if text.is_empty() {
         return Err(BotError::UserError(
-            "Please provide your chosen serial number!".to_string(),
+            "❌ Please provide your chosen serial number!".to_string(),
         ));
     }
     let parsed_num = text.parse::<usize>();
@@ -168,14 +169,14 @@ pub fn parse_serial_num(text: &str, length: usize) -> Result<usize, BotError> {
         Ok(serial_num) => {
             if serial_num > length || serial_num == 0 {
                 Err(BotError::UserError(
-                    "Please provide a valid serial number for your payments!".to_string(),
+                    "❌ Please provide a valid serial number for your payments!".to_string(),
                 ))
             } else {
                 Ok(serial_num)
             }
         }
         Err(_) => Err(BotError::UserError(
-            "Please provide a proper number!".to_string(),
+            "❌ Please provide a proper number!".to_string(),
         )),
     }
 }
@@ -193,7 +194,7 @@ pub fn process_debts(
         let pair = pair.split_whitespace().collect::<Vec<&str>>();
         if pair.len() != 2 {
             return Err(BotError::UserError(
-                "Please use the following format!".to_string(),
+                "❌ Please use the following format!".to_string(),
             ));
         }
 
@@ -219,7 +220,8 @@ pub fn process_debts(
         if let Some(total) = total {
             if sum > total {
                 Err(BotError::UserError(
-                    "Something's wrong! The sum of the amounts exceeds the total paid.".to_string(),
+                    "❌ Something's wrong! The sum of the amounts exceeds the total paid."
+                        .to_string(),
                 ))
             } else if sum < total {
                 for debt in &mut debts {

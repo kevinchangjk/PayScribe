@@ -22,7 +22,8 @@ pub struct EditPaymentParams {
     debts: Option<Vec<(String, f64)>>,
 }
 
-const CANCEL_MESSAGE: &str = "Sure, I've cancelled editing the payment. No changes have been made!";
+const CANCEL_MESSAGE: &str =
+    "Sure, I've cancelled editing the payment. No changes have been made! 👌";
 
 /* Displays a payment entry by combining original entry and edited fields.
  */
@@ -115,7 +116,7 @@ async fn call_processor_edit_payment(
                             chat.id,
                             id,
                             format!(
-                                "I've edited the payment!\n\n{}\nHere are the updated balances:\n{}",
+                                "🎉 I've edited the payment!\n\n{}\nHere are the updated balances:\n{}",
                                 edit_overview,
                                 display_balances(&balances)
                             ),
@@ -127,7 +128,7 @@ async fn call_processor_edit_payment(
                             chat.id,
                             id,
                             format!(
-                                "I've edited the payment!\n\n{}\nThere are no changes to the balances.",
+                                "🎉 I've edited the payment!\n\n{}\nThere are no changes to the balances.",
                                 edit_overview
                             ),
                         )
@@ -149,7 +150,7 @@ async fn call_processor_edit_payment(
                     chat.id,
                     id,
                     format!(
-                        "Hmm, something went wrong! Sorry, I can't edit the payment right now."
+                        "❓ Hmm, something went wrong! Sorry, I can't edit the payment right now."
                     ),
                 )
                 .await?;
@@ -171,7 +172,7 @@ async fn call_processor_edit_payment(
 pub async fn handle_repeated_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "You are already editing a payment entry! Please complete or cancel the current operation before starting a new one.",
+        "🚫 You are already editing a payment entry! Please complete or cancel the current operation before starting a new one.",
     ).await?;
     Ok(())
 }
@@ -191,7 +192,7 @@ pub async fn cancel_edit_payment(bot: Bot, dialogue: UserDialogue, msg: Message)
 pub async fn block_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "You are currently editing a payment entry! Please complete or cancel the current payment entry before starting another command.",
+        "🚫 You are currently editing a payment entry! Please complete or cancel the current payment entry before starting another command.",
     ).await?;
     Ok(())
 }
@@ -202,7 +203,7 @@ pub async fn block_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn no_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("Please view the payment records first with {COMMAND_VIEW_PAYMENTS}!"),
+        format!("❌ Please view the payment records first with {COMMAND_VIEW_PAYMENTS}!"),
     )
     .await?;
     Ok(())

@@ -31,7 +31,8 @@ pub enum AddPaymentEdit {
     Debts,
 }
 
-const CANCEL_MESSAGE: &str = "Sure, I've cancelled adding the payment. No changes have been made!";
+const CANCEL_MESSAGE: &str =
+    "Sure, I've cancelled adding the payment. No changes have been made! 👌";
 
 /* Displays a payment entry (being added) in String format.
  */
@@ -88,7 +89,7 @@ async fn display_add_edit_menu(
     let keyboard = make_keyboard(buttons, Some(2));
 
     if let Some(Message { id, chat, .. }) = query.message {
-        bot.edit_message_text(chat.id, id, "What would you like to edit?")
+        bot.edit_message_text(chat.id, id, "Sure! What would you like to edit?")
             .reply_markup(keyboard)
             .await?;
         dialogue.update(State::AddEditMenu { payment }).await?;
@@ -109,12 +110,6 @@ async fn handle_debts(
         Some(text) => {
             let debts = process_debts(text, &payment.creditor, payment.total);
             if let Err(err) = debts {
-                log::error!(
-                    "Add Payment - Debt parsing failed for user {} in chat {}: {}",
-                    payment.sender_id,
-                    payment.chat_id,
-                    err.to_string()
-                );
                 bot.send_message(
                     msg.chat.id,
                     format!("{}\n\n{DEBT_INSTRUCTIONS_MESSAGE}", err.to_string()),
@@ -234,7 +229,9 @@ async fn call_processor_add_payment(
                 bot.edit_message_text(
                     chat.id,
                     id,
-                    format!("Hmm, something went wrong! Sorry, I can't add the payment right now."),
+                    format!(
+                        "❓ Hmm, something went wrong! Sorry, I can't add the payment right now."
+                    ),
                 )
                 .await?;
             }
@@ -249,7 +246,7 @@ async fn call_processor_add_payment(
                     chat.id,
                     id,
                     format!(
-                        "I've added the payment!\n\n{}Here are the updated balances:\n{}",
+                        "🎉 I've added the payment!\n\n{}Here are the updated balances:\n{}",
                         payment_overview,
                         display_balances(&balances)
                     ),
@@ -270,7 +267,7 @@ async fn call_processor_add_payment(
 pub async fn handle_repeated_add_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "You are already adding a payment entry! Please complete or cancel the current operation before starting a new one.",
+        "🚫 You are already adding a payment entry! Please complete or cancel the current operation before starting a new one.",
     ).await?;
     Ok(())
 }
@@ -290,7 +287,7 @@ pub async fn cancel_add_payment(bot: Bot, dialogue: UserDialogue, msg: Message) 
 pub async fn block_add_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "You are currently adding a payment entry! Please complete or cancel the current payment entry before starting another command.",
+        "🚫 You are currently adding a payment entry! Please complete or cancel the current payment entry before starting another command.",
     ).await?;
     Ok(())
 }
@@ -321,40 +318,34 @@ pub async fn action_add_description(
         Some(text) => {
             let user = msg.from();
             if let Some(user) = user {
-                let username = match &user.username {
-                    Some(user) => parse_username(user),
-                    None => {
-                        return Err(BotError::UserError(format!(
-                            "Add Payment - Username not found for user ID {}",
-                            user.id.to_string()
-                        )));
-                    }
-                };
-                let payment = AddPaymentParams {
-                    chat_id: msg.chat.id.to_string(),
-                    sender_id: user.id.to_string(),
-                    sender_username: username,
-                    datetime: msg.date.to_string(),
-                    description: Some(text.to_string()),
-                    creditor: None,
-                    total: None,
-                    debts: None,
-                };
-                log::info!(
+                if let Some(username) = &user.username {
+                    let username = parse_username(username);
+                    let payment = AddPaymentParams {
+                        chat_id: msg.chat.id.to_string(),
+                        sender_id: user.id.to_string(),
+                        sender_username: username,
+                        datetime: msg.date.to_string(),
+                        description: Some(text.to_string()),
+                        creditor: None,
+                        total: None,
+                        debts: None,
+                    };
+                    log::info!(
                     "Add Payment - Description updated successfully for user {} in chat {}: {:?}",
                     payment.sender_id,
                     payment.chat_id,
                     payment
                 );
-                bot.send_message(
-                    msg.chat.id,
-                    format!(
-                        "{}Great! Who paid for this item?",
-                        display_add_payment(&payment)
-                    ),
-                )
-                .await?;
-                dialogue.update(State::AddCreditor { payment }).await?;
+                    bot.send_message(
+                        msg.chat.id,
+                        format!(
+                            "{}Great! Who paid for this item?",
+                            display_add_payment(&payment)
+                        ),
+                    )
+                    .await?;
+                    dialogue.update(State::AddCreditor { payment }).await?;
+                }
             }
         }
         None => {

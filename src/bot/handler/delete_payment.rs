@@ -15,7 +15,7 @@ use crate::bot::{
 /* Utilities */
 
 const CANCEL_MESSAGE: &str =
-    "Sure, I've cancelled deleting the payment. No changes have been made!";
+    "Sure, I've cancelled deleting the payment. No changes have been made! 👌";
 
 /* Action handler functions */
 
@@ -25,7 +25,7 @@ const CANCEL_MESSAGE: &str =
 pub async fn handle_repeated_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "You are already deleting a payment entry! Please complete or cancel the current operation before starting a new one.",
+        "🚫 You are already deleting a payment entry! Please complete or cancel the current operation before starting a new one.",
     ).await?;
     Ok(())
 }
@@ -49,7 +49,7 @@ pub async fn cancel_delete_payment(
 pub async fn block_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "You are currently deleting a payment entry! Please complete or cancel the current payment entry before starting another command.",
+        "🚫 You are currently deleting a payment entry! Please complete or cancel the current payment entry before starting another command.",
     ).await?;
     Ok(())
 }
@@ -60,7 +60,7 @@ pub async fn block_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn no_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("Please view the payment records first with {COMMAND_VIEW_PAYMENTS}!"),
+        format!("❌ Please view the payment records first with {COMMAND_VIEW_PAYMENTS}!"),
     )
     .await?;
     Ok(())
@@ -168,7 +168,7 @@ pub async fn action_delete_payment_confirm(
                                 chat.id,
                                 id,
                                 format!(
-                                    "I've deleted the payment!\n\nHere are the updated balances:\n{}",
+                                    "🎉 I've deleted the payment!\n\nHere are the updated balances:\n{}",
                                     display_balances(&balances)
                                 ),
                             )
@@ -187,7 +187,7 @@ pub async fn action_delete_payment_confirm(
                             bot.edit_message_text(
                                 chat.id,
                                 id,
-                                format!("Hmm, Something went wrong! Sorry, I can't delete the payment right now." ),
+                                format!("❓ Hmm, Something went wrong! Sorry, I can't delete the payment right now." ),
                             )
                             .await?;
                             dialogue
