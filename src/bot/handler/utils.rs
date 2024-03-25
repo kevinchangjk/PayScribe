@@ -7,6 +7,8 @@ use super::Payment;
 
 /* Common utilites for handlers. */
 
+pub const MAX_VALUE: f64 = 10_000_000_000_000.00;
+
 // Displays balances in a more readable format.
 pub fn display_balances(debts: &Vec<Debt>) -> String {
     let mut message = String::new();
@@ -83,7 +85,9 @@ pub fn parse_amount(text: &str) -> Result<f64, BotError> {
         },
     };
 
-    if amount <= 0.0 {
+    if amount > MAX_VALUE {
+        Err(BotError::UserError("Amount is too large.".to_string()))
+    } else if amount <= 0.0 {
         Err(BotError::UserError("Amount must be positive.".to_string()))
     } else {
         Ok(amount)

@@ -459,10 +459,7 @@ pub async fn action_edit_payment_edit(
                 if let Err(err) = total {
                     bot.send_message(
                         msg.chat.id,
-                        format!(
-                            "{}\n\nWhat should the total be?\n{DEBT_INSTRUCTIONS_MESSAGE}",
-                            err.to_string()
-                        ),
+                        format!("{}\n\nWhat should the total be?", err.to_string()),
                     )
                     .await?;
                     return Ok(());
