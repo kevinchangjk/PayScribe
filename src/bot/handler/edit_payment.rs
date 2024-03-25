@@ -1,27 +1,19 @@
 use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
 
 use crate::bot::{
-    dispatcher::{HandlerResult, State, UserDialogue},
+    dispatcher::State,
     handler::{
-        general::{DEBT_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE},
         utils::{
-            display_balances, display_debts, make_keyboard, parse_amount, parse_username,
-            process_debts,
+            display_balances, display_debts, display_payment, make_keyboard, parse_amount,
+            parse_serial_num, parse_username, process_debts, BotError, HandlerResult, UserDialogue,
+            COMMAND_VIEW_PAYMENTS, DEBT_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
         },
+        AddPaymentEdit, Payment,
     },
-    processor::{add_payment, edit_payment},
-    BotError,
-};
-
-use super::{
-    utils::{display_payment, parse_serial_num},
-    AddPaymentEdit, Payment,
+    processor::edit_payment,
 };
 
 /* Utilities */
-const HEADER_MESSAGE: &str = "Adding a new payment entry!\n\n";
-const FOOTER_MESSAGE: &str = "\n\n";
-
 #[derive(Clone, Debug)]
 pub struct EditPaymentParams {
     description: Option<String>,
@@ -30,11 +22,13 @@ pub struct EditPaymentParams {
     debts: Option<Vec<(String, f64)>>,
 }
 
+const CANCEL_MESSAGE: &str = "Sure, I've cancelled editing the payment. No changes have been made!";
+
 /* Displays a payment entry by combining original entry and edited fields.
  */
 fn display_edit_payment(payment: Payment, edited_payment: EditPaymentParams) -> String {
     format!(
-        "Description: {}\nCreditor: {}\nTotal: {:.2}\nSplit Amounts:\n{}",
+        "Description: {}\nPayer: {}\nTotal: {:.2}\n{}",
         edited_payment.description.unwrap_or(payment.description),
         edited_payment.creditor.unwrap_or(payment.creditor),
         edited_payment.total.unwrap_or(payment.total),
@@ -56,9 +50,9 @@ async fn display_edit_overview(
 ) -> HandlerResult {
     let options = vec![
         "Description",
-        "Creditor",
+        "Payer",
         "Total",
-        "Debts",
+        "Splits",
         "Cancel",
         "Confirm",
     ];
@@ -66,7 +60,7 @@ async fn display_edit_overview(
     bot.send_message(
         msg.chat.id,
         format!(
-            "What do you want to edit for this payment entry?\n\n{}",
+            "Sure! What do you want to edit for this payment entry?\n\n{}",
             display_edit_payment(payment.clone(), edited_payment.clone())
         ),
     )
@@ -121,7 +115,7 @@ async fn call_processor_edit_payment(
                             chat.id,
                             id,
                             format!(
-                                "Payment successfully edited!\n\n{}\nCurrent balances:\n{}",
+                                "I've edited the payment!\n\n{}\nHere are the updated balances:\n{}",
                                 edit_overview,
                                 display_balances(&balances)
                             ),
@@ -133,7 +127,7 @@ async fn call_processor_edit_payment(
                             chat.id,
                             id,
                             format!(
-                                "Payment successfully edited!\n\n{}\nNo changes to current balances!",
+                                "I've edited the payment!\n\n{}\nThere are no changes to the balances.",
                                 edit_overview
                             ),
                         )
@@ -146,15 +140,17 @@ async fn call_processor_edit_payment(
             }
             Err(err) => {
                 log::error!(
-                                "Edit Payment Submission - Processor failed to edit payment for chat {} with payment {}: {}",
-                                chat.id,
-                                display_payment(&payment, 1),
-                                err.to_string()
-                            );
+                    "Edit Payment Submission - Processor failed to edit payment for chat {} with payment {}: {}",
+                    chat.id,
+                    display_payment(&payment, 1),
+                    err.to_string()
+                );
                 bot.edit_message_text(
                     chat.id,
                     id,
-                    format!("{}\nPayment edit failed!", err.to_string()),
+                    format!(
+                        "Hmm, something went wrong! Sorry, I can't edit the payment right now."
+                    ),
                 )
                 .await?;
                 dialogue
@@ -184,8 +180,7 @@ pub async fn handle_repeated_edit_payment(bot: Bot, msg: Message) -> HandlerResu
  * Can be called at any step of the process.
  */
 pub async fn cancel_edit_payment(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, "Payment edit cancelled, no changes made!")
-        .await?;
+    bot.send_message(msg.chat.id, CANCEL_MESSAGE).await?;
     dialogue.exit().await?;
     Ok(())
 }
@@ -207,7 +202,7 @@ pub async fn block_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn no_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "Please view the payment records first with /viewpayments!",
+        format!("Please view the payment records first with {COMMAND_VIEW_PAYMENTS}!"),
     )
     .await?;
     Ok(())
@@ -242,23 +237,33 @@ pub async fn action_edit_payment(
                 return Ok(());
             }
             Err(err) => {
-                bot.send_message(
-                    msg.chat.id,
-                    format!(
-                        "{}\nPlease choose a number between 1 and {}.",
-                        err.to_string(),
-                        payments.len()
-                    ),
-                )
-                .await?;
+                if payments.len() == 1 {
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("{}\nA valid serial number would be 1.", err.to_string()),
+                    )
+                    .await?;
+                } else {
+                    bot.send_message(
+                        msg.chat.id,
+                        format!(
+                            "{}\nA valid serial number is a number from 1 to {}.",
+                            err.to_string(),
+                            payments.len()
+                        ),
+                    )
+                    .await?;
+                }
                 return Ok(());
             }
         }
     }
     dialogue.exit().await?;
-    Err(BotError::UserError(
-        "Unable to delete payment: User not found".to_string(),
-    ))
+    log::error!(
+        "Edit Payment - User not found in message: {}",
+        msg.id.to_string()
+    );
+    Ok(())
 }
 
 /* Edits a specified payment.
@@ -271,17 +276,13 @@ pub async fn action_edit_payment_confirm(
     query: CallbackQuery,
 ) -> HandlerResult {
     if let Some(button) = &query.data {
-        bot.answer_callback_query(format!("{}", query.id)).await?;
+        bot.answer_callback_query(query.id.to_string()).await?;
 
         if let Some(Message { id, chat, .. }) = &query.message {
             match button.as_str() {
                 "Cancel" => {
-                    bot.edit_message_text(
-                        chat.id,
-                        *id,
-                        format!("Payment edit cancelled, no changes made!"),
-                    )
-                    .await?;
+                    bot.edit_message_text(chat.id, *id, format!("{CANCEL_MESSAGE}"))
+                        .await?;
                     dialogue
                         .update(State::ViewPayments { payments, page })
                         .await?;
@@ -315,11 +316,11 @@ pub async fn action_edit_payment_confirm(
                         })
                         .await?;
                 }
-                "Creditor" => {
+                "Payer" => {
                     bot.send_message(
                         chat.id,
                         format!(
-                            "Current creditor: {}\n\nWho should the creditor be?",
+                            "Current payer: {}\n\nWho should the payer be?",
                             payment.creditor
                         ),
                     )
@@ -353,11 +354,11 @@ pub async fn action_edit_payment_confirm(
                         })
                         .await?;
                 }
-                "Debts" => {
+                "Splits" => {
                     bot.send_message(
                         chat.id,
                         format!(
-                            "Current debts: {}\n\nWho are we splitting this with?",
+                            "Current splits: {}\n\nHow are we splitting this?",
                             display_debts(&payment.debts)
                         ),
                     )
@@ -481,7 +482,7 @@ pub async fn action_edit_payment_edit(
 
                 bot.send_message(
                     msg.chat.id,
-                    format!("Who are we splitting this with?\n{DEBT_INSTRUCTIONS_MESSAGE}"),
+                    format!("How are we splitting this new total?\n{DEBT_INSTRUCTIONS_MESSAGE}"),
                 )
                 .await?;
                 dialogue
@@ -511,7 +512,11 @@ pub async fn action_edit_payment_edit(
                             msg.chat.id,
                             err.to_string()
                         );
-                        bot.send_message(msg.chat.id, format!("{}\n\nWho are we splitting this with?\n{DEBT_INSTRUCTIONS_MESSAGE}", err.to_string())).await?;
+                        bot.send_message(
+                            msg.chat.id,
+                            format!("{}\n\n{DEBT_INSTRUCTIONS_MESSAGE}", err.to_string()),
+                        )
+                        .await?;
                         return Ok(());
                     }
 
@@ -546,11 +551,8 @@ pub async fn action_edit_payment_edit(
             },
         },
         None => {
-            bot.send_message(
-                msg.chat.id,
-                format!("{NO_TEXT_MESSAGE}What is the new value?{FOOTER_MESSAGE}"),
-            )
-            .await?;
+            bot.send_message(msg.chat.id, format!("{NO_TEXT_MESSAGE}"))
+                .await?;
         }
     }
 

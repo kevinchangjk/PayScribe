@@ -1,11 +1,7 @@
 use teloxide::{
-    dispatching::{
-        dialogue,
-        dialogue::{InMemStorage, InMemStorageError},
-    },
+    dispatching::{dialogue, dialogue::InMemStorage},
     prelude::*,
     utils::command::BotCommands,
-    RequestError,
 };
 
 use crate::bot::handler::{
@@ -24,7 +20,6 @@ use super::handler::{
     action_help, action_start, cancel_add_payment, invalid_state, AddPaymentEdit, AddPaymentParams,
     EditPaymentParams, PayBackParams, Payment,
 };
-use super::processor::ProcessError;
 
 /* Handler is the front-facing agent of the bot.
  * It receives messages and commands from the user, and handles user interaction.
@@ -32,38 +27,6 @@ use super::processor::ProcessError;
  * It communicates only with the Processor, which executes the commands.
  * User exceptions are handled in this module. Processor may propagate some errors here.dialogue
  */
-
-/* Types */
-pub type UserDialogue = Dialogue<State, InMemStorage<State>>;
-pub type HandlerResult = Result<(), BotError>;
-
-#[derive(thiserror::Error, Debug)]
-pub enum BotError {
-    #[error("User error: {0}")]
-    UserError(String),
-    #[error("Process error: {0}")]
-    ProcessError(ProcessError),
-    #[error("Request error: {0}")]
-    RequestError(RequestError),
-}
-
-impl From<RequestError> for BotError {
-    fn from(request_error: RequestError) -> BotError {
-        BotError::RequestError(request_error)
-    }
-}
-
-impl From<InMemStorageError> for BotError {
-    fn from(storage_error: InMemStorageError) -> BotError {
-        BotError::UserError(storage_error.to_string())
-    }
-}
-
-impl From<ProcessError> for BotError {
-    fn from(process_error: ProcessError) -> BotError {
-        BotError::ProcessError(process_error)
-    }
-}
 
 #[derive(Clone, Default)]
 pub enum State {

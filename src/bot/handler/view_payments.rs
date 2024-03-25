@@ -5,15 +5,18 @@ use teloxide::{
 };
 
 use crate::bot::{
-    dispatcher::{HandlerResult, State, UserDialogue},
-    handler::utils::{display_payment, make_keyboard},
+    dispatcher::State,
+    handler::utils::{
+        display_payment, make_keyboard, HandlerResult, UserDialogue, COMMAND_ADD_PAYMENT,
+        UNKNOWN_ERROR_MESSAGE,
+    },
     processor::{view_payments, ProcessError},
     redis::{CrudError, UserPayment},
-    BotError,
 };
 
 /* Utilities */
-const HEADER_MESSAGE: &str = " payments tracked for this group!\n\n";
+const HEADER_MESSAGE_FRONT: &str = "I've recorded ";
+const HEADER_MESSAGE_BACK: &str = " payments for this group.\nHere are the latest ones:\n\n";
 
 #[derive(Clone, Debug)]
 pub struct Payment {
@@ -53,7 +56,7 @@ fn display_payments_paged(payments: &Vec<Payment>, page: usize) -> String {
         .enumerate()
         .map(|(index, payment)| display_payment(payment, serial_num + index));
 
-    format!("{}", formatted_payments.collect::<Vec<String>>().join("\n"))
+    format!("{}", formatted_payments.collect::<Vec<String>>().join(""))
 }
 
 fn get_navigation_menu() -> InlineKeyboardMarkup {
@@ -74,44 +77,33 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
         let payments = view_payments(&chat_id, &sender_id, sender_username.as_deref());
         match payments {
             Ok(payments) => {
-                if payments.is_empty() {
-                    log::info!(
-                        "View Payments - User {} viewed payments for group {}, but no payments found.",
-                        sender_id,
-                        chat_id
-                    );
-                    bot.send_message(msg.chat.id, format!("No payments found for this group!"))
-                        .await?;
-                    dialogue.exit().await?;
-                } else {
-                    let payments: Vec<Payment> = payments
-                        .into_iter()
-                        .map(|payment| unfold_payment(payment))
-                        .collect();
-                    log::info!(
-                        "View Payments - User {} viewed payments for group {}, found: {}",
-                        sender_id,
-                        chat_id,
+                let payments: Vec<Payment> = payments
+                    .into_iter()
+                    .map(|payment| unfold_payment(payment))
+                    .collect();
+                log::info!(
+                    "View Payments - User {} viewed payments for group {}, found: {}",
+                    sender_id,
+                    chat_id,
+                    display_payments_paged(&payments, 0)
+                );
+                bot.send_message(
+                    msg.chat.id,
+                    format!(
+                        "{HEADER_MESSAGE_FRONT}{}{HEADER_MESSAGE_BACK}{}",
+                        &payments.len(),
                         display_payments_paged(&payments, 0)
-                    );
-                    bot.send_message(
-                        msg.chat.id,
-                        format!(
-                            "{}{HEADER_MESSAGE}{}",
-                            &payments.len(),
-                            display_payments_paged(&payments, 0)
-                        ),
-                    )
-                    .reply_markup(get_navigation_menu())
+                    ),
+                )
+                .reply_markup(get_navigation_menu())
+                .await?;
+                dialogue
+                    .update(State::ViewPayments { payments, page: 0 })
                     .await?;
-                    dialogue
-                        .update(State::ViewPayments { payments, page: 0 })
-                        .await?;
-                }
                 return Ok(());
             }
             Err(ProcessError::CrudError(CrudError::NoPaymentsError())) => {
-                bot.send_message(msg.chat.id, format!("No payments found for this group!"))
+                bot.send_message(msg.chat.id, format!("I have not recorded any payment entry for this group. Use {COMMAND_ADD_PAYMENT} to let me know when you need my help with that!"))
                     .await?;
                 dialogue.exit().await?;
             }
@@ -122,21 +114,17 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
                     chat_id,
                     err.to_string()
                 );
-                bot.send_message(
-                    msg.chat.id,
-                    format!(
-                        "{}\nUnable to view payments for this group!",
-                        err.to_string()
-                    ),
-                )
-                .await?;
+                bot.send_message(msg.chat.id, format!("{UNKNOWN_ERROR_MESSAGE}"))
+                    .await?;
             }
         }
     }
     dialogue.exit().await?;
-    Err(BotError::UserError(
-        "Unable to view payments: User not found".to_string(),
-    ))
+    log::error!(
+        "View Payments - User not found in msg {}.",
+        msg.id.to_string()
+    );
+    Ok(())
 }
 
 pub async fn action_view_more(
@@ -146,7 +134,7 @@ pub async fn action_view_more(
     query: CallbackQuery,
 ) -> HandlerResult {
     if let Some(button) = &query.data {
-        bot.answer_callback_query(format!("{}", query.id)).await?;
+        bot.answer_callback_query(query.id.to_string()).await?;
 
         if let Some(Message { id, chat, .. }) = query.message {
             match button.as_str() {
@@ -156,7 +144,7 @@ pub async fn action_view_more(
                             chat.id,
                             id,
                             format!(
-                                "{}{HEADER_MESSAGE}{}",
+                                "{HEADER_MESSAGE_FRONT}{}{HEADER_MESSAGE_BACK}{}",
                                 &payments.len(),
                                 display_payments_paged(&payments, page - 1)
                             ),
@@ -177,7 +165,7 @@ pub async fn action_view_more(
                             chat.id,
                             id,
                             format!(
-                                "{}{HEADER_MESSAGE}{}",
+                                "{HEADER_MESSAGE_FRONT}{}{HEADER_MESSAGE_BACK}{}",
                                 &payments.len(),
                                 display_payments_paged(&payments, page + 1)
                             ),

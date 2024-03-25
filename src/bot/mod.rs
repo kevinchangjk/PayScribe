@@ -4,7 +4,7 @@
 pub use self::dispatcher::run_dispatcher;
 
 // Exported structs and types
-pub use self::dispatcher::{BotError, Command, HandlerResult, State, UserDialogue};
+pub use self::dispatcher::{Command, State};
 
 // Declare submodules
 mod dispatcher;

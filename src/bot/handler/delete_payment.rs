@@ -1,20 +1,21 @@
 use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
 
 use crate::bot::{
-    dispatcher::{HandlerResult, State, UserDialogue},
-    handler::utils::{display_balances, make_keyboard},
+    dispatcher::State,
+    handler::{
+        utils::{
+            display_balances, display_payment, make_keyboard, parse_serial_num, BotError,
+            HandlerResult, UserDialogue, COMMAND_VIEW_PAYMENTS,
+        },
+        Payment,
+    },
     processor::delete_payment,
-    BotError,
-};
-
-use super::{
-    utils::{display_payment, parse_serial_num},
-    Payment,
 };
 
 /* Utilities */
-const HEADER_MESSAGE: &str = "Adding a new payment entry!\n\n";
-const FOOTER_MESSAGE: &str = "\n\n";
+
+const CANCEL_MESSAGE: &str =
+    "Sure, I've cancelled deleting the payment. No changes have been made!";
 
 /* Action handler functions */
 
@@ -37,8 +38,7 @@ pub async fn cancel_delete_payment(
     dialogue: UserDialogue,
     msg: Message,
 ) -> HandlerResult {
-    bot.send_message(msg.chat.id, "Payment deletion cancelled, no changes made!")
-        .await?;
+    bot.send_message(msg.chat.id, CANCEL_MESSAGE).await?;
     dialogue.exit().await?;
     Ok(())
 }
@@ -60,7 +60,7 @@ pub async fn block_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn no_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "Please view the payment records first with /viewpayments!",
+        format!("Please view the payment records first with {COMMAND_VIEW_PAYMENTS}!"),
     )
     .await?;
     Ok(())
@@ -103,23 +103,33 @@ pub async fn action_delete_payment(
                 return Ok(());
             }
             Err(err) => {
-                bot.send_message(
-                    msg.chat.id,
-                    format!(
-                        "{}\nPlease choose a number between 1 and {}.",
-                        err.to_string(),
-                        payments.len()
-                    ),
-                )
-                .await?;
+                if payments.len() == 1 {
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("{}\nA valid serial number would be 1.", err.to_string()),
+                    )
+                    .await?;
+                } else {
+                    bot.send_message(
+                        msg.chat.id,
+                        format!(
+                            "{}\nA valid serial number is a number from 1 to {}.",
+                            err.to_string(),
+                            payments.len()
+                        ),
+                    )
+                    .await?;
+                }
                 return Ok(());
             }
         }
     }
     dialogue.exit().await?;
-    Err(BotError::UserError(
-        "Unable to delete payment: User not found".to_string(),
-    ))
+    log::error!(
+        "Delete Payment - User not found in message: {}",
+        msg.id.to_string()
+    );
+    Ok(())
 }
 
 /* Deletes a specified payment.
@@ -132,17 +142,13 @@ pub async fn action_delete_payment_confirm(
     query: CallbackQuery,
 ) -> HandlerResult {
     if let Some(button) = &query.data {
-        bot.answer_callback_query(format!("{}", query.id)).await?;
+        bot.answer_callback_query(query.id.to_string()).await?;
 
         if let Some(Message { id, chat, .. }) = query.message {
             match button.as_str() {
                 "Cancel" => {
-                    bot.edit_message_text(
-                        chat.id,
-                        id,
-                        format!("Payment deletion cancelled, no changes made!"),
-                    )
-                    .await?;
+                    bot.edit_message_text(chat.id, id, format!("{CANCEL_MESSAGE}"))
+                        .await?;
                     dialogue
                         .update(State::ViewPayments { payments, page })
                         .await?;
@@ -162,7 +168,7 @@ pub async fn action_delete_payment_confirm(
                                 chat.id,
                                 id,
                                 format!(
-                                    "Payment successfully deleted!\n\nCurrent balances:\n{}",
+                                    "I've deleted the payment!\n\nHere are the updated balances:\n{}",
                                     display_balances(&balances)
                                 ),
                             )
@@ -181,7 +187,7 @@ pub async fn action_delete_payment_confirm(
                             bot.edit_message_text(
                                 chat.id,
                                 id,
-                                format!("{}\nPayment deletion failed!", err.to_string()),
+                                format!("Hmm, Something went wrong! Sorry, I can't delete the payment right now." ),
                             )
                             .await?;
                             dialogue
