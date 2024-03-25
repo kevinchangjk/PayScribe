@@ -4,8 +4,8 @@ use crate::bot::{
     dispatcher::State,
     handler::utils::{
         display_balances, display_debts, make_keyboard, parse_amount, parse_username,
-        process_debts, BotError, HandlerResult, UserDialogue, DEBT_INSTRUCTIONS_MESSAGE,
-        NO_TEXT_MESSAGE, UNKNOWN_ERROR_MESSAGE,
+        process_debts, HandlerResult, UserDialogue, DEBT_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+        UNKNOWN_ERROR_MESSAGE,
     },
     processor::add_payment,
 };
