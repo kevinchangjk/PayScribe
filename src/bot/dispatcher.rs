@@ -13,9 +13,9 @@ use crate::bot::handler::{
     action_edit_payment_confirm, action_edit_payment_edit, action_pay_back,
     action_pay_back_confirm, action_pay_back_debts, action_view_balances, action_view_more,
     action_view_payments, block_add_payment, block_delete_payment, block_edit_payment,
-    block_pay_back, cancel_delete_payment, cancel_edit_payment, cancel_pay_back,
-    handle_repeated_add_payment, handle_repeated_delete_payment, handle_repeated_edit_payment,
-    handle_repeated_pay_back, no_delete_payment, no_edit_payment,
+    block_pay_back, callback_invalid_message, cancel_delete_payment, cancel_edit_payment,
+    cancel_pay_back, handle_repeated_add_payment, handle_repeated_delete_payment,
+    handle_repeated_edit_payment, handle_repeated_pay_back, no_delete_payment, no_edit_payment,
 };
 
 use super::handler::{
@@ -359,7 +359,19 @@ pub async fn run_dispatcher(bot: Bot) {
             }]
             .endpoint(action_edit_payment_edit),
         )
-        .branch(dptree::endpoint(invalid_state));
+        .branch(case![State::AddConfirm { payment }].endpoint(callback_invalid_message))
+        .branch(case![State::AddEditMenu { payment }].endpoint(callback_invalid_message))
+        .branch(case![State::PayBackConfirm { payment }].endpoint(callback_invalid_message))
+        .branch(
+            case![State::EditPayment {
+                payment,
+                edited_payment,
+                payments,
+                page
+            }]
+            .endpoint(callback_invalid_message),
+        )
+        .branch(case![State::Start].endpoint(invalid_state));
 
     let callback_query_handler = Update::filter_callback_query()
         .branch(case![State::AddConfirm { payment }].endpoint(action_add_confirm))

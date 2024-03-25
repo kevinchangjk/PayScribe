@@ -12,7 +12,9 @@ pub use self::edit_payment::{
     action_edit_payment, action_edit_payment_confirm, action_edit_payment_edit, block_edit_payment,
     cancel_edit_payment, handle_repeated_edit_payment, no_edit_payment, EditPaymentParams,
 };
-pub use self::general::{action_cancel, action_help, action_start, invalid_state};
+pub use self::general::{
+    action_cancel, action_help, action_start, callback_invalid_message, invalid_state,
+};
 pub use self::pay_back::{
     action_pay_back, action_pay_back_confirm, action_pay_back_debts, block_pay_back,
     cancel_pay_back, handle_repeated_pay_back, PayBackParams,

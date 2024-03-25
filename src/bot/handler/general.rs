@@ -12,15 +12,33 @@ const HELP_MESSAGE: &str = "Need some help?\n\nTo begin, you can add new payment
 
 /* Invalid state.
  */
-pub async fn invalid_state(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, INVALID_STATE_MESSAGE).await?;
+pub async fn invalid_state(bot: Bot, msg: Message) -> HandlerResult {
+    // Checks if msg is a service message, ignores it if so
+    let is_service_msg = msg.from().is_none();
+
+    if is_service_msg {
+        Ok(())
+    } else {
+        bot.send_message(msg.chat.id, INVALID_STATE_MESSAGE).await?;
+        Ok(())
+    }
+}
+
+/* Invalid message during callback expected.
+ */
+pub async fn callback_invalid_message(bot: Bot, msg: Message) -> HandlerResult {
+    bot.send_message(
+        msg.chat.id,
+        "You don't have to text me. Just click on any of the buttons above to continue!",
+    )
+    .await?;
     Ok(())
 }
 
 /* Start command.
  * Displays a welcome message to the user.
  */
-pub async fn action_start(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+pub async fn action_start(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(msg.chat.id, START_MESSAGE).await?;
     Ok(())
 }
@@ -28,7 +46,7 @@ pub async fn action_start(bot: Bot, dialogue: UserDialogue, msg: Message) -> Han
 /* Help command.
  * Displays a list of commands available to the user.
  */
-pub async fn action_help(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+pub async fn action_help(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
         format!("{HELP_MESSAGE}{}", Command::descriptions().to_string()),
@@ -40,8 +58,7 @@ pub async fn action_help(bot: Bot, dialogue: UserDialogue, msg: Message) -> Hand
 /* Cancel command.
  * Called when state is at start, thus nothing to cancel.
  */
-pub async fn action_cancel(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+pub async fn action_cancel(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(msg.chat.id, "Nothing to cancel!").await?;
-    dialogue.exit().await?;
     Ok(())
 }
