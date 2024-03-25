@@ -238,30 +238,36 @@ pub fn process_debts(
             }
         } else {
             Err(BotError::UserError(
-                "Something's wrong! The total amount isn't provided.".to_string(),
+                "❌ Something's wrong! The total amount isn't provided.".to_string(),
             ))
         }
     } else {
         Err(BotError::UserError(
-            "Something's wrong! The payer isn't provided.".to_string(),
+            "❌ Something's wrong! The payer isn't provided.".to_string(),
         ))
     }
 }
 
 // Parses a string of debts and returns a vector of debts
-pub fn parse_debts(text: &str) -> Result<Vec<(String, f64)>, BotError> {
+pub fn parse_debts_payback(text: &str, sender: &str) -> Result<Vec<(String, f64)>, BotError> {
     let mut debts: Vec<(String, f64)> = Vec::new();
     let pairs: Vec<&str> = text.split(',').collect();
     for pair in pairs {
         let pair = pair.split_whitespace().collect::<Vec<&str>>();
         if pair.len() != 2 {
             return Err(BotError::UserError(
-                "Please use the following format!".to_string(),
+                "❌ Please use the following format!".to_string(),
             ));
         }
 
         let username = parse_username(pair[0]);
         let amount = parse_amount(pair[1])?;
+
+        if username == sender {
+            return Err(BotError::UserError(
+                "❌ You can't pay back yourself!".to_string(),
+            ));
+        }
 
         let mut found = false;
         for debt in &mut debts {

@@ -5,11 +5,13 @@ use crate::bot::{
     {
         dispatcher::State,
         handler::utils::{
-            display_balances, display_debts, make_keyboard, parse_debts, parse_username, BotError,
+            display_balances, display_debts, make_keyboard, parse_username, BotError,
             HandlerResult, UserDialogue, DEBT_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
         },
     },
 };
+
+use super::utils::parse_debts_payback;
 
 /* Utilities */
 #[derive(Clone, Debug)]
@@ -172,17 +174,17 @@ pub async fn action_pay_back_debts(
 ) -> HandlerResult {
     match msg.text() {
         Some(text) => {
-            let debts = parse_debts(text);
-            if let Err(err) = debts {
-                bot.send_message(msg.chat.id, err.to_string()).await?;
-                return Ok(());
-            }
-
-            let debts = debts?;
-            let total = debts.iter().fold(0.0, |curr, next| curr + next.1);
             if let Some(user) = msg.from() {
                 if let Some(username) = &user.username {
                     let username = parse_username(username);
+                    let debts = parse_debts_payback(text, &username);
+                    if let Err(err) = debts {
+                        bot.send_message(msg.chat.id, err.to_string()).await?;
+                        return Ok(());
+                    }
+
+                    let debts = debts?;
+                    let total = debts.iter().fold(0.0, |curr, next| curr + next.1);
                     let payment = PayBackParams {
                         chat_id: msg.chat.id.to_string(),
                         sender_id: msg.from().as_ref().unwrap().id.to_string(),
