@@ -222,7 +222,7 @@ pub fn parse_datetime(text: &str) -> DateTime<Local> {
 
 // Formats a Datetime object into an easy to read string
 pub fn format_datetime(datetime: &DateTime<Local>) -> String {
-    datetime.format("%v %R").to_string()
+    datetime.format("%e %b %Y").to_string()
 }
 
 // Combines both datetime functions to essentially reformat a string into an easier format
