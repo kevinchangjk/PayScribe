@@ -12,8 +12,9 @@ env:
   REDIS_URL: ${{ secrets.REDIS_URL }}
 
 jobs:
-  build:
+  build-test:
     runs-on: ubuntu-latest
+    environment: development
 
     steps:
       - uses: actions/checkout@v3
