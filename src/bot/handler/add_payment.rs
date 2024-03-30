@@ -4,11 +4,15 @@ use crate::bot::{
     dispatcher::State,
     handler::utils::{
         display_balances, display_debts, make_keyboard, parse_amount, parse_username,
-        process_debts, HandlerResult, UserDialogue, DEBT_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
-        UNKNOWN_ERROR_MESSAGE,
+        process_debts, HandlerResult, UserDialogue, DEBT_EQUAL_DESCRIPTION_MESSAGE,
+        DEBT_EQUAL_INSTRUCTIONS_MESSAGE, DEBT_EXACT_DESCRIPTION_MESSAGE,
+        DEBT_EXACT_INSTRUCTIONS_MESSAGE, DEBT_RATIO_DESCRIPTION_MESSAGE,
+        DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, UNKNOWN_ERROR_MESSAGE,
     },
     processor::add_payment,
 };
+
+use super::utils::make_keyboard_debt_selection;
 
 /* Utilities */
 #[derive(Clone, Debug)]
@@ -28,7 +32,16 @@ pub enum AddPaymentEdit {
     Description,
     Creditor,
     Total,
-    Debts,
+    DebtsEqual,
+    DebtsExact,
+    DebtsRatio,
+}
+
+#[derive(Clone, Debug)]
+pub enum AddDebtsFormat {
+    Equal,
+    Exact,
+    Ratio,
 }
 
 const CANCEL_MESSAGE: &str =
@@ -104,17 +117,19 @@ async fn handle_debts(
     dialogue: UserDialogue,
     msg: Message,
     payment: AddPaymentParams,
-    error_msg: String,
+    debts_format: AddDebtsFormat,
 ) -> HandlerResult {
+    let error_msg = match debts_format {
+        AddDebtsFormat::Equal => DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
+        AddDebtsFormat::Exact => DEBT_EXACT_INSTRUCTIONS_MESSAGE,
+        AddDebtsFormat::Ratio => DEBT_RATIO_INSTRUCTIONS_MESSAGE,
+    };
     match msg.text() {
         Some(text) => {
-            let debts = process_debts(text, &payment.creditor, payment.total);
+            let debts = process_debts(debts_format, text, &payment.creditor, payment.total);
             if let Err(err) = debts {
-                bot.send_message(
-                    msg.chat.id,
-                    format!("{}\n\n{DEBT_INSTRUCTIONS_MESSAGE}", err.to_string()),
-                )
-                .await?;
+                bot.send_message(msg.chat.id, format!("{}\n\n{error_msg}", err.to_string()))
+                    .await?;
                 return Ok(());
             }
 
@@ -129,12 +144,6 @@ async fn handle_debts(
                 debts: Some(debts?),
             };
 
-            log::info!(
-                "Add Payment - Debt updated successfully by user {} in chat {}: {:?}",
-                new_payment.sender_id,
-                new_payment.chat_id,
-                new_payment
-            );
             display_add_overview(bot, dialogue, new_payment).await?;
         }
         None => {
@@ -330,12 +339,6 @@ pub async fn action_add_description(
                         total: None,
                         debts: None,
                     };
-                    log::info!(
-                    "Add Payment - Description updated successfully for user {} in chat {}: {:?}",
-                    payment.sender_id,
-                    payment.chat_id,
-                    payment
-                );
                     bot.send_message(
                         msg.chat.id,
                         format!(
@@ -378,12 +381,6 @@ pub async fn action_add_creditor(
                 total: None,
                 debts: None,
             };
-            log::info!(
-                "Add Payment - Creditor updated successfully for user {} in chat {}: {:?}",
-                new_payment.sender_id,
-                new_payment.chat_id,
-                new_payment
-            );
             bot.send_message(
                 msg.chat.id,
                 format!(
@@ -432,22 +429,17 @@ pub async fn action_add_total(
                 total: Some(total?),
                 debts: None,
             };
-            log::info!(
-                "Add Payment - Total updated successfully for user {} in chat {}: {:?}",
-                new_payment.sender_id,
-                new_payment.chat_id,
-                new_payment.total
-            );
             bot.send_message(
                 msg.chat.id,
                 format!(
-                    "{}Cool! How are we splitting this?\n{DEBT_INSTRUCTIONS_MESSAGE}",
+                    "{}Cool! How are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
                     display_add_payment(&new_payment)
                 ),
             )
+            .reply_markup(make_keyboard_debt_selection())
             .await?;
             dialogue
-                .update(State::AddDebt {
+                .update(State::AddDebtSelection {
                     payment: new_payment,
                 })
                 .await?;
@@ -461,6 +453,82 @@ pub async fn action_add_total(
 }
 
 /* Add a payment entry in a group chat.
+ * Bot receives a callback query from the user indicating how they want to split.
+ * No Cancel button required.
+ */
+pub async fn action_add_debt_selection(
+    bot: Bot,
+    dialogue: UserDialogue,
+    query: CallbackQuery,
+    payment: AddPaymentParams,
+) -> HandlerResult {
+    if let Some(button) = &query.data {
+        bot.answer_callback_query(query.id.to_string()).await?;
+
+        match button.as_str() {
+            "Equal" => {
+                if let Some(Message { id, chat, .. }) = query.message {
+                    bot.edit_message_text(
+                        chat.id,
+                        id,
+                        format!(
+                            "{}Okay, who is involved in the payment?\n\n{DEBT_EQUAL_INSTRUCTIONS_MESSAGE}",
+                            display_add_payment(&payment)
+                        ),
+                    )
+                    .await?;
+                    dialogue
+                        .update(State::AddDebt {
+                            payment,
+                            debts_format: AddDebtsFormat::Equal,
+                        })
+                        .await?;
+                }
+            }
+            "Exact" => {
+                if let Some(Message { id, chat, .. }) = query.message {
+                    bot.edit_message_text(
+                        chat.id,
+                        id,
+                        format!(
+                            "{}Okay, who is involved and how much do they owe?\n\n{DEBT_EXACT_INSTRUCTIONS_MESSAGE}",
+                            display_add_payment(&payment))
+                        ).await?;
+                    dialogue
+                        .update(State::AddDebt {
+                            payment,
+                            debts_format: AddDebtsFormat::Exact,
+                        })
+                        .await?;
+                }
+            }
+            "Ratio" => {
+                if let Some(Message { id, chat, .. }) = query.message {
+                    bot.edit_message_text(
+                        chat.id,
+                        id,
+                        format!(
+                            "{}Okay, who is involved and what fraction do they owe?\n\n{DEBT_RATIO_INSTRUCTIONS_MESSAGE}",
+                            display_add_payment(&payment))
+                        ).await?;
+                    dialogue
+                        .update(State::AddDebt {
+                            payment,
+                            debts_format: AddDebtsFormat::Ratio,
+                        })
+                        .await?;
+                }
+            }
+            _ => {
+                log::error!("Add Payment Debt Selection - Invalid button for user {} in chat {} with payment {:?}: {}",
+                            payment.sender_id, payment.chat_id, payment, button);
+            }
+        }
+    }
+    Ok(())
+}
+
+/* Add a payment entry in a group chat.
  * Bot receives a Debt from user, and checks if the total amounts tally.
  * If so, it presents an overview. Else, it asks for more debts.
  */
@@ -468,16 +536,9 @@ pub async fn action_add_debt(
     bot: Bot,
     dialogue: UserDialogue,
     msg: Message,
-    payment: AddPaymentParams,
+    (payment, debts_format): (AddPaymentParams, AddDebtsFormat),
 ) -> HandlerResult {
-    handle_debts(
-        bot,
-        dialogue,
-        msg,
-        payment,
-        format!("{NO_TEXT_MESSAGE}{DEBT_INSTRUCTIONS_MESSAGE}"),
-    )
-    .await
+    handle_debts(bot, dialogue, msg, payment, debts_format).await
 }
 
 /* Add a payment entry in a group chat.
@@ -588,17 +649,12 @@ pub async fn action_add_edit_menu(
                         chat.id,
                         id,
                         format!(
-                            "Current splits:\n{}\n\nHow are we splitting this?\n\n{DEBT_INSTRUCTIONS_MESSAGE}",
+                            "Current splits:\n{}\nHow are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
                             display_debts(&payment_clone.debts.unwrap())
                         ),
-                    )
+                    ).reply_markup(make_keyboard_debt_selection())
                     .await?;
-                    dialogue
-                        .update(State::AddEdit {
-                            payment,
-                            edit: AddPaymentEdit::Debts,
-                        })
-                        .await?;
+                    dialogue.update(State::AddDebtSelection { payment }).await?;
                 }
                 "Back" => {
                     display_add_overview(bot, dialogue, payment).await?;
@@ -637,12 +693,6 @@ pub async fn action_add_edit(
                     total: payment.total,
                     debts: payment.debts,
                 };
-                log::info!(
-                    "Add Payment - Description updated successfully for user {} in chat {}: {:?}",
-                    new_payment.sender_id,
-                    new_payment.chat_id,
-                    new_payment
-                );
                 display_add_overview(bot, dialogue, new_payment).await?;
             }
             AddPaymentEdit::Creditor => {
@@ -656,12 +706,6 @@ pub async fn action_add_edit(
                     total: payment.total,
                     debts: payment.debts,
                 };
-                log::info!(
-                    "Add Payment - Creditor updated successfully for user {} in chat {}: {:?}",
-                    new_payment.sender_id,
-                    new_payment.chat_id,
-                    new_payment
-                );
                 display_add_overview(bot, dialogue, new_payment).await?;
             }
             AddPaymentEdit::Total => {
@@ -682,33 +726,25 @@ pub async fn action_add_edit(
                     debts: payment.debts,
                 };
 
-                log::info!(
-                    "Add Payment - Total updated successfully for user {} in chat {}: {:?}",
-                    new_payment.sender_id,
-                    new_payment.chat_id,
-                    new_payment
-                );
                 bot.send_message(
                     msg.chat.id,
-                    format!("How are we splitting this?\n{DEBT_INSTRUCTIONS_MESSAGE}"),
-                )
+                    format!("How are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",),
+                ).reply_markup(make_keyboard_debt_selection())
                 .await?;
                 dialogue
-                    .update(State::AddEdit {
+                    .update(State::AddDebtSelection {
                         payment: new_payment,
-                        edit: AddPaymentEdit::Debts,
                     })
                     .await?;
             }
-            AddPaymentEdit::Debts => {
-                handle_debts(
-                    bot,
-                    dialogue,
-                    msg,
-                    payment,
-                    format!("{DEBT_INSTRUCTIONS_MESSAGE}",),
-                )
-                .await?;
+            AddPaymentEdit::DebtsEqual => {
+                handle_debts(bot, dialogue, msg, payment, AddDebtsFormat::Equal).await?;
+            }
+            AddPaymentEdit::DebtsExact => {
+                handle_debts(bot, dialogue, msg, payment, AddDebtsFormat::Exact).await?;
+            }
+            AddPaymentEdit::DebtsRatio => {
+                handle_debts(bot, dialogue, msg, payment, AddDebtsFormat::Ratio).await?;
             }
         },
         None => {

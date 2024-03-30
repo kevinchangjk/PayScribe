@@ -1,16 +1,18 @@
 // Exported functions
 pub use self::add_payment::{
-    action_add_confirm, action_add_creditor, action_add_debt, action_add_description,
-    action_add_edit, action_add_edit_menu, action_add_payment, action_add_total, block_add_payment,
-    cancel_add_payment, handle_repeated_add_payment, AddPaymentEdit, AddPaymentParams,
+    action_add_confirm, action_add_creditor, action_add_debt, action_add_debt_selection,
+    action_add_description, action_add_edit, action_add_edit_menu, action_add_payment,
+    action_add_total, block_add_payment, cancel_add_payment, handle_repeated_add_payment,
+    AddDebtsFormat, AddPaymentEdit, AddPaymentParams,
 };
 pub use self::delete_payment::{
     action_delete_payment, action_delete_payment_confirm, block_delete_payment,
     cancel_delete_payment, handle_repeated_delete_payment, no_delete_payment,
 };
 pub use self::edit_payment::{
-    action_edit_payment, action_edit_payment_confirm, action_edit_payment_edit, block_edit_payment,
-    cancel_edit_payment, handle_repeated_edit_payment, no_edit_payment, EditPaymentParams,
+    action_edit_payment, action_edit_payment_confirm, action_edit_payment_debts,
+    action_edit_payment_edit, block_edit_payment, cancel_edit_payment,
+    handle_repeated_edit_payment, no_edit_payment, EditPaymentParams,
 };
 pub use self::general::{
     action_cancel, action_help, action_start, callback_invalid_message, invalid_state,

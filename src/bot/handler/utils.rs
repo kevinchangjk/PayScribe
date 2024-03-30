@@ -7,7 +7,7 @@ use teloxide::{
 
 use crate::bot::{processor::ProcessError, redis::Debt, State};
 
-use super::Payment;
+use super::{AddDebtsFormat, Payment};
 
 /* Common utilites for handlers. */
 
@@ -16,8 +16,20 @@ pub const UNKNOWN_ERROR_MESSAGE: &str =
     "❓ Hmm, something went wrong! Sorry, I can't do that right now, please try again later!\n\n";
 pub const NO_TEXT_MESSAGE: &str =
     "❓ Sorry, I can't understand that! Please reply to me in text.\n\n";
-pub const DEBT_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and costs as follows: \n\n@user1 amount1, @user2 amount2, etc.\n\n";
+pub const DEBT_EQUAL_DESCRIPTION_MESSAGE: &str =
+    "Equal — divide the total amount equally among users\n";
+pub const DEBT_EXACT_DESCRIPTION_MESSAGE: &str =
+    "Exact — share the total cost by specifying exact amounts for each user\n";
+pub const DEBT_RATIO_DESCRIPTION_MESSAGE: &str =
+    "Ratio — split the total cost by assigning fractional/relative amounts of the total that the user owes\n";
+pub const DEBT_EQUAL_INSTRUCTIONS_MESSAGE: &str =
+    "Enter the usernames of those sharing the cost as follows: \n\n@user1 @user2 @user3 ...\n\n";
+pub const DEBT_EXACT_INSTRUCTIONS_MESSAGE: &str =
+    "Enter the usernames and exact amounts as follows: \n\n@user1 amount1\n@user2 amount2\n@user3 amount3\n...\n\n";
+pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
+    "Enter the usernames and exact amounts as follows: \n\n@user1 amount1\n@user2 amount2\n@user3 amount3\n...\n\n";
+pub const DEBT_RATIO_INSTRUCTIONS_MESSAGE: &str =
+    "Enter the usernames and ratios as follows: \n\n@user1 ratio1\n@user2 ratio2\n@user3 ratio3\n...\n\nThe ratios can be any number, and they can sum up to any number as well.";
 pub const COMMAND_START: &str = "/start";
 pub const COMMAND_HELP: &str = "/help";
 pub const COMMAND_ADD_PAYMENT: &str = "/addpayment";
@@ -127,6 +139,12 @@ pub fn make_keyboard(options: Vec<&str>, columns: Option<usize>) -> InlineKeyboa
     InlineKeyboardMarkup::new(keyboard)
 }
 
+// Make debt selection keyboard
+pub fn make_keyboard_debt_selection() -> InlineKeyboardMarkup {
+    let buttons = vec!["Equal", "Exact", "Ratio"];
+    make_keyboard(buttons, Some(3))
+}
+
 // Ensures that a username has a leading '@'.
 pub fn parse_username(username: &str) -> String {
     if username.starts_with('@') {
@@ -163,15 +181,40 @@ pub fn parse_amount(text: &str) -> Result<f64, BotError> {
     }
 }
 
-// Parse and process a string to retrieve a list of debts, returns Vec<Debt>.
-pub fn process_debts(
+// Parse and process a string to retrieve a list of debts, for split by equal amount.
+pub fn process_debts_equal(text: &str, total: Option<f64>) -> Result<Vec<(String, f64)>, BotError> {
+    let users = text.split_whitespace().collect::<Vec<&str>>();
+    if users.len() == 0 {
+        return Err(BotError::UserError(
+            "❌ Please provide at least one username!".to_string(),
+        ));
+    }
+
+    let total = match total {
+        Some(val) => val,
+        None => {
+            return Err(BotError::UserError(
+                "❌ Something's wrong! The total amount isn't provided.".to_string(),
+            ));
+        }
+    };
+
+    let amount = total / users.len() as f64;
+    Ok(users
+        .iter()
+        .map(|user| (user.to_string(), amount))
+        .collect())
+}
+
+// Parse and process a string to retrieve a list of debts, for split by exact amount.
+pub fn process_debts_exact(
     text: &str,
     creditor: &Option<String>,
     total: Option<f64>,
 ) -> Result<Vec<(String, f64)>, BotError> {
     let mut debts: Vec<(String, f64)> = Vec::new();
     let mut sum: f64 = 0.0;
-    let pairs: Vec<&str> = text.split(',').collect();
+    let pairs: Vec<&str> = text.split('\n').collect();
     for pair in pairs {
         let pair = pair.split_whitespace().collect::<Vec<&str>>();
         if pair.len() != 2 {
@@ -227,6 +270,63 @@ pub fn process_debts(
         Err(BotError::UserError(
             "❌ Something's wrong! The payer isn't provided.".to_string(),
         ))
+    }
+}
+
+// Parse and process a string to retrieve a list of debts, for split by ratio.
+pub fn process_debts_ratio(text: &str, total: Option<f64>) -> Result<Vec<(String, f64)>, BotError> {
+    let pairs: Vec<&str> = text.split('\n').collect();
+    let mut debts: Vec<(String, f64)> = Vec::new();
+    let mut sum: f64 = 0.0;
+
+    if pairs.len() == 0 {
+        return Err(BotError::UserError(
+            "❌ Please provide at least one username!".to_string(),
+        ));
+    }
+
+    for pair in pairs {
+        let pair = pair.split_whitespace().collect::<Vec<&str>>();
+        if pair.len() != 2 {
+            return Err(BotError::UserError(
+                "❌ Please use the following format!".to_string(),
+            ));
+        }
+
+        let username = parse_username(pair[0]);
+        let ratio = parse_amount(pair[1])?;
+
+        sum += ratio;
+        debts.push((username, ratio));
+    }
+
+    let total = match total {
+        Some(val) => val,
+        None => {
+            return Err(BotError::UserError(
+                "❌ Something's wrong! The total amount isn't provided.".to_string(),
+            ));
+        }
+    };
+
+    for debt in &mut debts {
+        debt.1 = (debt.1 / sum) * total;
+    }
+
+    Ok(debts)
+}
+
+// Parse and process a string to retrieve a list of debts, returns Vec<Debt>.
+pub fn process_debts(
+    debts_format: AddDebtsFormat,
+    text: &str,
+    creditor: &Option<String>,
+    total: Option<f64>,
+) -> Result<Vec<(String, f64)>, BotError> {
+    match debts_format {
+        AddDebtsFormat::Equal => process_debts_equal(text, total),
+        AddDebtsFormat::Exact => process_debts_exact(text, creditor, total),
+        AddDebtsFormat::Ratio => process_debts_ratio(text, total),
     }
 }
 

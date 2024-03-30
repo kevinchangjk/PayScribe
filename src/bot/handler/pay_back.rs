@@ -6,7 +6,7 @@ use crate::bot::{
         dispatcher::State,
         handler::utils::{
             display_balances, display_debts, make_keyboard, parse_username, HandlerResult,
-            UserDialogue, DEBT_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            UserDialogue, NO_TEXT_MESSAGE, PAY_BACK_INSTRUCTIONS_MESSAGE,
         },
     },
 };
@@ -156,7 +156,7 @@ pub async fn action_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
     bot.send_message(
         msg.chat.id,
         format!(
-            "Alright! Who did you pay back, and how much did you pay?\n{DEBT_INSTRUCTIONS_MESSAGE}"
+            "Alright! Who did you pay back, and how much did you pay?\n{PAY_BACK_INSTRUCTIONS_MESSAGE}"
         ),
     )
     .await?;
@@ -236,7 +236,7 @@ pub async fn action_pay_back_confirm(
                 bot.send_message(
                     payment.chat_id,
                     format!(
-                        "Alright! Who did you pay back, and how much did you pay?\n\n{DEBT_INSTRUCTIONS_MESSAGE}"
+                        "Alright! Who did you pay back, and how much did you pay?\n\n{PAY_BACK_INSTRUCTIONS_MESSAGE}"
                         ),
                     )
                     .await?;
