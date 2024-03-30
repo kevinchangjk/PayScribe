@@ -46,7 +46,7 @@ pub async fn action_start(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn action_help(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("👋 Hey there! Need some help?\n\nTo begin, you can add new payment records with {COMMAND_ADD_PAYMENT}. Use {COMMAND_VIEW_BALANCES} at any time to see how much everyone owes one another. \n\nTo edit or delete payment records, use {COMMAND_VIEW_PAYMENTS}, then {COMMAND_EDIT_PAYMENT} or {COMMAND_DELETE_PAYMENT}. After you have paid back your friends, be sure to record those down with the {COMMAND_PAY_BACK} command too! \n\nCheck out the full list of commands here:\n\n{}", Command::descriptions().to_string()),
+        format!("👋 Hey there! Need some help?\n\nTo begin, you can add new payment records with {COMMAND_ADD_PAYMENT}. When specifying how much each person owes you can either divide the total cost equally among some users (e.g. sharing ticket prices equally among friends), specify the exact amount each person owes, or provide a ratio of how much each person owes (e.g. sharing subscription costs among friends with different usage durations).\n\nUse {COMMAND_VIEW_BALANCES} at any time to see how much everyone owes one another. To edit or delete payment records, use {COMMAND_VIEW_PAYMENTS}, then {COMMAND_EDIT_PAYMENT} or {COMMAND_DELETE_PAYMENT}. After you have paid back your friends, be sure to record those down with the {COMMAND_PAY_BACK} command too! \n\nCheck out the full list of commands here:\n\n{}", Command::descriptions().to_string()),
     )
     .await?;
     Ok(())
