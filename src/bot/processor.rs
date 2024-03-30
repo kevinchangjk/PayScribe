@@ -18,7 +18,7 @@ use super::{
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum ProcessError {
-    #[error("Database CRUD error: {0}")]
+    #[error("{0}")]
     CrudError(CrudError),
 }
 

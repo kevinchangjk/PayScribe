@@ -1,23 +1,19 @@
-use teloxide::{
-    payloads::SendMessageSetters,
-    prelude::*,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup, Message},
+use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
+
+use crate::bot::{
+    processor::add_payment,
+    {
+        dispatcher::State,
+        handler::utils::{
+            display_balances, display_debts, make_keyboard, parse_username, HandlerResult,
+            UserDialogue, NO_TEXT_MESSAGE, PAY_BACK_INSTRUCTIONS_MESSAGE,
+        },
+    },
 };
 
-use crate::bot::{handler::utils::display_debts, processor::add_payment, BotError};
-
-use super::{
-    super::dispatcher::{HandlerResult, State, UserDialogue},
-    general::{NO_TEXT_MESSAGE, UNKNOWN_ERROR_MESSAGE},
-    utils::{display_balances, make_keyboard, parse_amount, parse_debts, parse_username},
-};
+use super::utils::parse_debts_payback;
 
 /* Utilities */
-const HEADER_MESSAGE: &str = "Adding a new entry to pay back!\n\n";
-const FOOTER_MESSAGE: &str = "Enter /cancel at any time to cancel the entry.\n\n";
-const DEBT_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and the amounts as follows: \n\n@user1 amount1, @user2 amount2, etc.\n\n";
-
 #[derive(Clone, Debug)]
 pub struct PayBackParams {
     chat_id: String,
@@ -27,6 +23,9 @@ pub struct PayBackParams {
     total: f64,
     debts: Vec<(String, f64)>,
 }
+
+const CANCEL_MESSAGE: &str =
+    "Sure, I've cancelled adding the payment. No changes have been made! 👌";
 
 fn display_pay_back_entry(payment: &PayBackParams) -> String {
     format!(
@@ -61,7 +60,7 @@ async fn call_processor_pay_back(
     if let Some(Message { id, chat, .. }) = query.message {
         let payment_clone = payment.clone();
         let payment_overview = display_pay_back_entry(&payment);
-        let description = format!("{} paid back", payment.sender_username);
+        let description = format!("{} paid back!", payment.sender_username);
         let total = payment.debts.iter().fold(0.0, |curr, next| curr + next.1);
 
         let updated_balances = add_payment(
@@ -87,7 +86,9 @@ async fn call_processor_pay_back(
                 bot.edit_message_text(
                     chat.id,
                     id,
-                    format!("{}\nPay back failed!", err.to_string()),
+                    format!(
+                        "❓ Hmm, something went wrong! Sorry, I can't add the payment right now."
+                    ),
                 )
                 .await?;
             }
@@ -102,7 +103,7 @@ async fn call_processor_pay_back(
                     chat.id,
                     id,
                     format!(
-                        "Pay back added!\n\n{}\nCurrent balances:\n{}",
+                        "🎉 I've added the payment! 🎉\n\n{}\nHere are the updated balances:\n{}",
                         payment_overview,
                         display_balances(&balances)
                     ),
@@ -123,7 +124,7 @@ async fn call_processor_pay_back(
 pub async fn handle_repeated_pay_back(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "You are already paying back! Please complete or cancel the current operation before starting a new one.",
+        "🚫 You are already paying back! Please complete or cancel the current operation before starting a new one.",
     ).await?;
     Ok(())
 }
@@ -132,7 +133,7 @@ pub async fn handle_repeated_pay_back(bot: Bot, msg: Message) -> HandlerResult {
  * Can be called at any step of the process.
  */
 pub async fn cancel_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, "Pay back cancelled!").await?;
+    bot.send_message(msg.chat.id, CANCEL_MESSAGE).await?;
     dialogue.exit().await?;
     Ok(())
 }
@@ -143,7 +144,7 @@ pub async fn cancel_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
 pub async fn block_pay_back(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "You are currently paying back! Please complete or cancel the current payment before starting another command.",
+        "🚫 You are currently paying back! Please complete or cancel the current payment before starting another command.",
     ).await?;
     Ok(())
 }
@@ -155,7 +156,7 @@ pub async fn action_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
     bot.send_message(
         msg.chat.id,
         format!(
-            "{HEADER_MESSAGE}Who did you pay back, and how much was it?\n{DEBT_INSTRUCTIONS_MESSAGE}{FOOTER_MESSAGE}"
+            "Alright! Who did you pay back, and how much did you pay?\n{PAY_BACK_INSTRUCTIONS_MESSAGE}"
         ),
     )
     .await?;
@@ -173,53 +174,38 @@ pub async fn action_pay_back_debts(
 ) -> HandlerResult {
     match msg.text() {
         Some(text) => {
-            let debts = parse_debts(text);
-            if let Err(err) = debts {
-                log::error!(
-                    "Pay Back - Debt parsing failed for user {} in chat {}: {}",
-                    msg.from().as_ref().unwrap().id,
-                    msg.chat.id,
-                    err.to_string()
-                );
-                bot.send_message(msg.chat.id, format!("{}\n\nWho did you pay back, and how much was it?\n{DEBT_INSTRUCTIONS_MESSAGE}{FOOTER_MESSAGE}", err.to_string())).await?;
-                return Ok(());
-            }
-
-            let debts = debts?;
-            let total = debts.iter().fold(0.0, |curr, next| curr + next.1);
             if let Some(user) = msg.from() {
-                let username = match &user.username {
-                    Some(user) => parse_username(user),
-                    None => {
-                        return Err(BotError::UserError(format!(
-                            "Pay Back - Username not found for user ID {}",
-                            user.id.to_string()
-                        )));
+                if let Some(username) = &user.username {
+                    let username = parse_username(username);
+                    let debts = parse_debts_payback(text, &username);
+                    if let Err(err) = debts {
+                        bot.send_message(msg.chat.id, err.to_string()).await?;
+                        return Ok(());
                     }
-                };
-                let payment = PayBackParams {
-                    chat_id: msg.chat.id.to_string(),
-                    sender_id: msg.from().as_ref().unwrap().id.to_string(),
-                    sender_username: username,
-                    datetime: msg.date.to_string(),
-                    total,
-                    debts,
-                };
-                log::info!(
-                    "Pay Back - Debt updated successfully for user {} in chat {}: {:?}",
-                    payment.sender_id,
-                    payment.chat_id,
-                    payment
-                );
-                display_pay_back_overview(bot, dialogue, payment).await?;
+
+                    let debts = debts?;
+                    let total = debts.iter().fold(0.0, |curr, next| curr + next.1);
+                    let payment = PayBackParams {
+                        chat_id: msg.chat.id.to_string(),
+                        sender_id: msg.from().as_ref().unwrap().id.to_string(),
+                        sender_username: username,
+                        datetime: msg.date.to_string(),
+                        total,
+                        debts,
+                    };
+                    log::info!(
+                        "Pay Back - Debt updated successfully for user {} in chat {}: {:?}",
+                        payment.sender_id,
+                        payment.chat_id,
+                        payment
+                    );
+                    display_pay_back_overview(bot, dialogue, payment).await?;
+                }
             }
         }
         None => {
-            bot.send_message(
-                msg.chat.id,
-                format!("{NO_TEXT_MESSAGE}{DEBT_INSTRUCTIONS_MESSAGE}{FOOTER_MESSAGE}"),
-            )
-            .await?;
+            bot.send_message(msg.chat.id, format!("{NO_TEXT_MESSAGE}"))
+                .await?;
         }
     }
     Ok(())
@@ -237,13 +223,12 @@ pub async fn action_pay_back_confirm(
     query: CallbackQuery,
 ) -> HandlerResult {
     if let Some(button) = &query.data {
-        bot.answer_callback_query(format!("{}", query.id)).await?;
+        bot.answer_callback_query(query.id.to_string()).await?;
 
         match button.as_str() {
             "Cancel" => {
                 if let Some(Message { id, chat, .. }) = query.message {
-                    bot.edit_message_text(chat.id, id, "Pay back entry cancelled!")
-                        .await?;
+                    bot.edit_message_text(chat.id, id, CANCEL_MESSAGE).await?;
                     dialogue.exit().await?;
                 }
             }
@@ -251,7 +236,7 @@ pub async fn action_pay_back_confirm(
                 bot.send_message(
                     payment.chat_id,
                     format!(
-                        "{HEADER_MESSAGE}Who did you pay back, and how much was it?\n\n{DEBT_INSTRUCTIONS_MESSAGE}{FOOTER_MESSAGE}"
+                        "Alright! Who did you pay back, and how much did you pay?\n\n{PAY_BACK_INSTRUCTIONS_MESSAGE}"
                         ),
                     )
                     .await?;

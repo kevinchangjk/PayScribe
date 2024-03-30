@@ -1,11 +1,8 @@
 use teloxide::{prelude::*, types::Message};
 
-use crate::bot::{processor::view_debts, BotError};
-
-use super::{
-    super::dispatcher::{HandlerResult, UserDialogue},
-    general::UNKNOWN_ERROR_MESSAGE,
-    utils::display_balances,
+use crate::bot::{
+    handler::utils::{display_balances, HandlerResult, UserDialogue, UNKNOWN_ERROR_MESSAGE},
+    processor::view_debts,
 };
 
 /* Utilities */
@@ -22,8 +19,11 @@ pub async fn action_view_balances(bot: Bot, dialogue: UserDialogue, msg: Message
             Ok(debts) => {
                 if debts.is_empty() {
                     log::info!("View Balances - User {} viewed balances for group {}, but no balances found.", sender_id, chat_id);
-                    bot.send_message(msg.chat.id, format!("No balances found for this group!"))
-                        .await?;
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("There are no outstanding balances at the moment."),
+                    )
+                    .await?;
                 } else {
                     log::info!(
                         "View Balances - User {} viewed balances for group {}, found: {}",
@@ -34,7 +34,7 @@ pub async fn action_view_balances(bot: Bot, dialogue: UserDialogue, msg: Message
                     bot.send_message(
                         msg.chat.id,
                         format!(
-                            "Here are the current balances for this group!\n\n{}",
+                            "Here you go! The current balances are:\n\n{}",
                             display_balances(&debts)
                         ),
                     )
@@ -48,19 +48,16 @@ pub async fn action_view_balances(bot: Bot, dialogue: UserDialogue, msg: Message
                     chat_id,
                     err.to_string()
                 );
-                bot.send_message(
-                    msg.chat.id,
-                    format!(
-                        "{}\nNo balances found for this group!",
-                        UNKNOWN_ERROR_MESSAGE
-                    ),
-                )
-                .await?;
+                bot.send_message(msg.chat.id, format!("{UNKNOWN_ERROR_MESSAGE}"))
+                    .await?;
             }
         }
         dialogue.exit().await?;
+        return Ok(());
     }
-    Err(BotError::UserError(
-        "Unable to view balances: User not found".to_string(),
-    ))
+    log::error!(
+        "View Balances - User not found in message: {}",
+        msg.id.to_string()
+    );
+    Ok(())
 }
