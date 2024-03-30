@@ -5,8 +5,8 @@ use crate::bot::{
     {
         dispatcher::State,
         handler::utils::{
-            display_balances, display_debts, make_keyboard, parse_username, BotError,
-            HandlerResult, UserDialogue, DEBT_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            display_balances, display_debts, make_keyboard, parse_username, HandlerResult,
+            UserDialogue, DEBT_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
         },
     },
 };
@@ -25,7 +25,7 @@ pub struct PayBackParams {
 }
 
 const CANCEL_MESSAGE: &str =
-    "👌 Sure, I've cancelled adding the payment. No changes have been made!";
+    "Sure, I've cancelled adding the payment. No changes have been made! 👌";
 
 fn display_pay_back_entry(payment: &PayBackParams) -> String {
     format!(
@@ -103,7 +103,7 @@ async fn call_processor_pay_back(
                     chat.id,
                     id,
                     format!(
-                        "🎉 I've added the payment!\n\n{}\nHere are the updated balances:\n{}",
+                        "🎉 I've added the payment! 🎉\n\n{}\nHere are the updated balances:\n{}",
                         payment_overview,
                         display_balances(&balances)
                     ),

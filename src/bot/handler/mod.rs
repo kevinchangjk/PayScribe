@@ -19,8 +19,13 @@ pub use self::pay_back::{
     action_pay_back, action_pay_back_confirm, action_pay_back_debts, block_pay_back,
     cancel_pay_back, handle_repeated_pay_back, PayBackParams,
 };
+pub use self::utils::SelectPaymentType;
 pub use self::view_balances::action_view_balances;
-pub use self::view_payments::{action_view_more, action_view_payments, Payment};
+pub use self::view_payments::{
+    action_select_payment_delete, action_select_payment_edit, action_select_payment_number,
+    action_view_more, action_view_payments, block_select_payment, cancel_select_payment,
+    handle_repeated_select_payment, Payment,
+};
 
 // Exported structs and types
 

@@ -1,11 +1,14 @@
-use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
+use teloxide::{
+    prelude::*,
+    types::{Message, MessageId},
+};
 
 use crate::bot::{
     dispatcher::State,
     handler::{
         utils::{
-            display_balances, display_payment, make_keyboard, parse_serial_num, BotError,
-            HandlerResult, UserDialogue, COMMAND_VIEW_PAYMENTS,
+            display_balances, display_payment, make_keyboard, HandlerResult, UserDialogue,
+            COMMAND_VIEW_PAYMENTS,
         },
         Payment,
     },
@@ -44,7 +47,7 @@ pub async fn cancel_delete_payment(
 }
 
 /* Blocks user command.
- * Called when user attempts to start another operation in the middle of adding a payment.
+ * Called when user attempts to start another operation in the middle of deleting a payment.
  */
 pub async fn block_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
@@ -73,62 +76,30 @@ pub async fn no_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn action_delete_payment(
     bot: Bot,
     dialogue: UserDialogue,
-    msg: Message,
+    msg_id: MessageId,
+    chat_id: String,
     (payments, page): (Vec<Payment>, usize),
-    serial_num: String,
+    index: usize,
 ) -> HandlerResult {
-    let user = msg.from();
-    if let Some(_user) = user {
-        let parsed_serial = parse_serial_num(&serial_num, payments.len());
-        match parsed_serial {
-            Ok(serial_num) => {
-                let payment = payments[serial_num - 1].clone();
-                let keyboard = make_keyboard(vec!["Cancel", "Confirm"], Some(2));
-                bot.send_message(
-                    msg.chat.id,
-                    format!(
-                        "Are you sure you want to delete the following payment?\n\n{}",
-                        display_payment(&payment, serial_num)
-                    ),
-                )
-                .reply_markup(keyboard)
-                .await?;
-                dialogue
-                    .update(State::DeletePayment {
-                        payment,
-                        payments,
-                        page,
-                    })
-                    .await?;
-                return Ok(());
-            }
-            Err(err) => {
-                if payments.len() == 1 {
-                    bot.send_message(
-                        msg.chat.id,
-                        format!("{}\nA valid serial number would be 1.", err.to_string()),
-                    )
-                    .await?;
-                } else {
-                    bot.send_message(
-                        msg.chat.id,
-                        format!(
-                            "{}\nA valid serial number is a number from 1 to {}.",
-                            err.to_string(),
-                            payments.len()
-                        ),
-                    )
-                    .await?;
-                }
-                return Ok(());
-            }
-        }
-    }
-    dialogue.exit().await?;
-    log::error!(
-        "Delete Payment - User not found in message: {}",
-        msg.id.to_string()
-    );
+    let payment = payments[index].clone();
+    let keyboard = make_keyboard(vec!["Cancel", "Confirm"], Some(2));
+    bot.edit_message_text(
+        chat_id,
+        msg_id,
+        format!(
+            "Are you sure you want to delete the following payment?\n\n{}",
+            display_payment(&payment, index + 1)
+        ),
+    )
+    .reply_markup(keyboard)
+    .await?;
+    dialogue
+        .update(State::DeletePayment {
+            payment,
+            payments,
+            page,
+        })
+        .await?;
     Ok(())
 }
 
@@ -168,7 +139,7 @@ pub async fn action_delete_payment_confirm(
                                 chat.id,
                                 id,
                                 format!(
-                                    "🎉 I've deleted the payment!\n\nHere are the updated balances:\n{}",
+                                    "🎉 I've deleted the payment! 🎉\n\nHere are the updated balances:\n{}",
                                     display_balances(&balances)
                                 ),
                             )

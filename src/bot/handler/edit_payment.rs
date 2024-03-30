@@ -1,12 +1,16 @@
-use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
+use teloxide::{
+    payloads::SendMessageSetters,
+    prelude::*,
+    types::{Message, MessageId},
+};
 
 use crate::bot::{
     dispatcher::State,
     handler::{
         utils::{
             display_balances, display_debts, display_payment, make_keyboard, parse_amount,
-            parse_serial_num, parse_username, process_debts, BotError, HandlerResult, UserDialogue,
-            COMMAND_VIEW_PAYMENTS, DEBT_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            parse_username, process_debts, HandlerResult, UserDialogue, COMMAND_VIEW_PAYMENTS,
+            DEBT_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
         },
         AddPaymentEdit, Payment,
     },
@@ -43,7 +47,8 @@ fn display_edit_payment(payment: Payment, edited_payment: EditPaymentParams) -> 
 async fn display_edit_overview(
     bot: Bot,
     dialogue: UserDialogue,
-    msg: Message,
+    msg_id: Option<MessageId>,
+    chat_id: String,
     payment: Payment,
     edited_payment: EditPaymentParams,
     payments: Vec<Payment>,
@@ -58,15 +63,31 @@ async fn display_edit_overview(
         "Confirm",
     ];
     let keyboard = make_keyboard(options, Some(4));
-    bot.send_message(
-        msg.chat.id,
-        format!(
-            "Sure! What do you want to edit for this payment entry?\n\n{}",
-            display_edit_payment(payment.clone(), edited_payment.clone())
-        ),
-    )
-    .reply_markup(keyboard)
-    .await?;
+    match msg_id {
+        Some(id) => {
+            bot.edit_message_text(
+                chat_id,
+                id,
+                format!(
+                    "Sure! What do you want to edit for this payment entry?\n\n{}",
+                    display_edit_payment(payment.clone(), edited_payment.clone())
+                ),
+            )
+            .reply_markup(keyboard)
+            .await?;
+        }
+        None => {
+            bot.send_message(
+                chat_id,
+                format!(
+                    "Sure! What do you want to edit for this payment entry?\n\n{}",
+                    display_edit_payment(payment.clone(), edited_payment.clone())
+                ),
+            )
+            .reply_markup(keyboard)
+            .await?;
+        }
+    }
 
     dialogue
         .update(State::EditPayment {
@@ -116,7 +137,7 @@ async fn call_processor_edit_payment(
                             chat.id,
                             id,
                             format!(
-                                "🎉 I've edited the payment!\n\n{}\nHere are the updated balances:\n{}",
+                                "🎉 I've edited the payment! 🎉\n\n{}\nHere are the updated balances:\n{}",
                                 edit_overview,
                                 display_balances(&balances)
                             ),
@@ -128,7 +149,7 @@ async fn call_processor_edit_payment(
                             chat.id,
                             id,
                             format!(
-                                "🎉 I've edited the payment!\n\n{}\nThere are no changes to the balances.",
+                                "🎉 I've edited the payment! 🎉\n\n{}\nThere are no changes to the balances.",
                                 edit_overview
                             ),
                         )
@@ -216,54 +237,30 @@ pub async fn no_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn action_edit_payment(
     bot: Bot,
     dialogue: UserDialogue,
-    msg: Message,
+    msg_id: MessageId,
+    chat_id: String,
     (payments, page): (Vec<Payment>, usize),
-    serial_num: String,
+    index: usize,
 ) -> HandlerResult {
-    let user = msg.from();
-    if let Some(_user) = user {
-        let parsed_serial = parse_serial_num(&serial_num, payments.len());
-        match parsed_serial {
-            Ok(serial_num) => {
-                let payment = payments[serial_num - 1].clone();
-                let edited_payment = EditPaymentParams {
-                    description: None,
-                    creditor: None,
-                    total: None,
-                    debts: None,
-                };
+    let payment = payments[index].clone();
+    let edited_payment = EditPaymentParams {
+        description: None,
+        creditor: None,
+        total: None,
+        debts: None,
+    };
 
-                display_edit_overview(bot, dialogue, msg, payment, edited_payment, payments, page)
-                    .await?;
-                return Ok(());
-            }
-            Err(err) => {
-                if payments.len() == 1 {
-                    bot.send_message(
-                        msg.chat.id,
-                        format!("{}\nA valid serial number would be 1.", err.to_string()),
-                    )
-                    .await?;
-                } else {
-                    bot.send_message(
-                        msg.chat.id,
-                        format!(
-                            "{}\nA valid serial number is a number from 1 to {}.",
-                            err.to_string(),
-                            payments.len()
-                        ),
-                    )
-                    .await?;
-                }
-                return Ok(());
-            }
-        }
-    }
-    dialogue.exit().await?;
-    log::error!(
-        "Edit Payment - User not found in message: {}",
-        msg.id.to_string()
-    );
+    display_edit_overview(
+        bot,
+        dialogue,
+        Some(msg_id),
+        chat_id,
+        payment,
+        edited_payment,
+        payments,
+        page,
+    )
+    .await?;
     Ok(())
 }
 
@@ -424,7 +421,8 @@ pub async fn action_edit_payment_edit(
                 display_edit_overview(
                     bot,
                     dialogue,
-                    msg,
+                    None,
+                    msg.chat.id.to_string(),
                     payment,
                     new_edited_payment,
                     payments,
@@ -448,7 +446,8 @@ pub async fn action_edit_payment_edit(
                 display_edit_overview(
                     bot,
                     dialogue,
-                    msg,
+                    None,
+                    msg.chat.id.to_string(),
                     payment,
                     new_edited_payment,
                     payments,
@@ -537,7 +536,8 @@ pub async fn action_edit_payment_edit(
                     display_edit_overview(
                         bot,
                         dialogue,
-                        msg,
+                        None,
+                        msg.chat.id.to_string(),
                         payment,
                         new_edited_payment,
                         payments,

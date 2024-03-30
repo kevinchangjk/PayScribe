@@ -31,6 +31,12 @@ pub const COMMAND_VIEW_BALANCES: &str = "/viewbalances";
 pub type UserDialogue = Dialogue<State, InMemStorage<State>>;
 pub type HandlerResult = Result<(), BotError>;
 
+#[derive(Debug, Clone)]
+pub enum SelectPaymentType {
+    EditPayment,
+    DeletePayment,
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum BotError {
     #[error("{0}")]
@@ -154,30 +160,6 @@ pub fn parse_amount(text: &str) -> Result<f64, BotError> {
         ))
     } else {
         Ok(amount)
-    }
-}
-
-// Parse a serial number (an index). Reads a string, returns a usize.
-pub fn parse_serial_num(text: &str, length: usize) -> Result<usize, BotError> {
-    if text.is_empty() {
-        return Err(BotError::UserError(
-            "❌ Please provide your chosen serial number!".to_string(),
-        ));
-    }
-    let parsed_num = text.parse::<usize>();
-    match parsed_num {
-        Ok(serial_num) => {
-            if serial_num > length || serial_num == 0 {
-                Err(BotError::UserError(
-                    "❌ Please provide a valid serial number for your payments!".to_string(),
-                ))
-            } else {
-                Ok(serial_num)
-            }
-        }
-        Err(_) => Err(BotError::UserError(
-            "❌ Please provide a proper number!".to_string(),
-        )),
     }
 }
 

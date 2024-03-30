@@ -7,18 +7,20 @@ use teloxide::{
 use crate::bot::handler::{
     action_delete_payment, action_delete_payment_confirm, action_edit_payment,
     action_edit_payment_confirm, action_edit_payment_edit, action_pay_back,
-    action_pay_back_confirm, action_pay_back_debts, action_view_balances, action_view_more,
-    action_view_payments, block_add_payment, block_delete_payment, block_edit_payment,
-    block_pay_back, callback_invalid_message, cancel_delete_payment, cancel_edit_payment,
-    cancel_pay_back, handle_repeated_add_payment, handle_repeated_delete_payment,
-    handle_repeated_edit_payment, handle_repeated_pay_back, no_delete_payment, no_edit_payment,
+    action_pay_back_confirm, action_pay_back_debts, action_select_payment_delete,
+    action_select_payment_edit, action_select_payment_number, action_view_balances,
+    action_view_more, action_view_payments, block_add_payment, block_delete_payment,
+    block_edit_payment, block_pay_back, block_select_payment, callback_invalid_message,
+    cancel_delete_payment, cancel_edit_payment, cancel_pay_back, cancel_select_payment,
+    handle_repeated_add_payment, handle_repeated_delete_payment, handle_repeated_edit_payment,
+    handle_repeated_pay_back, handle_repeated_select_payment, no_delete_payment, no_edit_payment,
 };
 
 use super::handler::{
     action_add_confirm, action_add_creditor, action_add_debt, action_add_description,
     action_add_edit, action_add_edit_menu, action_add_payment, action_add_total, action_cancel,
     action_help, action_start, cancel_add_payment, invalid_state, AddPaymentEdit, AddPaymentParams,
-    EditPaymentParams, PayBackParams, Payment,
+    EditPaymentParams, PayBackParams, Payment, SelectPaymentType,
 };
 
 /* Handler is the front-facing agent of the bot.
@@ -63,6 +65,11 @@ pub enum State {
         payments: Vec<Payment>,
         page: usize,
     },
+    SelectPayment {
+        payments: Vec<Payment>,
+        page: usize,
+        function: SelectPaymentType,
+    },
     EditPayment {
         payment: Payment,
         edited_payment: EditPaymentParams,
@@ -97,9 +104,9 @@ pub enum Command {
     #[command(description = "View all payment records for the group")]
     ViewPayments,
     #[command(description = "Edit a payment record previously added")]
-    EditPayment { serial_num: String },
+    EditPayment,
     #[command(description = "Delete a payment record previously added")]
-    DeletePayment { serial_num: String },
+    DeletePayment,
     #[command(description = "View the current balances for the group")]
     ViewBalances,
     #[command(description = "Cancels an ongoing action")]
@@ -120,8 +127,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::ViewBalances].endpoint(action_view_balances))
                 .branch(case![Command::PayBack].endpoint(action_pay_back))
                 .branch(case![Command::ViewPayments].endpoint(action_view_payments))
-                .branch(case![Command::EditPayment { serial_num }].endpoint(no_edit_payment))
-                .branch(case![Command::DeletePayment { serial_num }].endpoint(no_delete_payment)),
+                .branch(case![Command::EditPayment].endpoint(no_edit_payment))
+                .branch(case![Command::DeletePayment].endpoint(no_delete_payment)),
         )
         .branch(
             case![State::AddDescription]
@@ -132,8 +139,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
                 .branch(case![Command::PayBack].endpoint(block_add_payment))
                 .branch(case![Command::ViewPayments].endpoint(block_add_payment))
-                .branch(case![Command::EditPayment { serial_num }].endpoint(block_add_payment))
-                .branch(case![Command::DeletePayment { serial_num }].endpoint(block_add_payment)),
+                .branch(case![Command::EditPayment].endpoint(block_add_payment))
+                .branch(case![Command::DeletePayment].endpoint(block_add_payment)),
         )
         .branch(
             case![State::AddCreditor { payment }]
@@ -144,8 +151,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
                 .branch(case![Command::PayBack].endpoint(block_add_payment))
                 .branch(case![Command::ViewPayments].endpoint(block_add_payment))
-                .branch(case![Command::EditPayment { serial_num }].endpoint(block_add_payment))
-                .branch(case![Command::DeletePayment { serial_num }].endpoint(block_add_payment)),
+                .branch(case![Command::EditPayment].endpoint(block_add_payment))
+                .branch(case![Command::DeletePayment].endpoint(block_add_payment)),
         )
         .branch(
             case![State::AddTotal { payment }]
@@ -156,8 +163,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
                 .branch(case![Command::PayBack].endpoint(block_add_payment))
                 .branch(case![Command::ViewPayments].endpoint(block_add_payment))
-                .branch(case![Command::EditPayment { serial_num }].endpoint(block_add_payment))
-                .branch(case![Command::DeletePayment { serial_num }].endpoint(block_add_payment)),
+                .branch(case![Command::EditPayment].endpoint(block_add_payment))
+                .branch(case![Command::DeletePayment].endpoint(block_add_payment)),
         )
         .branch(
             case![State::AddDebt { payment }]
@@ -168,8 +175,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
                 .branch(case![Command::PayBack].endpoint(block_add_payment))
                 .branch(case![Command::ViewPayments].endpoint(block_add_payment))
-                .branch(case![Command::EditPayment { serial_num }].endpoint(block_add_payment))
-                .branch(case![Command::DeletePayment { serial_num }].endpoint(block_add_payment)),
+                .branch(case![Command::EditPayment].endpoint(block_add_payment))
+                .branch(case![Command::DeletePayment].endpoint(block_add_payment)),
         )
         .branch(
             case![State::AddConfirm { payment }]
@@ -180,8 +187,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
                 .branch(case![Command::PayBack].endpoint(block_add_payment))
                 .branch(case![Command::ViewPayments].endpoint(block_add_payment))
-                .branch(case![Command::EditPayment { serial_num }].endpoint(block_add_payment))
-                .branch(case![Command::DeletePayment { serial_num }].endpoint(block_add_payment)),
+                .branch(case![Command::EditPayment].endpoint(block_add_payment))
+                .branch(case![Command::DeletePayment].endpoint(block_add_payment)),
         )
         .branch(
             case![State::AddEditMenu { payment }]
@@ -192,8 +199,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
                 .branch(case![Command::PayBack].endpoint(block_add_payment))
                 .branch(case![Command::ViewPayments].endpoint(block_add_payment))
-                .branch(case![Command::EditPayment { serial_num }].endpoint(block_add_payment))
-                .branch(case![Command::DeletePayment { serial_num }].endpoint(block_add_payment)),
+                .branch(case![Command::EditPayment].endpoint(block_add_payment))
+                .branch(case![Command::DeletePayment].endpoint(block_add_payment)),
         )
         .branch(
             case![State::AddEdit { payment, edit }]
@@ -204,8 +211,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
                 .branch(case![Command::PayBack].endpoint(block_add_payment))
                 .branch(case![Command::ViewPayments].endpoint(block_add_payment))
-                .branch(case![Command::EditPayment { serial_num }].endpoint(block_add_payment))
-                .branch(case![Command::DeletePayment { serial_num }].endpoint(block_add_payment)),
+                .branch(case![Command::EditPayment].endpoint(block_add_payment))
+                .branch(case![Command::DeletePayment].endpoint(block_add_payment)),
         )
         .branch(
             case![State::PayBackDebts]
@@ -216,8 +223,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::ViewBalances].endpoint(block_pay_back))
                 .branch(case![Command::PayBack].endpoint(handle_repeated_pay_back))
                 .branch(case![Command::ViewPayments].endpoint(block_pay_back))
-                .branch(case![Command::EditPayment { serial_num }].endpoint(block_pay_back))
-                .branch(case![Command::DeletePayment { serial_num }].endpoint(block_pay_back)),
+                .branch(case![Command::EditPayment].endpoint(block_pay_back))
+                .branch(case![Command::DeletePayment].endpoint(block_pay_back)),
         )
         .branch(
             case![State::PayBackConfirm { payment }]
@@ -228,8 +235,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::ViewBalances].endpoint(block_pay_back))
                 .branch(case![Command::PayBack].endpoint(handle_repeated_pay_back))
                 .branch(case![Command::ViewPayments].endpoint(block_pay_back))
-                .branch(case![Command::EditPayment { serial_num }].endpoint(block_pay_back))
-                .branch(case![Command::DeletePayment { serial_num }].endpoint(block_pay_back)),
+                .branch(case![Command::EditPayment].endpoint(block_pay_back))
+                .branch(case![Command::DeletePayment].endpoint(block_pay_back)),
         )
         .branch(
             case![State::ViewPayments { payments, page }]
@@ -240,10 +247,24 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::ViewBalances].endpoint(action_view_balances))
                 .branch(case![Command::PayBack].endpoint(action_pay_back))
                 .branch(case![Command::ViewPayments].endpoint(action_view_payments))
-                .branch(case![Command::EditPayment { serial_num }].endpoint(action_edit_payment))
-                .branch(
-                    case![Command::DeletePayment { serial_num }].endpoint(action_delete_payment),
-                ),
+                .branch(case![Command::EditPayment].endpoint(action_select_payment_edit))
+                .branch(case![Command::DeletePayment].endpoint(action_select_payment_delete)),
+        )
+        .branch(
+            case![State::SelectPayment {
+                payments,
+                page,
+                function
+            }]
+            .branch(case![Command::Start].endpoint(action_start))
+            .branch(case![Command::Help].endpoint(action_help))
+            .branch(case![Command::AddPayment].endpoint(block_select_payment))
+            .branch(case![Command::Cancel].endpoint(cancel_select_payment))
+            .branch(case![Command::ViewBalances].endpoint(block_select_payment))
+            .branch(case![Command::PayBack].endpoint(block_select_payment))
+            .branch(case![Command::ViewPayments].endpoint(block_select_payment))
+            .branch(case![Command::EditPayment].endpoint(handle_repeated_select_payment))
+            .branch(case![Command::DeletePayment].endpoint(handle_repeated_select_payment)),
         )
         .branch(
             case![State::EditPayment {
@@ -259,10 +280,8 @@ pub async fn run_dispatcher(bot: Bot) {
             .branch(case![Command::ViewBalances].endpoint(block_edit_payment))
             .branch(case![Command::PayBack].endpoint(block_edit_payment))
             .branch(case![Command::ViewPayments].endpoint(block_edit_payment))
-            .branch(
-                case![Command::EditPayment { serial_num }].endpoint(handle_repeated_edit_payment),
-            )
-            .branch(case![Command::DeletePayment { serial_num }].endpoint(block_edit_payment)),
+            .branch(case![Command::EditPayment].endpoint(handle_repeated_edit_payment))
+            .branch(case![Command::DeletePayment].endpoint(block_edit_payment)),
         )
         .branch(
             case![State::EditPaymentDetails {
@@ -279,10 +298,8 @@ pub async fn run_dispatcher(bot: Bot) {
             .branch(case![Command::ViewBalances].endpoint(block_edit_payment))
             .branch(case![Command::PayBack].endpoint(block_edit_payment))
             .branch(case![Command::ViewPayments].endpoint(block_edit_payment))
-            .branch(
-                case![Command::EditPayment { serial_num }].endpoint(handle_repeated_edit_payment),
-            )
-            .branch(case![Command::DeletePayment { serial_num }].endpoint(block_edit_payment)),
+            .branch(case![Command::EditPayment].endpoint(handle_repeated_edit_payment))
+            .branch(case![Command::DeletePayment].endpoint(block_edit_payment)),
         )
         .branch(
             case![State::DeletePayment {
@@ -297,11 +314,8 @@ pub async fn run_dispatcher(bot: Bot) {
             .branch(case![Command::ViewBalances].endpoint(block_delete_payment))
             .branch(case![Command::PayBack].endpoint(block_delete_payment))
             .branch(case![Command::ViewPayments].endpoint(block_delete_payment))
-            .branch(case![Command::EditPayment { serial_num }].endpoint(block_delete_payment))
-            .branch(
-                case![Command::DeletePayment { serial_num }]
-                    .endpoint(handle_repeated_delete_payment),
-            ),
+            .branch(case![Command::EditPayment].endpoint(block_delete_payment))
+            .branch(case![Command::DeletePayment].endpoint(handle_repeated_delete_payment)),
         );
 
     let message_handler = Update::filter_message()
@@ -341,6 +355,14 @@ pub async fn run_dispatcher(bot: Bot) {
         .branch(case![State::AddEditMenu { payment }].endpoint(action_add_edit_menu))
         .branch(case![State::PayBackConfirm { payment }].endpoint(action_pay_back_confirm))
         .branch(case![State::ViewPayments { payments, page }].endpoint(action_view_more))
+        .branch(
+            case![State::SelectPayment {
+                payments,
+                page,
+                function
+            }]
+            .endpoint(action_select_payment_number),
+        )
         .branch(
             case![State::EditPayment {
                 payment,
