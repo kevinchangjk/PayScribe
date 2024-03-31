@@ -1,4 +1,5 @@
 use chrono::{DateTime, Local, NaiveDateTime};
+use regex::Regex;
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage, InMemStorageError},
     types::{InlineKeyboardButton, InlineKeyboardMarkup},
@@ -17,19 +18,19 @@ pub const UNKNOWN_ERROR_MESSAGE: &str =
 pub const NO_TEXT_MESSAGE: &str =
     "❓ Sorry, I can't understand that! Please reply to me in text.\n\n";
 pub const DEBT_EQUAL_DESCRIPTION_MESSAGE: &str =
-    "Equal — divide the total amount equally among users\n";
+    "Equal — Divide the total amount equally among users\n";
 pub const DEBT_EXACT_DESCRIPTION_MESSAGE: &str =
-    "Exact — share the total cost by specifying exact amounts for each user\n";
+    "Exact — Share the total cost by specifying exact amounts for each user\n";
 pub const DEBT_RATIO_DESCRIPTION_MESSAGE: &str =
-    "Ratio — split the total cost by assigning fractional/relative amounts of the total that the user owes\n";
+    "Ratio — Split the total cost by assigning fractional/relative amounts of the total that each user owes\n";
 pub const DEBT_EQUAL_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames of those sharing the cost as follows: \n\n@user1 @user2 @user3 ...\n\n";
+    "Enter the usernames of those sharing the cost (including the payer if sharing too) as follows: \n\n@user1 @user2 @user3 ...\n\n";
 pub const DEBT_EXACT_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and exact amounts as follows: \n\n@user1 amount1\n@user2 amount2\n@user3 amount3\n...\n\n";
+    "Enter the usernames and exact amounts as follows: \n\n@user1 amount1\n@user2 amount2\n@user3 amount3\n...\n\nAny leftover amount will be taken as the payer's share.";
 pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
     "Enter the usernames and exact amounts as follows: \n\n@user1 amount1\n@user2 amount2\n@user3 amount3\n...\n\n";
 pub const DEBT_RATIO_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and ratios as follows: \n\n@user1 ratio1\n@user2 ratio2\n@user3 ratio3\n...\n\nThe ratios can be any number, and they can sum up to any number as well.";
+    "Enter the usernames and ratios as follows: \n\n@user1 ratio1\n@user2 ratio2\n@user3 ratio3\n...\n\nThe ratios can be any number, and do not need to sum up to any specific number.";
 pub const COMMAND_START: &str = "/start";
 pub const COMMAND_HELP: &str = "/help";
 pub const COMMAND_ADD_PAYMENT: &str = "/addpayment";
@@ -106,7 +107,7 @@ pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
 // Displays a single payment entry in a user-friendly format.
 pub fn display_payment(payment: &Payment, serial_num: usize) -> String {
     format!(
-        "_________________________________________\nNo. {} — {}\nDate: {}\nPayer: {}\nTotal: {:.2}\n{}",
+        "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {:.2}\n{}",
         serial_num,
         payment.description,
         reformat_datetime(&payment.datetime),
@@ -146,16 +147,35 @@ pub fn make_keyboard_debt_selection() -> InlineKeyboardMarkup {
 }
 
 // Ensures that a username has a leading '@'.
-pub fn parse_username(username: &str) -> String {
+pub fn parse_username(username: &str) -> Result<String, BotError> {
+    let text: &str;
     if username.starts_with('@') {
-        username.to_string()
+        text = username.trim_start_matches('@');
     } else {
-        format!("@{}", username)
+        text = username;
     }
+
+    if text.split_whitespace().count() == 1 && text.len() >= 5 {
+        let re = Regex::new(r"^[a-zA-Z0-9_]+$");
+        if let Ok(re) = re {
+            if re.captures(text).is_some() {
+                return Ok(format!("@{}", text.to_string()));
+            }
+        }
+    }
+
+    Err(BotError::UserError(
+        "❌ Please provide a valid username!".to_string(),
+    ))
 }
 
 // Parse an amount. Reads a string, returns f64.
 pub fn parse_amount(text: &str) -> Result<f64, BotError> {
+    let text = text
+        .chars()
+        .filter(|&c| c.is_digit(10) || c == '.')
+        .collect::<String>();
+
     let amount = match text.parse::<f64>() {
         Ok(val) => val,
         Err(_) => match text.parse::<i32>() {
@@ -200,10 +220,13 @@ pub fn process_debts_equal(text: &str, total: Option<f64>) -> Result<Vec<(String
     };
 
     let amount = total / users.len() as f64;
-    Ok(users
-        .iter()
-        .map(|user| (user.to_string(), amount))
-        .collect())
+    let mut debts: Vec<(String, f64)> = Vec::new();
+    for user in &users {
+        let debt = (parse_username(user)?, amount);
+        debts.push(debt);
+    }
+
+    Ok(debts)
 }
 
 // Parse and process a string to retrieve a list of debts, for split by exact amount.
@@ -214,17 +237,16 @@ pub fn process_debts_exact(
 ) -> Result<Vec<(String, f64)>, BotError> {
     let mut debts: Vec<(String, f64)> = Vec::new();
     let mut sum: f64 = 0.0;
-    let pairs: Vec<&str> = text.split('\n').collect();
-    for pair in pairs {
-        let pair = pair.split_whitespace().collect::<Vec<&str>>();
-        if pair.len() != 2 {
-            return Err(BotError::UserError(
-                "❌ Please use the following format!".to_string(),
-            ));
-        }
+    let items: Vec<&str> = text.split_whitespace().collect();
+    if items.len() % 2 != 0 {
+        return Err(BotError::UserError(
+            "❌ Please use the following format!".to_string(),
+        ));
+    }
 
-        let username = parse_username(pair[0]);
-        let amount = parse_amount(pair[1])?;
+    for i in (0..items.len()).step_by(2) {
+        let username = parse_username(items[i])?;
+        let amount = parse_amount(items[i + 1])?;
         sum += amount;
 
         let mut found = false;
@@ -275,26 +297,19 @@ pub fn process_debts_exact(
 
 // Parse and process a string to retrieve a list of debts, for split by ratio.
 pub fn process_debts_ratio(text: &str, total: Option<f64>) -> Result<Vec<(String, f64)>, BotError> {
-    let pairs: Vec<&str> = text.split('\n').collect();
+    let items: Vec<&str> = text.split_whitespace().collect();
     let mut debts: Vec<(String, f64)> = Vec::new();
     let mut sum: f64 = 0.0;
 
-    if pairs.len() == 0 {
+    if items.len() % 2 != 0 {
         return Err(BotError::UserError(
-            "❌ Please provide at least one username!".to_string(),
+            "❌ Please use the following format!".to_string(),
         ));
     }
 
-    for pair in pairs {
-        let pair = pair.split_whitespace().collect::<Vec<&str>>();
-        if pair.len() != 2 {
-            return Err(BotError::UserError(
-                "❌ Please use the following format!".to_string(),
-            ));
-        }
-
-        let username = parse_username(pair[0]);
-        let ratio = parse_amount(pair[1])?;
+    for i in (0..items.len()).step_by(2) {
+        let username = parse_username(items[i])?;
+        let ratio = parse_amount(items[i + 1])?;
 
         sum += ratio;
         debts.push((username, ratio));
@@ -333,24 +348,21 @@ pub fn process_debts(
 // Parses a string of debts and returns a vector of debts
 pub fn parse_debts_payback(text: &str, sender: &str) -> Result<Vec<(String, f64)>, BotError> {
     let mut debts: Vec<(String, f64)> = Vec::new();
-    let pairs: Vec<&str> = text.split(',').collect();
-    for pair in pairs {
-        let pair = pair.split_whitespace().collect::<Vec<&str>>();
-        if pair.len() != 2 {
-            return Err(BotError::UserError(
-                "❌ Please use the following format!".to_string(),
-            ));
-        }
+    let items: Vec<&str> = text.split_whitespace().collect();
+    if items.len() % 2 != 0 {
+        return Err(BotError::UserError(
+            "❌ Please use the following format!".to_string(),
+        ));
+    }
 
-        let username = parse_username(pair[0]);
-        let amount = parse_amount(pair[1])?;
-
+    for i in (0..items.len()).step_by(2) {
+        let username = parse_username(items[i])?;
+        let amount = parse_amount(items[i + 1])?;
         if username == sender {
             return Err(BotError::UserError(
                 "❌ You can't pay back yourself!".to_string(),
             ));
         }
-
         let mut found = false;
         for debt in &mut debts {
             if debt.0 == username {
@@ -359,7 +371,6 @@ pub fn parse_debts_payback(text: &str, sender: &str) -> Result<Vec<(String, f64)
                 break;
             }
         }
-
         if !found {
             debts.push((username, amount));
         }

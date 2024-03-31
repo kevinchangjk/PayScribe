@@ -177,6 +177,11 @@ pub async fn action_pay_back_debts(
             if let Some(user) = msg.from() {
                 if let Some(username) = &user.username {
                     let username = parse_username(username);
+                    if let Err(err) = username {
+                        bot.send_message(msg.chat.id, err.to_string()).await?;
+                        return Ok(());
+                    }
+                    let username = username?;
                     let debts = parse_debts_payback(text, &username);
                     if let Err(err) = debts {
                         bot.send_message(msg.chat.id, err.to_string()).await?;
