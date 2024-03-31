@@ -9,7 +9,10 @@ use super::{
     },
     connect::{connect, DBError},
     payment::{add_payment, delete_payment, get_payment, update_payment, Payment},
-    user::{add_user, get_user_chats, get_user_exists, initialize_user, update_user_chats},
+    user::{
+        add_user, get_preferred_username, get_user_chats, get_user_exists, initialize_user,
+        set_preferred_username, update_user_chats,
+    },
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -65,20 +68,23 @@ impl From<DBError> for CrudError {
 pub fn update_user(username: &str, chat_id: &str, user_id: Option<&str>) -> Result<(), CrudError> {
     let mut con = connect()?;
 
+    let user_key = username.to_lowercase();
+
     // Adds user if not exists
-    if !get_user_exists(&mut con, username)? {
-        add_user(&mut con, username, chat_id, user_id)?;
+    if !get_user_exists(&mut con, &user_key)? {
+        add_user(&mut con, &user_key, chat_id, user_id)?;
+        set_preferred_username(&mut con, username, &user_key)?;
     }
 
     // Adds chat to user list if not already added
-    let current_chats = get_user_chats(&mut con, username)?;
+    let current_chats = get_user_chats(&mut con, &user_key)?;
     if !current_chats.contains(&chat_id.to_string()) {
-        update_user_chats(&mut con, username, chat_id)?;
+        update_user_chats(&mut con, &user_key, chat_id)?;
     }
 
-    // If user_id is provided, just initialize user (set username) regardless of existence
+    // If user_id is provided, just initialize user (set user_key) regardless of existence
     if let Some(id) = user_id {
-        initialize_user(&mut con, id, username)?;
+        initialize_user(&mut con, id, &user_key)?;
     }
 
     Ok(())
@@ -93,11 +99,15 @@ pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> Result<(), CrudErro
 
     // Adds chat if not exists
     if !get_chat_exists(&mut con, chat_id)? {
-        add_chat(&mut con, chat_id, &usernames[0])?;
+        add_chat(&mut con, chat_id, &usernames[0].to_lowercase())?;
     }
 
     // Adds all users, automatically checked if added
-    add_chat_user_multiple(&mut con, chat_id, usernames)?;
+    add_chat_user_multiple(
+        &mut con,
+        chat_id,
+        usernames.iter().map(|user| user.to_lowercase()).collect(),
+    )?;
 
     Ok(())
 }
@@ -114,7 +124,7 @@ pub fn update_chat_balances(
 
     // Update balances through changes
     for change in changes {
-        let username = change.username;
+        let username = change.username.to_lowercase();
         let balance = change.balance;
         if let Ok(false) = get_balance_exists(&mut con, chat_id, &username) {
             set_balance(&mut con, chat_id, &username, balance)?;
@@ -131,10 +141,8 @@ pub fn update_chat_balances(
     for user in users {
         if get_balance_exists(&mut con, chat_id, &user)? {
             let balance = get_balance(&mut con, chat_id, &user)?;
-            updated_balances.push(UserBalance {
-                username: user,
-                balance,
-            });
+            let username = get_preferred_username(&mut con, &user)?;
+            updated_balances.push(UserBalance { username, balance });
         }
     }
 
@@ -271,7 +279,10 @@ mod tests {
     use crate::bot::redis::{
         balance::delete_balance,
         chat::{delete_chat, delete_chat_debt, get_chat_users},
-        user::{delete_user, delete_user_id, get_user_chats, get_user_is_init, get_username},
+        user::{
+            delete_preferred_username, delete_user, delete_user_id, get_preferred_username,
+            get_user_chats, get_user_is_init, get_username,
+        },
     };
 
     use super::*;
@@ -280,54 +291,66 @@ mod tests {
     fn test_update_user_add_user() {
         let mut con = connect().unwrap();
 
-        let username = "manager_test_user";
+        let username = "Manager_Test_User";
+        let user_key = username.to_lowercase();
         let chat_id = "manager_123456789";
 
         // Checks that user does not exist
-        assert!(!get_user_exists(&mut con, username).unwrap());
+        assert!(!get_user_exists(&mut con, &user_key).unwrap());
 
         // Adds user
         assert!(update_user(username, chat_id, None).is_ok());
-        assert!(!get_user_is_init(&mut con, username).unwrap());
-        assert_eq!(get_user_chats(&mut con, username).unwrap(), vec![chat_id]);
+        assert!(!get_user_is_init(&mut con, &user_key).unwrap());
+        assert_eq!(
+            get_preferred_username(&mut con, &user_key).unwrap(),
+            username
+        );
+        assert_eq!(get_user_chats(&mut con, &user_key).unwrap(), vec![chat_id]);
 
         // Performs again, nothing should happen
         assert!(update_user(username, chat_id, None).is_ok());
-        assert!(!get_user_is_init(&mut con, username).unwrap());
-        assert_eq!(get_user_chats(&mut con, username).unwrap(), vec![chat_id]);
+        assert!(!get_user_is_init(&mut con, &user_key).unwrap());
+        assert_eq!(
+            get_preferred_username(&mut con, &user_key).unwrap(),
+            username
+        );
+        assert_eq!(get_user_chats(&mut con, &user_key).unwrap(), vec![chat_id]);
 
         // Deletes user
-        delete_user(&mut con, username).unwrap();
+        delete_user(&mut con, &user_key).unwrap();
+        delete_preferred_username(&mut con, &user_key).unwrap();
     }
 
     #[test]
     fn test_update_user_add_chat() {
         let mut con = connect().unwrap();
 
-        let username = "manager_test_user_0";
+        let username = "Manager_Test_User_0";
+        let user_key = username.to_lowercase();
         let chat_id = "manager_1234567890";
         let second_chat_id = "manager_1234567891";
 
         // Adds user and chat
         assert!(update_user(username, chat_id, None).is_ok());
-        assert_eq!(get_user_chats(&mut con, username).unwrap(), vec![chat_id]);
+        assert_eq!(get_user_chats(&mut con, &user_key).unwrap(), vec![chat_id]);
 
         // Calls again, adds a second chat
         assert!(update_user(username, second_chat_id, None).is_ok());
         assert_eq!(
-            get_user_chats(&mut con, username).unwrap(),
+            get_user_chats(&mut con, &user_key).unwrap(),
             vec![chat_id, second_chat_id]
         );
 
         // Calls again, nothing should happen
         assert!(update_user(username, second_chat_id, None).is_ok());
         assert_eq!(
-            get_user_chats(&mut con, username).unwrap(),
+            get_user_chats(&mut con, &user_key).unwrap(),
             vec![chat_id, second_chat_id]
         );
 
         // Deletes user
-        delete_user(&mut con, username).unwrap();
+        delete_user(&mut con, &user_key).unwrap();
+        delete_preferred_username(&mut con, &user_key).unwrap();
     }
 
     #[test]
@@ -345,6 +368,7 @@ mod tests {
         // Deletes user temporarily
         delete_user(&mut con, username).unwrap();
         delete_user_id(&mut con, user_id).unwrap();
+        delete_preferred_username(&mut con, username).unwrap();
 
         // Calls again, adds user again but without ID
         assert!(update_user(username, chat_id, None).is_ok());
@@ -357,6 +381,7 @@ mod tests {
         // Deletes user
         delete_user(&mut con, username).unwrap();
         delete_user_id(&mut con, user_id).unwrap();
+        delete_preferred_username(&mut con, username).unwrap();
     }
 
     #[test]
@@ -381,6 +406,8 @@ mod tests {
         delete_user(&mut con, username).unwrap();
         delete_user(&mut con, second_username).unwrap();
         delete_user_id(&mut con, user_id).unwrap();
+        delete_preferred_username(&mut con, username).unwrap();
+        delete_preferred_username(&mut con, second_username).unwrap();
     }
 
     #[test]
@@ -605,7 +632,11 @@ mod tests {
             "manager_test_user_21".to_string(),
             "manager_test_user_22".to_string(),
         ];
-        update_chat(chat_id, usernames).unwrap();
+        update_chat(chat_id, usernames.clone()).unwrap();
+
+        for username in &usernames {
+            update_user(&username, chat_id, None).unwrap();
+        }
 
         let changes = vec![
             UserBalance {
@@ -684,6 +715,12 @@ mod tests {
         // Deletes balances
         for balance in initial_balances {
             delete_balance(&mut con, chat_id, &balance.username).unwrap();
+        }
+
+        // Deletes usernames
+        for username in &usernames {
+            delete_user(&mut con, &username).unwrap();
+            delete_preferred_username(&mut con, username).unwrap();
         }
 
         // Deletes chat
