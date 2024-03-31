@@ -16,6 +16,7 @@ dotenv = "0.15.0"
 thiserror = "1.0.58"
 serde = "1.0.197"
 serde_json = "1.0.114"
+regex = "1.10.4"
 
 [dependencies.uuid]
 version = "1.7.0"

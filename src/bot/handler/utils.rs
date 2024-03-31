@@ -1,4 +1,5 @@
 use chrono::{DateTime, Local, NaiveDateTime};
+use regex::Regex;
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage, InMemStorageError},
     types::{InlineKeyboardButton, InlineKeyboardMarkup},
@@ -146,12 +147,26 @@ pub fn make_keyboard_debt_selection() -> InlineKeyboardMarkup {
 }
 
 // Ensures that a username has a leading '@'.
-pub fn parse_username(username: &str) -> String {
+pub fn parse_username(username: &str) -> Result<String, BotError> {
+    let text: &str;
     if username.starts_with('@') {
-        username.to_string()
+        text = username.trim_start_matches('@');
     } else {
-        format!("@{}", username)
+        text = username;
     }
+
+    if text.split_whitespace().count() == 1 && text.len() >= 5 {
+        let re = Regex::new(r"^[a-zA-Z0-9_]+$");
+        if let Ok(re) = re {
+            if re.captures(text).is_some() {
+                return Ok(format!("@{}", text.to_string()));
+            }
+        }
+    }
+
+    Err(BotError::UserError(
+        "❌ Please provide a valid username!".to_string(),
+    ))
 }
 
 // Parse an amount. Reads a string, returns f64.
@@ -200,10 +215,13 @@ pub fn process_debts_equal(text: &str, total: Option<f64>) -> Result<Vec<(String
     };
 
     let amount = total / users.len() as f64;
-    Ok(users
-        .iter()
-        .map(|user| (user.to_string(), amount))
-        .collect())
+    let mut debts: Vec<(String, f64)> = Vec::new();
+    for user in &users {
+        let debt = (parse_username(user)?, amount);
+        debts.push(debt);
+    }
+
+    Ok(debts)
 }
 
 // Parse and process a string to retrieve a list of debts, for split by exact amount.
@@ -223,7 +241,7 @@ pub fn process_debts_exact(
             ));
         }
 
-        let username = parse_username(pair[0]);
+        let username = parse_username(pair[0])?;
         let amount = parse_amount(pair[1])?;
         sum += amount;
 
@@ -293,7 +311,7 @@ pub fn process_debts_ratio(text: &str, total: Option<f64>) -> Result<Vec<(String
             ));
         }
 
-        let username = parse_username(pair[0]);
+        let username = parse_username(pair[0])?;
         let ratio = parse_amount(pair[1])?;
 
         sum += ratio;
@@ -342,7 +360,7 @@ pub fn parse_debts_payback(text: &str, sender: &str) -> Result<Vec<(String, f64)
             ));
         }
 
-        let username = parse_username(pair[0]);
+        let username = parse_username(pair[0])?;
         let amount = parse_amount(pair[1])?;
 
         if username == sender {

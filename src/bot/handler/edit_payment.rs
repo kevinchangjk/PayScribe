@@ -360,7 +360,7 @@ pub async fn action_edit_payment_confirm(
                     bot.send_message(
                         chat.id,
                         format!(
-                            "Current splits: {}\n\nHow are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
+                            "Current splits:\n{}\n\nHow are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
                             display_debts(&payment.debts)
                         ),
                     ).reply_markup(make_keyboard_debt_selection())
@@ -515,9 +515,14 @@ pub async fn action_edit_payment_edit(
                 .await?;
             }
             AddPaymentEdit::Creditor => {
+                let username = parse_username(text);
+                if let Err(err) = username {
+                    bot.send_message(msg.chat.id, err.to_string()).await?;
+                    return Ok(());
+                }
                 let new_edited_payment = EditPaymentParams {
                     description: edited_payment.description,
-                    creditor: Some(parse_username(text)),
+                    creditor: Some(username?),
                     total: edited_payment.total,
                     debts: edited_payment.debts,
                 };
@@ -589,9 +594,9 @@ pub async fn action_edit_payment_edit(
                     _ => AddDebtsFormat::Equal,
                 };
                 let error_msg = match debts_format {
-                    AddDebtsFormat::Equal => DEBT_EQUAL_DESCRIPTION_MESSAGE,
-                    AddDebtsFormat::Exact => DEBT_EXACT_DESCRIPTION_MESSAGE,
-                    AddDebtsFormat::Ratio => DEBT_RATIO_DESCRIPTION_MESSAGE,
+                    AddDebtsFormat::Equal => DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
+                    AddDebtsFormat::Exact => DEBT_EXACT_INSTRUCTIONS_MESSAGE,
+                    AddDebtsFormat::Ratio => DEBT_RATIO_INSTRUCTIONS_MESSAGE,
                 };
                 match msg.text() {
                     Some(text) => {
@@ -605,12 +610,6 @@ pub async fn action_edit_payment_edit(
                             edited_payment.total.or(Some(payment.total)),
                         );
                         if let Err(err) = debts {
-                            log::error!(
-                                "Edit Payment - Debt parsing failed for user {} in chat {}: {}",
-                                msg.from().unwrap().id,
-                                msg.chat.id,
-                                err.to_string()
-                            );
                             bot.send_message(
                                 msg.chat.id,
                                 format!("{}\n\n{error_msg}", err.to_string()),
