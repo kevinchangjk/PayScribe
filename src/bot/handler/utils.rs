@@ -18,11 +18,11 @@ pub const UNKNOWN_ERROR_MESSAGE: &str =
 pub const NO_TEXT_MESSAGE: &str =
     "❓ Sorry, I can't understand that! Please reply to me in text.\n\n";
 pub const DEBT_EQUAL_DESCRIPTION_MESSAGE: &str =
-    "Equal — divide the total amount equally among users\n";
+    "Equal — Divide the total amount equally among users\n";
 pub const DEBT_EXACT_DESCRIPTION_MESSAGE: &str =
-    "Exact — share the total cost by specifying exact amounts for each user\n";
+    "Exact — Share the total cost by specifying exact amounts for each user\n";
 pub const DEBT_RATIO_DESCRIPTION_MESSAGE: &str =
-    "Ratio — split the total cost by assigning fractional/relative amounts of the total that each user owes\n";
+    "Ratio — Split the total cost by assigning fractional/relative amounts of the total that each user owes\n";
 pub const DEBT_EQUAL_INSTRUCTIONS_MESSAGE: &str =
     "Enter the usernames of those sharing the cost (including the payer if sharing too) as follows: \n\n@user1 @user2 @user3 ...\n\n";
 pub const DEBT_EXACT_INSTRUCTIONS_MESSAGE: &str =
@@ -107,7 +107,7 @@ pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
 // Displays a single payment entry in a user-friendly format.
 pub fn display_payment(payment: &Payment, serial_num: usize) -> String {
     format!(
-        "_________________________________________\nNo. {} — {}\nDate: {}\nPayer: {}\nTotal: {:.2}\n{}",
+        "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {:.2}\n{}",
         serial_num,
         payment.description,
         reformat_datetime(&payment.datetime),

@@ -82,7 +82,7 @@ async fn display_add_overview(
     let buttons = vec!["Cancel", "Edit", "Confirm"];
     let keyboard = make_keyboard(buttons, Some(3));
 
-    bot.send_message(payment.chat_id.clone(), format!("Here's what I've gathered so far! Do you want to confirm this entry? Or do you want to edit anything?\n\n{}", display_add_payment(&payment)))
+    bot.send_message(payment.chat_id.clone(), format!("Here's what I've gathered so far!\n\n{}Do you want to confirm this entry? Or do you want to edit anything?", display_add_payment(&payment)))
         .reply_markup(keyboard)
         .await?;
     dialogue.update(State::AddConfirm { payment }).await?;
@@ -315,7 +315,7 @@ pub async fn block_add_payment(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn action_add_payment(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("Alright let's go!\nWhat's the description for this new payment?"),
+        format!("Alright!\nWhat's the description for this new payment?"),
     )
     .await?;
     dialogue.update(State::AddDescription).await?;

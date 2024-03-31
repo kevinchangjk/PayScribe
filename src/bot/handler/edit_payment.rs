@@ -66,7 +66,7 @@ async fn display_edit_overview(
         "Cancel",
         "Confirm",
     ];
-    let keyboard = make_keyboard(options, Some(4));
+    let keyboard = make_keyboard(options, Some(2));
     match msg_id {
         Some(id) => {
             bot.edit_message_text(
