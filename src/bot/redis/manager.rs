@@ -9,10 +9,7 @@ use super::{
     },
     connect::{connect, DBError},
     payment::{add_payment, delete_payment, get_payment, update_payment, Payment},
-    user::{
-        add_user, get_user_chats, get_user_exists, get_user_is_init, get_username, initialize_user,
-        update_user_chats, update_username,
-    },
+    user::{add_user, get_user_chats, get_user_exists, initialize_user, update_user_chats},
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -79,13 +76,9 @@ pub fn update_user(username: &str, chat_id: &str, user_id: Option<&str>) -> Resu
         update_user_chats(&mut con, username, chat_id)?;
     }
 
-    // If user is init, ensure username is updated, else init user
+    // If user_id is provided, just initialize user (set username) regardless of existence
     if let Some(id) = user_id {
-        if !get_user_is_init(&mut con, id)? {
-            initialize_user(&mut con, id, username)?;
-        } else if get_username(&mut con, id)? != username {
-            update_username(&mut con, id, username)?;
-        }
+        initialize_user(&mut con, id, username)?;
     }
 
     Ok(())
@@ -278,7 +271,7 @@ mod tests {
     use crate::bot::redis::{
         balance::delete_balance,
         chat::{delete_chat, delete_chat_debt, get_chat_users},
-        user::{delete_user, delete_user_id, get_user_chats},
+        user::{delete_user, delete_user_id, get_user_chats, get_user_is_init, get_username},
     };
 
     use super::*;
