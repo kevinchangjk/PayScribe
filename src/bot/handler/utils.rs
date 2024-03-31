@@ -171,6 +171,11 @@ pub fn parse_username(username: &str) -> Result<String, BotError> {
 
 // Parse an amount. Reads a string, returns f64.
 pub fn parse_amount(text: &str) -> Result<f64, BotError> {
+    let text = text
+        .chars()
+        .filter(|&c| c.is_digit(10) || c == '.')
+        .collect::<String>();
+
     let amount = match text.parse::<f64>() {
         Ok(val) => val,
         Err(_) => match text.parse::<i32>() {
