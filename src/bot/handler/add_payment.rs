@@ -82,7 +82,7 @@ async fn display_add_overview(
     let buttons = vec!["Cancel", "Edit", "Confirm"];
     let keyboard = make_keyboard(buttons, Some(3));
 
-    bot.send_message(payment.chat_id.clone(), display_add_payment(&payment))
+    bot.send_message(payment.chat_id.clone(), format!("Here's what I've gathered so far! Do you want to confirm this entry? Or do you want to edit anything?\n\n{}", display_add_payment(&payment)))
         .reply_markup(keyboard)
         .await?;
     dialogue.update(State::AddConfirm { payment }).await?;
@@ -102,9 +102,16 @@ async fn display_add_edit_menu(
     let keyboard = make_keyboard(buttons, Some(2));
 
     if let Some(Message { id, chat, .. }) = query.message {
-        bot.edit_message_text(chat.id, id, "Sure! What would you like to edit?")
-            .reply_markup(keyboard)
-            .await?;
+        bot.edit_message_text(
+            chat.id,
+            id,
+            format!(
+                "{}Sure! What would you like to edit?",
+                display_add_payment(&payment)
+            ),
+        )
+        .reply_markup(keyboard)
+        .await?;
         dialogue.update(State::AddEditMenu { payment }).await?;
     }
     Ok(())
@@ -747,7 +754,7 @@ pub async fn action_add_edit(
                     description: payment.description,
                     creditor: payment.creditor,
                     total: Some(total?),
-                    debts: payment.debts,
+                    debts: None,
                 };
 
                 bot.send_message(

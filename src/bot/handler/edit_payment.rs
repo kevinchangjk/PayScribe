@@ -73,7 +73,7 @@ async fn display_edit_overview(
                 chat_id,
                 id,
                 format!(
-                    "Sure! What do you want to edit for this payment entry?\n\n{}",
+                    "Sure! What do you want to edit?\n\n{}",
                     display_edit_payment(payment.clone(), edited_payment.clone())
                 ),
             )
@@ -84,7 +84,7 @@ async fn display_edit_overview(
             bot.send_message(
                 chat_id,
                 format!(
-                    "Sure! What do you want to edit for this payment entry?\n\n{}",
+                    "Sure! What do you want to edit?\n\n{}",
                     display_edit_payment(payment.clone(), edited_payment.clone())
                 ),
             )
@@ -559,7 +559,7 @@ pub async fn action_edit_payment_edit(
                     description: edited_payment.description,
                     creditor: edited_payment.creditor,
                     total: Some(total.unwrap()),
-                    debts: edited_payment.debts,
+                    debts: None,
                 };
 
                 log::info!(

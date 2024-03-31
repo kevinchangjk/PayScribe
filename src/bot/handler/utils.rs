@@ -22,15 +22,15 @@ pub const DEBT_EQUAL_DESCRIPTION_MESSAGE: &str =
 pub const DEBT_EXACT_DESCRIPTION_MESSAGE: &str =
     "Exact — share the total cost by specifying exact amounts for each user\n";
 pub const DEBT_RATIO_DESCRIPTION_MESSAGE: &str =
-    "Ratio — split the total cost by assigning fractional/relative amounts of the total that the user owes\n";
+    "Ratio — split the total cost by assigning fractional/relative amounts of the total that each user owes\n";
 pub const DEBT_EQUAL_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames of those sharing the cost as follows: \n\n@user1 @user2 @user3 ...\n\n";
+    "Enter the usernames of those sharing the cost (including the payer if sharing too) as follows: \n\n@user1 @user2 @user3 ...\n\n";
 pub const DEBT_EXACT_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and exact amounts as follows: \n\n@user1 amount1\n@user2 amount2\n@user3 amount3\n...\n\n";
+    "Enter the usernames and exact amounts as follows: \n\n@user1 amount1\n@user2 amount2\n@user3 amount3\n...\n\nAny leftover amount will be taken as the payer's share.";
 pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
     "Enter the usernames and exact amounts as follows: \n\n@user1 amount1\n@user2 amount2\n@user3 amount3\n...\n\n";
 pub const DEBT_RATIO_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and ratios as follows: \n\n@user1 ratio1\n@user2 ratio2\n@user3 ratio3\n...\n\nThe ratios can be any number, and they can sum up to any number as well.";
+    "Enter the usernames and ratios as follows: \n\n@user1 ratio1\n@user2 ratio2\n@user3 ratio3\n...\n\nThe ratios can be any number, and do not need to sum up to any specific number.";
 pub const COMMAND_START: &str = "/start";
 pub const COMMAND_HELP: &str = "/help";
 pub const COMMAND_ADD_PAYMENT: &str = "/addpayment";
