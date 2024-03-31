@@ -2,6 +2,7 @@ use redis::{Commands, Connection, RedisResult};
 
 const USER_KEY: &str = "user";
 const USER_ID_KEY: &str = "user_id";
+const USERNAME_KEY: &str = "username";
 
 /* user.rs contains CRUD operations for both `user` and `user_id`.
  * `user` is the main table used for normal operations.
@@ -84,6 +85,33 @@ pub fn update_username(con: &mut Connection, user_id: &str, username: &str) -> R
 // In application, no real need to delete keys
 pub fn delete_user_id(con: &mut Connection, user_id: &str) -> RedisResult<()> {
     con.del(format!("{USER_ID_KEY}:{user_id}"))
+}
+
+/* Username CRUD Operations
+ * Username represents the Telegram username of a user, in the preferred casing of the user
+ * themselves.
+ * Has set, get, and delete operations.
+ */
+
+// Sets the preferred username of a user
+pub fn set_preferred_username(
+    con: &mut Connection,
+    username: &str,
+    user_key: &str,
+) -> RedisResult<()> {
+    con.set(format!("{USERNAME_KEY}:{user_key}"), username)
+}
+
+// Gets the preferred username of a user
+pub fn get_preferred_username(con: &mut Connection, user_key: &str) -> RedisResult<String> {
+    con.get(format!("{USERNAME_KEY}:{user_key}"))
+}
+
+// Deletes the preferred username of a user
+// Mainly for testing purposes
+// In application, no real need to delete keys
+pub fn delete_preferred_username(con: &mut Connection, user_key: &str) -> RedisResult<()> {
+    con.del(format!("{USERNAME_KEY}:{user_key}"))
 }
 
 // Tests
@@ -225,5 +253,19 @@ mod tests {
         assert!(get_user_is_init(&mut con, user_id).unwrap());
         delete_user_id(&mut con, user_id).unwrap();
         assert!(!get_user_is_init(&mut con, user_id).unwrap());
+    }
+
+    #[test]
+    fn test_set_get_delete_preferred_username() {
+        let mut con = connect().unwrap();
+        let username = "Test_User_Preferred_Username";
+        let user_key = username.to_lowercase();
+        assert!(set_preferred_username(&mut con, username, &user_key).is_ok());
+        assert_eq!(
+            get_preferred_username(&mut con, &user_key).unwrap(),
+            username
+        );
+
+        delete_preferred_username(&mut con, &user_key).unwrap();
     }
 }
