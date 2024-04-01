@@ -82,7 +82,7 @@ async fn display_add_overview(
     let buttons = vec!["Cancel", "Edit", "Confirm"];
     let keyboard = make_keyboard(buttons, Some(3));
 
-    bot.send_message(payment.chat_id.clone(), display_add_payment(&payment))
+    bot.send_message(payment.chat_id.clone(), format!("Here's what I've gathered so far!\n\n{}Do you want to confirm this entry? Or do you want to edit anything?", display_add_payment(&payment)))
         .reply_markup(keyboard)
         .await?;
     dialogue.update(State::AddConfirm { payment }).await?;
@@ -102,9 +102,16 @@ async fn display_add_edit_menu(
     let keyboard = make_keyboard(buttons, Some(2));
 
     if let Some(Message { id, chat, .. }) = query.message {
-        bot.edit_message_text(chat.id, id, "Sure! What would you like to edit?")
-            .reply_markup(keyboard)
-            .await?;
+        bot.edit_message_text(
+            chat.id,
+            id,
+            format!(
+                "{}Sure! What would you like to edit?",
+                display_add_payment(&payment)
+            ),
+        )
+        .reply_markup(keyboard)
+        .await?;
         dialogue.update(State::AddEditMenu { payment }).await?;
     }
     Ok(())
@@ -308,7 +315,7 @@ pub async fn block_add_payment(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn action_add_payment(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("Alright let's go!\nWhat's a suitable description for the new payment?"),
+        format!("Alright!\nWhat's the description for this new payment?"),
     )
     .await?;
     dialogue.update(State::AddDescription).await?;
@@ -329,10 +336,20 @@ pub async fn action_add_description(
             if let Some(user) = user {
                 if let Some(username) = &user.username {
                     let username = parse_username(username);
+
+                    if let Err(err) = username {
+                        log::error!(
+                            "Add Payment Description - Failed to parse username for user {}: {}",
+                            user.id,
+                            err.to_string()
+                        );
+                        return Ok(());
+                    }
+
                     let payment = AddPaymentParams {
                         chat_id: msg.chat.id.to_string(),
                         sender_id: user.id.to_string(),
-                        sender_username: username,
+                        sender_username: username?,
                         datetime: msg.date.to_string(),
                         description: Some(text.to_string()),
                         creditor: None,
@@ -342,7 +359,7 @@ pub async fn action_add_description(
                     bot.send_message(
                         msg.chat.id,
                         format!(
-                            "{}Great! Who paid for this item?",
+                            "{}Great! What's the Telegram username of the one who paid?",
                             display_add_payment(&payment)
                         ),
                     )
@@ -370,21 +387,28 @@ pub async fn action_add_creditor(
 ) -> HandlerResult {
     match msg.text() {
         Some(text) => {
-            let text: String = parse_username(text);
+            let text = parse_username(text);
+
+            if let Err(err) = text {
+                bot.send_message(msg.chat.id, format!("{}", err.to_string()))
+                    .await?;
+                return Ok(());
+            }
+
             let new_payment = AddPaymentParams {
                 chat_id: payment.chat_id,
                 sender_id: payment.sender_id,
                 sender_username: payment.sender_username,
                 datetime: payment.datetime,
                 description: payment.description,
-                creditor: Some(text),
+                creditor: Some(text?),
                 total: None,
                 debts: None,
             };
             bot.send_message(
                 msg.chat.id,
                 format!(
-                    "{}Nice! How much was the total amount?\nPlease enter the number without any currency symbols.",
+                    "{}Nice! How much was the total amount?",
                     display_add_payment(&new_payment)
                 ),
             )
@@ -696,13 +720,20 @@ pub async fn action_add_edit(
                 display_add_overview(bot, dialogue, new_payment).await?;
             }
             AddPaymentEdit::Creditor => {
+                let username = parse_username(text);
+
+                if let Err(err) = username {
+                    bot.send_message(msg.chat.id, err.to_string()).await?;
+                    return Ok(());
+                }
+
                 let new_payment = AddPaymentParams {
                     chat_id: payment.chat_id,
                     sender_id: payment.sender_id,
                     sender_username: payment.sender_username,
                     datetime: payment.datetime,
                     description: payment.description,
-                    creditor: Some(parse_username(text)),
+                    creditor: Some(username?),
                     total: payment.total,
                     debts: payment.debts,
                 };
@@ -723,7 +754,7 @@ pub async fn action_add_edit(
                     description: payment.description,
                     creditor: payment.creditor,
                     total: Some(total?),
-                    debts: payment.debts,
+                    debts: None,
                 };
 
                 bot.send_message(

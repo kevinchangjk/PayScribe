@@ -52,7 +52,6 @@ pub async fn action_view_balances(bot: Bot, dialogue: UserDialogue, msg: Message
                     .await?;
             }
         }
-        dialogue.exit().await?;
         return Ok(());
     }
     log::error!(
