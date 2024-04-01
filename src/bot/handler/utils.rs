@@ -24,13 +24,13 @@ pub const DEBT_EXACT_DESCRIPTION_MESSAGE: &str =
 pub const DEBT_RATIO_DESCRIPTION_MESSAGE: &str =
     "Proportion — Split the total cost by specifying relative proportions of the total that each user owes\n";
 pub const DEBT_EQUAL_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames of those sharing the cost (including the payer if sharing too) as follows: \n\n@user1\n@user2\n@user3\n...\n\n";
+    "Enter the usernames of those sharing the cost (including the payer if sharing too) as follows: \n\n@username__1\n@username__2\n@username__3\n...\n\n";
 pub const DEBT_EXACT_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and exact amounts as follows: \n\n@user1 amount1\n@user2 amount2\n@user3 amount3\n...\n\nAny leftover amount will be taken as the payer's share.";
+    "Enter the usernames and exact amounts as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\nAny leftover amount will be taken as the payer's share.";
 pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and exact amounts as follows: \n\n@user1 amount1\n@user2 amount2\n@user3 amount3\n...\n\n";
+    "Enter the usernames and exact amounts as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n";
 pub const DEBT_RATIO_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and proportions as follows: \n\n@user1 portion1\n@user2 portion2\n@user3 portion3\n...\n\nThe portions can be any whole or decimal number.";
+    "Enter the usernames and proportions as follows: \n\n@username__1 portion1\n@username__2 portion2\n@username__3 portion3\n...\n\nThe portions can be any whole or decimal number.";
 pub const COMMAND_START: &str = "/start";
 pub const COMMAND_HELP: &str = "/help";
 pub const COMMAND_ADD_PAYMENT: &str = "/addpayment";
