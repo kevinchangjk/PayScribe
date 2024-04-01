@@ -155,9 +155,7 @@ pub async fn block_pay_back(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn action_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!(
-            "Alright! Who did you pay back, and how much did you pay?\n{PAY_BACK_INSTRUCTIONS_MESSAGE}"
-        ),
+        format!("Alright! Who did you pay?\n{PAY_BACK_INSTRUCTIONS_MESSAGE}"),
     )
     .await?;
     dialogue.update(State::PayBackDebts).await?;

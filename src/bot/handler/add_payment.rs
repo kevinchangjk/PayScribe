@@ -63,7 +63,7 @@ fn display_add_payment(payment: &AddPaymentParams) -> String {
         None => "".to_string(),
     };
     let debts = match &payment.debts {
-        Some(debts) => format!("Splits:\n{}", display_debts(&debts)),
+        Some(debts) => format!("Split with:\n{}", display_debts(&debts)),
         None => "".to_string(),
     };
 
@@ -532,7 +532,7 @@ pub async fn action_add_debt_selection(
                         chat.id,
                         id,
                         format!(
-                            "{}Okay, who is involved and what fraction do they owe?\n\n{DEBT_RATIO_INSTRUCTIONS_MESSAGE}",
+                            "{}Okay, who is involved and what proportions do they owe?\n\n{DEBT_RATIO_INSTRUCTIONS_MESSAGE}",
                             display_add_payment(&payment))
                         ).await?;
                     dialogue

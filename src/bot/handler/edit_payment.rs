@@ -37,7 +37,7 @@ const CANCEL_MESSAGE: &str =
  */
 fn display_edit_payment(payment: Payment, edited_payment: EditPaymentParams) -> String {
     format!(
-        "Description: {}\nPayer: {}\nTotal: {:.2}\n{}",
+        "Description: {}\nPayer: {}\nTotal: {:.2}\nSplit with:\n{}",
         edited_payment.description.unwrap_or(payment.description),
         edited_payment.creditor.unwrap_or(payment.creditor),
         edited_payment.total.unwrap_or(payment.total),
@@ -450,7 +450,7 @@ pub async fn action_edit_payment_debts(
                         chat.id,
                         id,
                         format!(
-                            "Okay, who is involved and what fraction do they owe?\n\n{DEBT_RATIO_INSTRUCTIONS_MESSAGE}",
+                            "Okay, who is involved and what proportions do they owe?\n\n{DEBT_RATIO_INSTRUCTIONS_MESSAGE}",
                         )).await?;
                     dialogue
                         .update(State::EditPaymentDetails {
