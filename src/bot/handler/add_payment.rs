@@ -82,7 +82,7 @@ async fn display_add_overview(
     let buttons = vec!["Cancel", "Edit", "Confirm"];
     let keyboard = make_keyboard(buttons, Some(3));
 
-    bot.send_message(payment.chat_id.clone(), format!("Here's what I've gathered so far!\n\n{}Do you want to confirm this entry? Or do you want to edit anything?", display_add_payment(&payment)))
+    bot.send_message(payment.chat_id.clone(), format!("Here's what I've gathered!\n\n{}Do you want to confirm this entry? Or do you want to edit anything?", display_add_payment(&payment)))
         .reply_markup(keyboard)
         .await?;
     dialogue.update(State::AddConfirm { payment }).await?;
