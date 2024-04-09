@@ -107,9 +107,9 @@ pub enum Command {
     Start,
     #[command(description = "Show all commands, and how to use the bot")]
     Help,
-    #[command(description = "Add a payment entry for the group")]
+    #[command(description = "Add a new payment entry for the group")]
     AddPayment,
-    #[command(description = "Add a entry paying back other members in the group")]
+    #[command(description = "Add a new entry paying back other members in the group")]
     PayBack,
     #[command(description = "View all payment records for the group")]
     ViewPayments,
