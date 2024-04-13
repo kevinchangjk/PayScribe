@@ -6,15 +6,25 @@ _Track your Telegram group payments right in the chat._
 
 **PayScribe** is a Telegram bot designed to help you track your group expenses in any Telegram group chat. It does not require any signup, any registration, or any external tools. Just add the bot into your group chat, and you're ready to go!
 
-### Features
+## Table of Contents
+
+1. [Features](#features)
+2. [Getting Started as a User](#getting-started-as-a-user)\
+   a. [Bot Commands](#bot-commands)
+3. [For Developers](#for-developers)\
+   a. [Setup](#setup)\
+   b. [Codebase](#codebase)
+
+## Features
 
 - Tracking group payment records
 - Automatic simplification of debts within groups
 - Complete viewability and editability of all payment records
-- 3 different modes of splitting the costs: by equal amounts, by exact amounts, and by proportionate amounts
-- No setup required, everything runs right within the chat
-
-## Table of Contents
+- 3 different modes of splitting the costs
+  - By equal amounts
+  - By exact amounts
+  - By proportionate amounts
+- **No setup required**, everything runs right within the chat
 
 ## Getting Started as a User
 
