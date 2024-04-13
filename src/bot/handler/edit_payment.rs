@@ -545,7 +545,7 @@ pub async fn action_edit_payment_edit(
                 .await?;
             }
             AddPaymentEdit::Total => {
-                let total = parse_amount(text);
+                let total = parse_amount(text, Some(2));
                 if let Err(err) = total {
                     bot.send_message(
                         msg.chat.id,

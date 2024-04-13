@@ -31,7 +31,6 @@ pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
     "Enter the usernames and exact amounts as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n";
 pub const DEBT_RATIO_INSTRUCTIONS_MESSAGE: &str =
     "Enter the usernames and proportions as follows: \n\n@username__1 portion1\n@username__2 portion2\n@username__3 portion3\n...\n\nThe portions can be any whole or decimal number.";
-pub const COMMAND_START: &str = "/start";
 pub const COMMAND_HELP: &str = "/help";
 pub const COMMAND_ADD_PAYMENT: &str = "/addpayment";
 pub const COMMAND_PAY_BACK: &str = "/payback";
@@ -78,12 +77,18 @@ impl From<ProcessError> for BotError {
     }
 }
 
+// Rounds a floating number to a specified precision.
+pub fn round_to_dp(num: f64, dp: i32) -> f64 {
+    let factor = 10.0_f64.powi(dp);
+    (num * factor).round() / factor
+}
+
 // Displays balances in a more readable format.
 pub fn display_balances(debts: &Vec<Debt>) -> String {
     let mut message = String::new();
     for debt in debts {
         message.push_str(&format!(
-            "{} owes {}: {:.2}\n",
+            "{} owes {}: {}\n",
             debt.debtor, debt.creditor, debt.amount
         ));
     }
@@ -99,7 +104,7 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
 pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
     let mut message = String::new();
     for debt in debts {
-        message.push_str(&format!("    {}: {:.2}\n", debt.0, debt.1));
+        message.push_str(&format!("    {}: {}\n", debt.0, debt.1));
     }
     message
 }
@@ -107,7 +112,7 @@ pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
 // Displays a single payment entry in a user-friendly format.
 pub fn display_payment(payment: &Payment, serial_num: usize) -> String {
     format!(
-        "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {:.2}\nSplit with:\n{}",
+        "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {}\nSplit with:\n{}",
         serial_num,
         payment.description,
         reformat_datetime(&payment.datetime),
@@ -169,8 +174,8 @@ pub fn parse_username(username: &str) -> Result<String, BotError> {
     ))
 }
 
-// Parse an amount. Reads a string, returns f64.
-pub fn parse_amount(text: &str) -> Result<f64, BotError> {
+// Parse an amount. Reads a string, returns f64 to specific precision.
+pub fn parse_amount(text: &str, round: Option<i32>) -> Result<f64, BotError> {
     let text = text
         .chars()
         .filter(|&c| c.is_digit(10) || c == '.')
@@ -197,7 +202,10 @@ pub fn parse_amount(text: &str) -> Result<f64, BotError> {
             "❌ Please provide a positive value!".to_string(),
         ))
     } else {
-        Ok(amount)
+        match round {
+            Some(dp) => Ok(round_to_dp(amount, dp)),
+            None => Ok(amount),
+        }
     }
 }
 
@@ -219,12 +227,16 @@ pub fn process_debts_equal(text: &str, total: Option<f64>) -> Result<Vec<(String
         }
     };
 
-    let amount = total / users.len() as f64;
+    let amount = round_to_dp(total / users.len() as f64, 2);
+    let diff = total - amount * users.len() as f64;
     let mut debts: Vec<(String, f64)> = Vec::new();
     for user in &users {
         let debt = (parse_username(user)?, amount);
         debts.push(debt);
     }
+
+    // Distribute the difference in amount to the first user (<= smallest denomination)
+    debts[0].1 += diff;
 
     Ok(debts)
 }
@@ -246,7 +258,7 @@ pub fn process_debts_exact(
 
     for i in (0..items.len()).step_by(2) {
         let username = parse_username(items[i])?;
-        let amount = parse_amount(items[i + 1])?;
+        let amount = parse_amount(items[i + 1], Some(2))?;
         sum += amount;
 
         let mut found = false;
@@ -309,7 +321,7 @@ pub fn process_debts_ratio(text: &str, total: Option<f64>) -> Result<Vec<(String
 
     for i in (0..items.len()).step_by(2) {
         let username = parse_username(items[i])?;
-        let ratio = parse_amount(items[i + 1])?;
+        let ratio = parse_amount(items[i + 1], None)?;
 
         sum += ratio;
         debts.push((username, ratio));
@@ -324,9 +336,16 @@ pub fn process_debts_ratio(text: &str, total: Option<f64>) -> Result<Vec<(String
         }
     };
 
+    let mut exact_sum: f64 = 0.0;
     for debt in &mut debts {
-        debt.1 = (debt.1 / sum) * total;
+        let amount = round_to_dp((debt.1 / sum) * total, 2);
+        debt.1 = amount;
+        exact_sum += amount;
     }
+
+    // Distribute the difference in amount to the first user (<= smallest denomination)
+    let diff = total - exact_sum;
+    debts[0].1 += diff;
 
     Ok(debts)
 }
@@ -357,7 +376,7 @@ pub fn parse_debts_payback(text: &str, sender: &str) -> Result<Vec<(String, f64)
 
     for i in (0..items.len()).step_by(2) {
         let username = parse_username(items[i])?;
-        let amount = parse_amount(items[i + 1])?;
+        let amount = parse_amount(items[i + 1], Some(2))?;
         if username == sender {
             return Err(BotError::UserError(
                 "❌ You can't pay back yourself!".to_string(),

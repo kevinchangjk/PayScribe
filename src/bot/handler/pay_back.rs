@@ -61,7 +61,6 @@ async fn call_processor_pay_back(
         let payment_clone = payment.clone();
         let payment_overview = display_pay_back_entry(&payment);
         let description = format!("{} paid back!", payment.sender_username);
-        let total = payment.debts.iter().fold(0.0, |curr, next| curr + next.1);
 
         let updated_balances = add_payment(
             payment.chat_id,
@@ -70,7 +69,7 @@ async fn call_processor_pay_back(
             payment.datetime,
             &description,
             &payment.sender_username,
-            total,
+            payment.total,
             payment.debts,
         );
 

@@ -29,8 +29,6 @@ pub use self::view_payments::{
     handle_repeated_select_payment, Payment,
 };
 
-// Exported structs and types
-
 // Submodules
 mod add_payment;
 mod delete_payment;

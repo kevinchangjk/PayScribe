@@ -1,9 +1,7 @@
-mod bot;
-
 use payscribe::bot::run_dispatcher;
 
 #[tokio::main]
-async fn main() {
+pub async fn main() {
     dotenv::dotenv().ok();
     pretty_env_logger::init();
     log::info!("Starting PayScribe bot...");

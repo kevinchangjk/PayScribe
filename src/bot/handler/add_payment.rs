@@ -438,7 +438,7 @@ pub async fn action_add_total(
 ) -> HandlerResult {
     match msg.text() {
         Some(text) => {
-            let total = parse_amount(text);
+            let total = parse_amount(text, Some(2));
             if let Err(err) = total {
                 bot.send_message(msg.chat.id, err.to_string()).await?;
                 return Ok(());
@@ -740,7 +740,7 @@ pub async fn action_add_edit(
                 display_add_overview(bot, dialogue, new_payment).await?;
             }
             AddPaymentEdit::Total => {
-                let total = parse_amount(text);
+                let total = parse_amount(text, Some(2));
                 if let Err(err) = total {
                     bot.send_message(msg.chat.id, err.to_string()).await?;
                     return Ok(());

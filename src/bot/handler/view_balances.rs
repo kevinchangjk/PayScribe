@@ -1,7 +1,7 @@
 use teloxide::{prelude::*, types::Message};
 
 use crate::bot::{
-    handler::utils::{display_balances, HandlerResult, UserDialogue, UNKNOWN_ERROR_MESSAGE},
+    handler::utils::{display_balances, HandlerResult, UNKNOWN_ERROR_MESSAGE},
     processor::view_debts,
 };
 
@@ -9,7 +9,7 @@ use crate::bot::{
 
 /* View the balances for the group.
  */
-pub async fn action_view_balances(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+pub async fn action_view_balances(bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id.to_string();
     if let Some(user) = msg.from() {
         let sender_id = user.id.to_string();

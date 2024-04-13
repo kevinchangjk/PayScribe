@@ -35,6 +35,8 @@ pub fn connect() -> Result<Connection, DBError> {
 }
 
 // Tests connection to Redis
+// Only used for testing purposes
+#[allow(dead_code)]
 pub fn test_redis_connection() -> RedisResult<bool> {
     let mut con = connect()?;
     con.set("my_key", 42)?;
