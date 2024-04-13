@@ -19,7 +19,7 @@ use super::{
 pub struct UserBalance {
     pub username: String,
     pub currency: String,
-    pub balance: f64,
+    pub balance: i64,
 }
 
 #[derive(Debug, PartialEq)]
@@ -252,8 +252,9 @@ pub fn update_payment_entry(
     payment_id: &str,
     description: Option<&str>,
     creditor: Option<&str>,
-    total: Option<&f64>,
-    debts: Option<Vec<(String, f64)>>,
+    currency: Option<&str>,
+    total: Option<&i64>,
+    debts: Option<Vec<(String, i64)>>,
 ) -> Result<(), CrudError> {
     let mut con = connect()?;
 
@@ -263,7 +264,15 @@ pub fn update_payment_entry(
     }
 
     // Updates payment
-    update_payment(&mut con, payment_id, description, creditor, total, debts)?;
+    update_payment(
+        &mut con,
+        payment_id,
+        description,
+        creditor,
+        currency,
+        total,
+        debts,
+    )?;
 
     Ok(())
 }
@@ -492,10 +501,11 @@ mod tests {
             description: "manager_test_payment".to_string(),
             datetime: "2021-01-01T00:00:00".to_string(),
             creditor: "manager_test_user_10".to_string(),
-            total: 100.0,
+            currency: "USD".to_string(),
+            total: 10000,
             debts: vec![
-                ("manager_test_user_11".to_string(), 50.0),
-                ("manager_test_user_12".to_string(), 50.0),
+                ("manager_test_user_11".to_string(), 5000),
+                ("manager_test_user_12".to_string(), 5000),
             ],
         };
 
@@ -506,10 +516,11 @@ mod tests {
             description: "manager_test_payment_2".to_string(),
             datetime: "2021-01-01T00:00:01".to_string(),
             creditor: "manager_test_user_13".to_string(),
-            total: 200.0,
+            currency: "USD".to_string(),
+            total: 20000,
             debts: vec![
-                ("manager_test_user_14".to_string(), 100.0),
-                ("manager_test_user_15".to_string(), 100.0),
+                ("manager_test_user_14".to_string(), 10000),
+                ("manager_test_user_15".to_string(), 10000),
             ],
         };
 
@@ -527,16 +538,18 @@ mod tests {
         // Updates second payment
         let updated_description = "manager_test_payment_3";
         let updated_creditor = "manager_test_user_16";
-        let updated_total = 300.0;
+        let updated_currency = "JPY";
+        let updated_total = 30000;
         let updated_debts = vec![
-            ("manager_test_user_17".to_string(), 150.0),
-            ("manager_test_user_18".to_string(), 150.0),
+            ("manager_test_user_17".to_string(), 15000),
+            ("manager_test_user_18".to_string(), 15000),
         ];
 
         assert!(update_payment_entry(
             &second_id,
             Some(updated_description),
             Some(updated_creditor),
+            Some(updated_currency),
             Some(&updated_total),
             Some(updated_debts.clone()),
         )
@@ -554,6 +567,7 @@ mod tests {
                         description: updated_description.to_string(),
                         datetime: "2021-01-01T00:00:01".to_string(),
                         creditor: updated_creditor.to_string(),
+                        currency: updated_currency.to_string(),
                         total: updated_total,
                         debts: updated_debts.clone(),
                     },
@@ -580,10 +594,11 @@ mod tests {
             description: "manager_test_user_20".to_string(),
             datetime: "2021-01-01T00:00:00".to_string(),
             creditor: "manager_test_user_21".to_string(),
-            total: 100.0,
+            currency: "USD".to_string(),
+            total: 10000,
             debts: vec![
-                ("manager_test_user_22".to_string(), 50.0),
-                ("manager_test_user_23".to_string(), 50.0),
+                ("manager_test_user_22".to_string(), 5000),
+                ("manager_test_user_23".to_string(), 5000),
             ],
         };
 
@@ -602,10 +617,11 @@ mod tests {
                 "nonexistent_payment",
                 Some("manager_test_payment_3"),
                 Some("manager_test_user_16"),
-                Some(&300.0),
+                Some("JPY"),
+                Some(&30000),
                 Some(vec![
-                    ("manager_test_user_17".to_string(), 150.0),
-                    ("manager_test_user_18".to_string(), 150.0),
+                    ("manager_test_user_17".to_string(), 15000),
+                    ("manager_test_user_18".to_string(), 15000),
                 ]),
             )
             .unwrap_err(),
@@ -650,17 +666,17 @@ mod tests {
         let changes = vec![
             UserBalance {
                 username: "manager_test_user_20".to_string(),
-                balance: 100.0,
+                balance: 10000,
                 currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_21".to_string(),
-                balance: -50.0,
+                balance: -5000,
                 currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_22".to_string(),
-                balance: -50.0,
+                balance: -5000,
                 currency: "USD".to_string(),
             },
         ];
@@ -674,17 +690,17 @@ mod tests {
             vec![
                 UserBalance {
                     username: "manager_test_user_20".to_string(),
-                    balance: 100.0,
+                    balance: 10000,
                     currency: "USD".to_string(),
                 },
                 UserBalance {
                     username: "manager_test_user_21".to_string(),
-                    balance: -50.0,
+                    balance: -5000,
                     currency: "USD".to_string(),
                 },
                 UserBalance {
                     username: "manager_test_user_22".to_string(),
-                    balance: -50.0,
+                    balance: -5000,
                     currency: "USD".to_string(),
                 },
             ]
@@ -694,17 +710,17 @@ mod tests {
         let new_changes = vec![
             UserBalance {
                 username: "manager_test_user_20".to_string(),
-                balance: -50.0,
+                balance: -5000,
                 currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_21".to_string(),
-                balance: -50.0,
+                balance: -5000,
                 currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_22".to_string(),
-                balance: 50.0,
+                balance: 5000,
                 currency: "USD".to_string(),
             },
         ];
@@ -717,17 +733,17 @@ mod tests {
             vec![
                 UserBalance {
                     username: "manager_test_user_20".to_string(),
-                    balance: 50.0,
+                    balance: 5000,
                     currency: "USD".to_string(),
                 },
                 UserBalance {
                     username: "manager_test_user_21".to_string(),
-                    balance: -100.0,
+                    balance: -10000,
                     currency: "USD".to_string(),
                 },
                 UserBalance {
                     username: "manager_test_user_22".to_string(),
-                    balance: 0.0,
+                    balance: 0,
                     currency: "USD".to_string(),
                 },
             ]
@@ -771,18 +787,18 @@ mod tests {
         let changes = vec![
             UserBalance {
                 username: "manager_test_user_26".to_string(),
-                balance: 100.0,
+                balance: 10000,
                 currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_27".to_string(),
-                balance: -50.0,
-                currency: "SGD".to_string(),
+                balance: -5000,
+                currency: "JPY".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_28".to_string(),
-                balance: 100.0,
-                currency: "SGD".to_string(),
+                balance: 10000,
+                currency: "JPY".to_string(),
             },
         ];
 
@@ -792,17 +808,17 @@ mod tests {
         let new_changes = vec![
             UserBalance {
                 username: "manager_test_user_26".to_string(),
-                balance: -50.0,
-                currency: "SGD".to_string(),
+                balance: -5000,
+                currency: "JPY".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_27".to_string(),
-                balance: -50.0,
+                balance: -5000,
                 currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_28".to_string(),
-                balance: -50.0,
+                balance: -5000,
                 currency: "USD".to_string(),
             },
         ];
@@ -813,33 +829,33 @@ mod tests {
         let balances = vec![
             UserBalance {
                 username: "manager_test_user_26".to_string(),
-                balance: 100.0,
+                balance: 10000,
                 currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_27".to_string(),
-                balance: -50.0,
+                balance: -5000,
                 currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_28".to_string(),
-                balance: -50.0,
+                balance: -5000,
                 currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_26".to_string(),
-                balance: -50.0,
-                currency: "SGD".to_string(),
+                balance: -5000,
+                currency: "JPY".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_27".to_string(),
-                balance: -50.0,
-                currency: "SGD".to_string(),
+                balance: -5000,
+                currency: "JPY".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_28".to_string(),
-                balance: 100.0,
-                currency: "SGD".to_string(),
+                balance: 10000,
+                currency: "JPY".to_string(),
             },
         ];
 

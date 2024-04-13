@@ -15,7 +15,7 @@ pub fn set_balance(
     chat_id: &str,
     user_id: &str,
     currency: &str,
-    balance: f64,
+    balance: i64,
 ) -> RedisResult<()> {
     con.set(
         format!("{BALANCE_KEY}:{chat_id}:{user_id}:{currency}"),
@@ -39,7 +39,7 @@ pub fn get_balance(
     chat_id: &str,
     user_id: &str,
     currency: &str,
-) -> RedisResult<f64> {
+) -> RedisResult<i64> {
     con.get(format!("{BALANCE_KEY}:{chat_id}:{user_id}:{currency}"))
 }
 
@@ -69,11 +69,11 @@ mod tests {
         let chat_id = "123456789";
         let user_id = "987654321";
         let currency = "USD";
-        assert!(set_balance(&mut con, chat_id, user_id, currency, 13.0).is_ok());
+        assert!(set_balance(&mut con, chat_id, user_id, currency, 1300).is_ok());
         assert!(get_balance_exists(&mut con, chat_id, user_id, currency).unwrap());
         assert_eq!(
             get_balance(&mut con, chat_id, user_id, currency).unwrap(),
-            (13.0)
+            (1300)
         );
 
         delete_balance(&mut con, chat_id, user_id, currency).unwrap();
@@ -86,11 +86,11 @@ mod tests {
         let chat_id = "1234567891";
         let user_id = "9876543211";
         let currency = "USD";
-        set_balance(&mut con, chat_id, user_id, currency, 5.0).unwrap();
-        assert!(set_balance(&mut con, chat_id, user_id, currency, -42.13).is_ok());
+        set_balance(&mut con, chat_id, user_id, currency, 500).unwrap();
+        assert!(set_balance(&mut con, chat_id, user_id, currency, -4213).is_ok());
         assert_eq!(
             get_balance(&mut con, chat_id, user_id, currency).unwrap(),
-            (-42.13)
+            (-4213)
         );
 
         delete_balance(&mut con, chat_id, user_id, currency).unwrap();
@@ -103,7 +103,7 @@ mod tests {
         let chat_id = "1234567892";
         let user_id = "9876543212";
         let currency = "SGD";
-        set_balance(&mut con, chat_id, user_id, currency, 42.13).unwrap();
+        set_balance(&mut con, chat_id, user_id, currency, 4213).unwrap();
         assert!(delete_balance(&mut con, chat_id, user_id, currency).is_ok());
         assert!(!get_balance_exists(&mut con, chat_id, user_id, currency).unwrap());
     }
