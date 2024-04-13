@@ -3,14 +3,13 @@ use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
 use crate::bot::{
     dispatcher::State,
     handler::utils::{
-        display_balances, display_debts, get_currency, make_keyboard, parse_username,
-        HandlerResult, UserDialogue, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+        display_balances, display_debts, display_username, get_currency, make_keyboard,
+        parse_debts_payback, parse_username, Currency, HandlerResult, UserDialogue,
+        CURRENCY_DEFAULT, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
         PAY_BACK_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
     },
     processor::add_payment,
 };
-
-use super::utils::{display_username, parse_debts_payback, Currency};
 
 /* Utilities */
 #[derive(Clone, Debug)]
@@ -195,7 +194,7 @@ pub async fn action_pay_back_currency_menu(
                     .await?;
                     dialogue
                         .update(State::PayBackDebts {
-                            currency: ("NIL".to_string(), 2),
+                            currency: CURRENCY_DEFAULT,
                         })
                         .await?;
                 }
