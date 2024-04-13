@@ -37,7 +37,7 @@ const CANCEL_MESSAGE: &str =
  */
 fn display_edit_payment(payment: Payment, edited_payment: EditPaymentParams) -> String {
     format!(
-        "Description: {}\nPayer: {}\nTotal: {:.2}\nSplit between:\n{}",
+        "Description: {}\nPayer: {}\nTotal: {:.2}\nSplit:\n{}",
         edited_payment.description.unwrap_or(payment.description),
         display_username(&edited_payment.creditor.unwrap_or(payment.creditor)),
         edited_payment.total.unwrap_or(payment.total),

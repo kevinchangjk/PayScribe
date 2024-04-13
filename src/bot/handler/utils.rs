@@ -118,7 +118,7 @@ pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
 // Displays a single payment entry in a user-friendly format.
 pub fn display_payment(payment: &Payment, serial_num: usize) -> String {
     format!(
-        "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {:.2}\nSplit between:\n{}",
+        "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {:.2}\nSplit:\n{}",
         serial_num,
         payment.description,
         reformat_datetime(&payment.datetime),

@@ -63,7 +63,7 @@ fn display_add_payment(payment: &AddPaymentParams) -> String {
         None => "".to_string(),
     };
     let debts = match &payment.debts {
-        Some(debts) => format!("Split between:\n{}", display_debts(&debts)),
+        Some(debts) => format!("Split:\n{}", display_debts(&debts)),
         None => "".to_string(),
     };
 
