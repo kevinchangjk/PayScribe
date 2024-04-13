@@ -3,8 +3,8 @@ use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
 use crate::bot::{
     dispatcher::State,
     handler::utils::{
-        display_balances, display_debts, make_keyboard, parse_amount, parse_username,
-        process_debts, HandlerResult, UserDialogue, DEBT_EQUAL_DESCRIPTION_MESSAGE,
+        display_balances, display_debts, display_username, make_keyboard, parse_amount,
+        parse_username, process_debts, HandlerResult, UserDialogue, DEBT_EQUAL_DESCRIPTION_MESSAGE,
         DEBT_EQUAL_INSTRUCTIONS_MESSAGE, DEBT_EXACT_DESCRIPTION_MESSAGE,
         DEBT_EXACT_INSTRUCTIONS_MESSAGE, DEBT_RATIO_DESCRIPTION_MESSAGE,
         DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, UNKNOWN_ERROR_MESSAGE,
@@ -55,7 +55,7 @@ fn display_add_payment(payment: &AddPaymentParams) -> String {
         None => "".to_string(),
     };
     let creditor = match &payment.creditor {
-        Some(cred) => format!("Payer: {}\n", cred),
+        Some(cred) => format!("Payer: {}\n", display_username(cred)),
         None => "".to_string(),
     };
     let total = match &payment.total {
@@ -63,7 +63,7 @@ fn display_add_payment(payment: &AddPaymentParams) -> String {
         None => "".to_string(),
     };
     let debts = match &payment.debts {
-        Some(debts) => format!("Split with:\n{}", display_debts(&debts)),
+        Some(debts) => format!("Split between:\n{}", display_debts(&debts)),
         None => "".to_string(),
     };
 
@@ -640,7 +640,7 @@ pub async fn action_add_edit_menu(
                         id,
                         format!(
                             "Current payer: {}\n\nWho should the payer be?",
-                            payment_clone.creditor.unwrap()
+                            display_username(&payment_clone.creditor.unwrap())
                         ),
                     )
                     .await?;

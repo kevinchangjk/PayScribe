@@ -8,9 +8,9 @@ use crate::bot::{
     dispatcher::State,
     handler::{
         utils::{
-            display_balances, display_debts, display_payment, make_keyboard, parse_amount,
-            parse_username, process_debts, HandlerResult, UserDialogue, COMMAND_VIEW_PAYMENTS,
-            DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
+            display_balances, display_debts, display_payment, display_username, make_keyboard,
+            parse_amount, parse_username, process_debts, HandlerResult, UserDialogue,
+            COMMAND_VIEW_PAYMENTS, DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
             DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
             DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
         },
@@ -37,9 +37,9 @@ const CANCEL_MESSAGE: &str =
  */
 fn display_edit_payment(payment: Payment, edited_payment: EditPaymentParams) -> String {
     format!(
-        "Description: {}\nPayer: {}\nTotal: {:.2}\nSplit with:\n{}",
+        "Description: {}\nPayer: {}\nTotal: {:.2}\nSplit between:\n{}",
         edited_payment.description.unwrap_or(payment.description),
-        edited_payment.creditor.unwrap_or(payment.creditor),
+        display_username(&edited_payment.creditor.unwrap_or(payment.creditor)),
         edited_payment.total.unwrap_or(payment.total),
         display_debts(&edited_payment.debts.unwrap_or(payment.debts.clone()))
     )
@@ -323,7 +323,7 @@ pub async fn action_edit_payment_confirm(
                         chat.id,
                         format!(
                             "Current payer: {}\n\nWho should the payer be?",
-                            payment.creditor
+                            display_username(&payment.creditor)
                         ),
                     )
                     .await?;

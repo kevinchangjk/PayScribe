@@ -88,8 +88,10 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
     let mut message = String::new();
     for debt in debts {
         message.push_str(&format!(
-            "{} owes {}: {}\n",
-            debt.debtor, debt.creditor, debt.amount
+            "{} owes {}: {:.2}\n",
+            display_username(&debt.debtor),
+            display_username(&debt.creditor),
+            debt.amount
         ));
     }
 
@@ -104,7 +106,11 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
 pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
     let mut message = String::new();
     for debt in debts {
-        message.push_str(&format!("    {}: {:.2}\n", debt.0, debt.1));
+        message.push_str(&format!(
+            "    {}: {:.2}\n",
+            display_username(&debt.0),
+            debt.1
+        ));
     }
     message
 }
@@ -112,11 +118,11 @@ pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
 // Displays a single payment entry in a user-friendly format.
 pub fn display_payment(payment: &Payment, serial_num: usize) -> String {
     format!(
-        "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {:.2}\nSplit with:\n{}",
+        "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {:.2}\nSplit between:\n{}",
         serial_num,
         payment.description,
         reformat_datetime(&payment.datetime),
-        payment.creditor,
+        display_username(&payment.creditor),
         payment.total,
         display_debts(&payment.debts)
     )
@@ -151,6 +157,11 @@ pub fn make_keyboard_debt_selection() -> InlineKeyboardMarkup {
     make_keyboard(buttons, Some(3))
 }
 
+// Displays a username with the '@' symbol.
+pub fn display_username(username: &str) -> String {
+    format!("@{}", username)
+}
+
 // Ensures that a username has a leading '@'.
 pub fn parse_username(username: &str) -> Result<String, BotError> {
     let text: &str;
@@ -164,7 +175,7 @@ pub fn parse_username(username: &str) -> Result<String, BotError> {
         let re = Regex::new(r"^[a-zA-Z0-9_]+$");
         if let Ok(re) = re {
             if re.captures(text).is_some() {
-                return Ok(format!("@{}", text.to_string()));
+                return Ok(text.to_string());
             }
         }
     }
