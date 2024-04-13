@@ -18,7 +18,7 @@ pub const UNKNOWN_ERROR_MESSAGE: &str =
 pub const NO_TEXT_MESSAGE: &str =
     "❓ Sorry, I can't understand that! Please reply to me in text.\n\n";
 pub const TOTAL_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the amount followed by the 3 letter abbreviation for the currency.\nE.g. 7.50 USD, 28 EUR, 320 JPY, etc.";
+"Enter the amount followed by the 3 letter abbreviation for the currency.\nE.g. 7.50 USD, 28 EUR, 320 JPY, etc.";
 pub const CURRENCY_INSTRUCTIONS_MESSAGE: &str =
     "Enter the 3 letter shorthand for the currency. E.g. USD, EUR, JPY, etc.";
 pub const DEBT_EQUAL_DESCRIPTION_MESSAGE: &str =
@@ -26,16 +26,17 @@ pub const DEBT_EQUAL_DESCRIPTION_MESSAGE: &str =
 pub const DEBT_EXACT_DESCRIPTION_MESSAGE: &str =
     "Exact — Share the total cost by specifying exact amounts for each user\n";
 pub const DEBT_RATIO_DESCRIPTION_MESSAGE: &str =
-    "Proportion — Split the total cost by specifying relative proportions of the total that each user owes\n";
+"Proportion — Split the total cost by specifying relative proportions of the total that each user owes\n";
 pub const DEBT_EQUAL_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames of those sharing the cost (including the payer if sharing too) as follows: \n\n@username__1\n@username__2\n@username__3\n...\n\n";
+"Enter the usernames of those sharing the cost (including the payer if sharing too) as follows: \n\n@username__1\n@username__2\n@username__3\n...\n\n";
 pub const DEBT_EXACT_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and exact amounts (without currency) as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\nAny leftover amount will be taken as the payer's share.";
+"Enter the usernames and exact amounts (without currency) as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\nAny leftover amount will be taken as the payer's share.";
 pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and exact amounts (without currency) as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n";
+"Enter the usernames and exact amounts (without currency) as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n";
 pub const DEBT_RATIO_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and proportions as follows: \n\n@username__1 portion1\n@username__2 portion2\n@username__3 portion3\n...\n\nThe portions can be any whole or decimal number.";
+"Enter the usernames and proportions as follows: \n\n@username__1 portion1\n@username__2 portion2\n@username__3 portion3\n...\n\nThe portions can be any whole or decimal number.";
 pub const COMMAND_HELP: &str = "/help";
+pub const COMMAND_CURRENCIES: &str = "/currencies";
 pub const COMMAND_ADD_PAYMENT: &str = "/addpayment";
 pub const COMMAND_PAY_BACK: &str = "/payback";
 pub const COMMAND_VIEW_PAYMENTS: &str = "/viewpayments";
@@ -84,8 +85,35 @@ impl From<ProcessError> for BotError {
 }
 
 // List of all supported currencies
-pub const CURRENCIES: [(&str, i32); 5] =
-    [("JPY", 0), ("USD", 2), ("SGD", 2), ("MYR", 2), ("NIL", 2)];
+pub const CURRENCIES: [(&str, i32); 27] = [
+    ("AED", 2),
+    ("AUD", 2),
+    ("CAD", 2),
+    ("CHF", 2),
+    ("CNY", 2),
+    ("EUR", 2),
+    ("GBP", 2),
+    ("HKD", 2),
+    ("IDR", 0),
+    ("INR", 2),
+    ("JPY", 0),
+    ("KRW", 0),
+    ("MXN", 2),
+    ("MYR", 2),
+    ("MYR", 2),
+    ("NIL", 2),
+    ("NZD", 2),
+    ("PHP", 2),
+    ("RUB", 2),
+    ("SAR", 2),
+    ("SEK", 2),
+    ("SGD", 2),
+    ("THB", 2),
+    ("TRY", 2),
+    ("TWD", 2),
+    ("USD", 2),
+    ("VND", 0),
+];
 pub const CURRENCY_DEFAULT: (&str, i32) = ("NIL", 2);
 
 // Converts a (&str, i32) to a Currency.
@@ -151,6 +179,7 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
                     display_currency_amount(debt.amount, currency),
                 ));
             }
+            // Should not occur, since code is already processed and stored in database
             Err(_err) => {
                 continue;
             }

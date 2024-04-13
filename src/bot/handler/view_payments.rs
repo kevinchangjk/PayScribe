@@ -226,7 +226,7 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
 }
 
 /* Navigation function for user to interact with payment pagination menu.
- */
+*/
 pub async fn action_view_more(
     bot: Bot,
     dialogue: UserDialogue,

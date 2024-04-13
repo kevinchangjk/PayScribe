@@ -29,7 +29,7 @@ pub async fn handle_repeated_delete_payment(bot: Bot, msg: Message) -> HandlerRe
     bot.send_message(
         msg.chat.id,
         "🚫 You are already deleting a payment entry! Please complete or cancel the current operation before starting a new one.",
-    ).await?;
+        ).await?;
     Ok(())
 }
 
@@ -53,7 +53,7 @@ pub async fn block_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
         "🚫 You are currently deleting a payment entry! Please complete or cancel the current payment entry before starting another command.",
-    ).await?;
+        ).await?;
     Ok(())
 }
 
@@ -134,16 +134,16 @@ pub async fn action_delete_payment_confirm(
                                 "Delete Payment Submission - payment deleted for chat {} with payment {}",
                                 chat.id,
                                 display_payment(&payment, 1)
-                            );
+                                );
                             bot.edit_message_text(
                                 chat.id,
                                 id,
                                 format!(
                                     "🎉 I've deleted the payment! 🎉\n\nHere are the updated balances:\n{}",
                                     display_balances(&balances)
-                                ),
-                            )
-                            .await?;
+                                    ),
+                                    )
+                                .await?;
                             dialogue
                                 .update(State::ViewPayments { payments, page })
                                 .await?;
@@ -154,13 +154,13 @@ pub async fn action_delete_payment_confirm(
                                 chat.id,
                                 display_payment(&payment, 1),
                                 err.to_string()
-                            );
+                                );
                             bot.edit_message_text(
                                 chat.id,
                                 id,
                                 format!("❓ Hmm, Something went wrong! Sorry, I can't delete the payment right now." ),
-                            )
-                            .await?;
+                                )
+                                .await?;
                             dialogue
                                 .update(State::ViewPayments { payments, page })
                                 .await?;

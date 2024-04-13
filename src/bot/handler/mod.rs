@@ -15,7 +15,8 @@ pub use self::edit_payment::{
     handle_repeated_edit_payment, no_edit_payment, EditPaymentParams,
 };
 pub use self::general::{
-    action_cancel, action_help, action_start, callback_invalid_message, invalid_state,
+    action_cancel, action_currencies, action_help, action_start, callback_invalid_message,
+    invalid_state,
 };
 pub use self::pay_back::{
     action_pay_back, action_pay_back_confirm, action_pay_back_currency,

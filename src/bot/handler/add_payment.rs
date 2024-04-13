@@ -4,11 +4,11 @@ use crate::bot::{
     dispatcher::State,
     handler::utils::{
         display_balances, display_currency_amount, display_debts, display_username, make_keyboard,
-        parse_username, process_debts, HandlerResult, UserDialogue, DEBT_EQUAL_DESCRIPTION_MESSAGE,
-        DEBT_EQUAL_INSTRUCTIONS_MESSAGE, DEBT_EXACT_DESCRIPTION_MESSAGE,
-        DEBT_EXACT_INSTRUCTIONS_MESSAGE, DEBT_RATIO_DESCRIPTION_MESSAGE,
-        DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, TOTAL_INSTRUCTIONS_MESSAGE,
-        UNKNOWN_ERROR_MESSAGE,
+        parse_username, process_debts, HandlerResult, UserDialogue, COMMAND_CURRENCIES,
+        DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
+        DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
+        DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+        TOTAL_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
     },
     processor::add_payment,
 };
@@ -507,9 +507,9 @@ pub async fn action_add_total(
                 Err(err) => {
                     bot.send_message(
                         msg.chat.id,
-                        format!("{}\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string()),
-                    )
-                    .await?;
+                        format!("{} Check out the supported currencies with {COMMAND_CURRENCIES}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string()),
+                        )
+                        .await?;
                     return Ok(());
                 }
             }
@@ -704,9 +704,9 @@ pub async fn action_add_edit_menu(
                         format!(
                             "Current total: {}\n\nWhat should the total be?\n\nOptional: You may also enter the currency of the amount. {TOTAL_INSTRUCTIONS_MESSAGE}",
                             display_currency_amount(payment_clone.total.unwrap(), payment_clone.currency.unwrap())
-                        ),
-                    )
-                    .await?;
+                            ),
+                            )
+                        .await?;
                     dialogue
                         .update(State::AddEdit {
                             payment,
@@ -803,10 +803,10 @@ pub async fn action_add_edit(
                             debts: payment.debts,
                         };
                         bot.send_message(
-                    msg.chat.id,
-                    format!("How are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",),
-                    ).reply_markup(make_keyboard_debt_selection())
-                    .await?;
+                            msg.chat.id,
+                            format!("How are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",),
+                            ).reply_markup(make_keyboard_debt_selection())
+                            .await?;
                         dialogue
                             .update(State::AddDebtSelection {
                                 payment: new_payment,
@@ -814,7 +814,9 @@ pub async fn action_add_edit(
                             .await?;
                     }
                     Err(err) => {
-                        bot.send_message(msg.chat.id, err.to_string()).await?;
+                        bot.send_message(msg.chat.id,
+                                         format!("{} Check out the supported currencies with {COMMAND_CURRENCIES}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string())
+                                        ).await?;
                         return Ok(());
                     }
                 }

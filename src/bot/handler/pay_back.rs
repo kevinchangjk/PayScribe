@@ -5,8 +5,8 @@ use crate::bot::{
     handler::utils::{
         display_balances, display_debts, display_username, get_currency, get_default_currency,
         make_keyboard, parse_debts_payback, parse_username, Currency, HandlerResult, UserDialogue,
-        CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, PAY_BACK_INSTRUCTIONS_MESSAGE,
-        UNKNOWN_ERROR_MESSAGE,
+        COMMAND_CURRENCIES, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+        PAY_BACK_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
     },
     processor::add_payment,
 };
@@ -162,9 +162,9 @@ pub async fn action_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
     bot.send_message(
         msg.chat.id,
         format!("Alright! What currency did you pay in? You can also choose to skip and not enter a currency."),
-    )
-    .reply_markup(keyboard)
-    .await?;
+        )
+        .reply_markup(keyboard)
+        .await?;
     dialogue.update(State::PayBackCurrencyMenu).await?;
     Ok(())
 }
@@ -191,12 +191,12 @@ pub async fn action_pay_back_currency_menu(
                 if let Some(Message { id, chat, .. }) = query.message {
                     bot.edit_message_text(
                         chat.id,
-                    id,
-                    format!(
-                        "Sure! Who did you pay back and how much did you pay?\n\n{PAY_BACK_INSTRUCTIONS_MESSAGE}"
-                        ),
-                    )
-                    .await?;
+                        id,
+                        format!(
+                            "Sure! Who did you pay back and how much did you pay?\n\n{PAY_BACK_INSTRUCTIONS_MESSAGE}"
+                            ),
+                            )
+                        .await?;
                     dialogue
                         .update(State::PayBackDebts {
                             currency: get_default_currency(),
@@ -210,8 +210,8 @@ pub async fn action_pay_back_currency_menu(
                         chat.id,
                         id,
                         format!(
-                        "Sure! What currency did you pay in?\n\n{CURRENCY_INSTRUCTIONS_MESSAGE}"
-                    ),
+                            "Sure! What currency did you pay in?\n\n{CURRENCY_INSTRUCTIONS_MESSAGE}"
+                            ),
                     )
                     .await?;
                     dialogue.update(State::PayBackCurrency).await?;
@@ -258,7 +258,14 @@ pub async fn action_pay_back_currency(
                     dialogue.update(State::PayBackDebts { currency }).await?;
                 }
                 Err(err) => {
-                    bot.send_message(msg.chat.id, err.to_string()).await?;
+                    bot.send_message(
+                        msg.chat.id,
+                        format!(
+                            "{} Check out the supported currencies with {COMMAND_CURRENCIES}.",
+                            err.to_string()
+                        ),
+                    )
+                    .await?;
                 }
             }
         }
@@ -350,14 +357,14 @@ pub async fn action_pay_back_confirm(
                     let buttons = vec!["Cancel", "Skip", "Set Currency"];
                     let keyboard = make_keyboard(buttons, Some(3));
                     bot.edit_message_text(
-                    chat.id,
-                    id,
-                    format!(
-                        "Alright! What currency did you pay in? You can also choose to skip and not enter a currency."
-                        ),
-                    )
+                        chat.id,
+                        id,
+                        format!(
+                            "Alright! What currency did you pay in? You can also choose to skip and not enter a currency."
+                            ),
+                            )
                         .reply_markup(keyboard)
-                    .await?;
+                        .await?;
                     dialogue.update(State::PayBackCurrencyMenu).await?;
                 }
             }
