@@ -104,7 +104,7 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
 pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
     let mut message = String::new();
     for debt in debts {
-        message.push_str(&format!("    {}: {}\n", debt.0, debt.1));
+        message.push_str(&format!("    {}: {:.2}\n", debt.0, debt.1));
     }
     message
 }
@@ -112,7 +112,7 @@ pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
 // Displays a single payment entry in a user-friendly format.
 pub fn display_payment(payment: &Payment, serial_num: usize) -> String {
     format!(
-        "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {}\nSplit with:\n{}",
+        "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {:.2}\nSplit with:\n{}",
         serial_num,
         payment.description,
         reformat_datetime(&payment.datetime),
