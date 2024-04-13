@@ -19,6 +19,7 @@ const CHAT_CURRENCY_KEY: &str = "chat_currency";
 pub struct Debt {
     pub debtor: String,
     pub creditor: String,
+    pub currency: String,
     pub amount: f64,
 }
 
@@ -306,11 +307,13 @@ mod tests {
             Debt {
                 debtor: "debtor1".to_string(),
                 creditor: "creditor1".to_string(),
+                currency: "USD".to_string(),
                 amount: 10.0,
             },
             Debt {
                 debtor: "debtor2".to_string(),
                 creditor: "creditor2".to_string(),
+                currency: "JPY".to_string(),
                 amount: 20.0,
             },
         ];
