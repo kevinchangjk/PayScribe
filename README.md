@@ -32,6 +32,10 @@ _Track your Telegram group payments right in the chat._
 
 To get started with using the bot, add the bot into any group chat of your choice! You can then check out the available bot commands with `/help`, or as listed below.
 
+Do note that by default, Telegram bots will have <a href="https://core.telegram.org/bots/features#:~:text=Privacy%20mode%20is%20enabled%20by,this%20change%20to%20take%20effect" target="_blank">Group Privacy</a> enabled, which means that they can only access messages that are directed towards them in some way. To interact with the **PayScribe**, users will have to call the bot's commands, or directly reply to the bot's messages.
+
+If you notice that **PayScribe** is responding to every message sent in the group, that means that the bot has been given admin rights, and can thus access every message in the group. Revoke the bot's admin rights for normal usage.
+
 ### Bot Commands
 
 `/start` — "Start" the bot.
