@@ -11,7 +11,7 @@ use crate::bot::{
     },
 };
 
-use super::utils::parse_debts_payback;
+use super::utils::{display_username, parse_debts_payback};
 
 /* Utilities */
 #[derive(Clone, Debug)]
@@ -60,8 +60,7 @@ async fn call_processor_pay_back(
     if let Some(Message { id, chat, .. }) = query.message {
         let payment_clone = payment.clone();
         let payment_overview = display_pay_back_entry(&payment);
-        let description = format!("{} paid back!", payment.sender_username);
-        let total = payment.debts.iter().fold(0.0, |curr, next| curr + next.1);
+        let description = format!("{} paid back!", display_username(&payment.sender_username));
 
         let updated_balances = add_payment(
             payment.chat_id,
@@ -70,7 +69,7 @@ async fn call_processor_pay_back(
             payment.datetime,
             &description,
             &payment.sender_username,
-            total,
+            payment.total,
             payment.debts,
         );
 

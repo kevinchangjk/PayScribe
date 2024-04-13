@@ -10,8 +10,8 @@ use super::{
     connect::{connect, DBError},
     payment::{add_payment, delete_payment, get_payment, update_payment, Payment},
     user::{
-        add_user, get_preferred_username, get_user_chats, get_user_exists, initialize_user,
-        set_preferred_username, update_user_chats,
+        add_user, get_preferred_username, get_user_chats, get_user_exists, set_preferred_username,
+        update_user_chats,
     },
 };
 
@@ -80,11 +80,6 @@ pub fn update_user(username: &str, chat_id: &str, user_id: Option<&str>) -> Resu
     let current_chats = get_user_chats(&mut con, &user_key)?;
     if !current_chats.contains(&chat_id.to_string()) {
         update_user_chats(&mut con, &user_key, chat_id)?;
-    }
-
-    // If user_id is provided, just initialize user (set user_key) regardless of existence
-    if let Some(id) = user_id {
-        initialize_user(&mut con, id, &user_key)?;
     }
 
     Ok(())
@@ -279,10 +274,7 @@ mod tests {
     use crate::bot::redis::{
         balance::delete_balance,
         chat::{delete_chat, delete_chat_debt, get_chat_users},
-        user::{
-            delete_preferred_username, delete_user, delete_user_id, get_preferred_username,
-            get_user_chats, get_user_is_init, get_username,
-        },
+        user::{delete_preferred_username, delete_user, get_preferred_username, get_user_chats},
     };
 
     use super::*;
@@ -300,7 +292,6 @@ mod tests {
 
         // Adds user
         assert!(update_user(username, chat_id, None).is_ok());
-        assert!(!get_user_is_init(&mut con, &user_key).unwrap());
         assert_eq!(
             get_preferred_username(&mut con, &user_key).unwrap(),
             username
@@ -309,7 +300,6 @@ mod tests {
 
         // Performs again, nothing should happen
         assert!(update_user(username, chat_id, None).is_ok());
-        assert!(!get_user_is_init(&mut con, &user_key).unwrap());
         assert_eq!(
             get_preferred_username(&mut con, &user_key).unwrap(),
             username
@@ -353,6 +343,7 @@ mod tests {
         delete_preferred_username(&mut con, &user_key).unwrap();
     }
 
+    /*
     #[test]
     fn test_update_user_init_user() {
         let mut con = connect().unwrap();
@@ -409,6 +400,7 @@ mod tests {
         delete_preferred_username(&mut con, username).unwrap();
         delete_preferred_username(&mut con, second_username).unwrap();
     }
+    */
 
     #[test]
     fn test_update_chat_add_chat_users() {

@@ -40,6 +40,8 @@ pub fn get_chat_exists(con: &mut Connection, chat_id: &str) -> RedisResult<bool>
 }
 
 // Adds a single new user to the chat. Automatically checks if already added.
+// Not in use in production, prefers add_chat_user_multiple
+#[allow(dead_code)]
 pub fn add_chat_user(con: &mut Connection, chat_id: &str, username: &str) -> RedisResult<()> {
     let current_users: Vec<String> = get_chat_users(con, chat_id)?;
     if current_users.contains(&username.to_string()) {
@@ -67,6 +69,7 @@ pub fn add_chat_user_multiple(
 // Deletes a chat from Redis
 // Mainly for testing purposes
 // In application, no real need to delete keys
+#[allow(dead_code)]
 pub fn delete_chat(con: &mut Connection, chat_id: &str) -> RedisResult<()> {
     con.del(format!("{CHAT_KEY}:{chat_id}"))
 }
@@ -100,6 +103,7 @@ pub fn delete_chat_payment(
 // Deletes all payments from a chat
 // Mainly for testing purposes
 // In application, no real need to delete keys
+#[allow(dead_code)]
 pub fn delete_all_chat_payment(con: &mut Connection, chat_id: &str) -> RedisResult<()> {
     con.del(format!("{CHAT_PAYMENT_KEY}:{chat_id}"))
 }
@@ -125,6 +129,7 @@ pub fn get_chat_debt(con: &mut Connection, chat_id: &str) -> RedisResult<Debts> 
 // Deletes the optimized debts for a chat
 // Mainly for testing purposes
 // In application, no real need to delete keys
+#[allow(dead_code)]
 pub fn delete_chat_debt(con: &mut Connection, chat_id: &str) -> RedisResult<()> {
     con.del(format!("{CHAT_DEBT_KEY}:{chat_id}"))
 }

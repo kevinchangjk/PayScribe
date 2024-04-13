@@ -47,7 +47,6 @@ fn update_balances_debts(
 ) -> Result<Vec<Debt>, ProcessError> {
     // Update balances
     let balances = update_chat_balances(chat_id, changes)?;
-    log::info!("{:?}", balances);
 
     // Update group debts
     let debts = optimize_debts(balances);
@@ -177,8 +176,6 @@ pub fn edit_payment(
         });
         update_chat_balances(&chat_id, prev_changes.clone())?;
 
-        log::info!("{:?}", prev_changes);
-
         // Second round of update
         let mut changes: Vec<UserBalance> = debts
             .unwrap_or(current_payment.debts)
@@ -192,8 +189,6 @@ pub fn edit_payment(
             username: creditor.unwrap_or(&current_payment.creditor).to_string(),
             balance: *total.unwrap_or(&current_payment.total),
         });
-
-        log::info!("{:?}", changes);
 
         let res = update_balances_debts(&chat_id, changes)?;
         return Ok(Some(res));

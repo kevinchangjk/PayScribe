@@ -32,6 +32,7 @@ pub fn get_balance(con: &mut Connection, chat_id: &str, user_id: &str) -> RedisR
 // Deletes a balance in Redis
 // Mainly for testing purposes
 // In application, no real need to delete keys
+#[allow(dead_code)]
 pub fn delete_balance(con: &mut Connection, chat_id: &str, user_id: &str) -> RedisResult<()> {
     con.del(format!("{BALANCE_KEY}:{chat_id}:{user_id}"))
 }

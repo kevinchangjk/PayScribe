@@ -4,21 +4,7 @@ use teloxide::{
     utils::command::BotCommands,
 };
 
-use crate::bot::handler::{
-    action_add_confirm, action_add_creditor, action_add_debt, action_add_debt_selection,
-    action_add_description, action_add_edit, action_add_edit_menu, action_add_payment,
-    action_add_total, action_cancel, action_delete_payment_confirm, action_edit_payment_confirm,
-    action_edit_payment_debts, action_edit_payment_edit, action_help, action_pay_back,
-    action_pay_back_confirm, action_pay_back_debts, action_select_payment_delete,
-    action_select_payment_edit, action_select_payment_number, action_start, action_view_balances,
-    action_view_more, action_view_payments, block_add_payment, block_delete_payment,
-    block_edit_payment, block_pay_back, block_select_payment, callback_invalid_message,
-    cancel_add_payment, cancel_delete_payment, cancel_edit_payment, cancel_pay_back,
-    cancel_select_payment, handle_repeated_add_payment, handle_repeated_delete_payment,
-    handle_repeated_edit_payment, handle_repeated_pay_back, handle_repeated_select_payment,
-    invalid_state, no_delete_payment, no_edit_payment, AddDebtsFormat, AddPaymentEdit,
-    AddPaymentParams, EditPaymentParams, PayBackParams, Payment, SelectPaymentType,
-};
+use crate::bot::handler::*;
 
 /* Handler is the front-facing agent of the bot.
  * It receives messages and commands from the user, and handles user interaction.
@@ -107,9 +93,9 @@ pub enum Command {
     Start,
     #[command(description = "Show all commands, and how to use the bot")]
     Help,
-    #[command(description = "Add a payment entry for the group")]
+    #[command(description = "Add a new payment entry for the group")]
     AddPayment,
-    #[command(description = "Add a entry paying back other members in the group")]
+    #[command(description = "Add a new entry paying back other members in the group")]
     PayBack,
     #[command(description = "View all payment records for the group")]
     ViewPayments,
