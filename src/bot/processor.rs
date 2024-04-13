@@ -67,8 +67,9 @@ pub fn add_payment(
     datetime: String,
     description: &str,
     creditor: &str,
-    total: f64,
-    debts: Vec<(String, f64)>,
+    currency: &str,
+    total: i64,
+    debts: Vec<(String, i64)>,
 ) -> Result<Vec<Debt>, ProcessError> {
     let mut all_users = vec![creditor.to_string()];
 
@@ -103,6 +104,7 @@ pub fn add_payment(
         description: description.to_string(),
         datetime,
         creditor: creditor.to_string(),
+        currency: currency.to_string(),
         total,
         debts: debts.clone(),
     };
@@ -113,12 +115,14 @@ pub fn add_payment(
         .iter()
         .map(|(user, amount)| UserBalance {
             username: user.to_string(),
+            currency: currency.to_string(),
             balance: amount.neg(),
         })
         .collect();
 
     changes.push(UserBalance {
         username: creditor.to_string(),
+        currency: currency.to_string(),
         balance: total,
     });
 
@@ -150,28 +154,40 @@ pub fn edit_payment(
     payment_id: &str,
     description: Option<&str>,
     creditor: Option<&str>,
-    total: Option<&f64>,
-    debts: Option<Vec<(String, f64)>>,
+    currency: Option<&str>,
+    total: Option<&i64>,
+    debts: Option<Vec<(String, i64)>>,
 ) -> Result<Option<Vec<Debt>>, ProcessError> {
     // Get current payment entry
     let current_payment = get_payment_entry(payment_id)?;
 
     // Edit payment entry
-    update_payment_entry(payment_id, description, creditor, total, debts.clone())?;
+    update_payment_entry(
+        payment_id,
+        description,
+        creditor,
+        currency,
+        total,
+        debts.clone(),
+    )?;
 
     // Update balances in two stages: first undo the previous payment, then set the new one
     if creditor.is_some() || total.is_some() || debts.is_some() {
         // First round of update
+        let prev_creditor = &current_payment.creditor;
+        let prev_currency = &current_payment.currency;
         let mut prev_changes: Vec<UserBalance> = current_payment
             .debts
             .iter()
             .map(|debt| UserBalance {
                 username: debt.0.to_string(),
+                currency: prev_currency.to_string(),
                 balance: debt.1,
             })
             .collect();
         prev_changes.push(UserBalance {
-            username: current_payment.creditor.clone(),
+            username: prev_creditor.to_string(),
+            currency: prev_currency.to_string(),
             balance: current_payment.total.neg(),
         });
         update_chat_balances(&chat_id, prev_changes.clone())?;
@@ -182,11 +198,13 @@ pub fn edit_payment(
             .iter()
             .map(|debt| UserBalance {
                 username: debt.0.to_string(),
+                currency: currency.unwrap_or(prev_currency).to_string(),
                 balance: debt.1.neg(),
             })
             .collect();
         changes.push(UserBalance {
             username: creditor.unwrap_or(&current_payment.creditor).to_string(),
+            currency: currency.unwrap_or(prev_currency).to_string(),
             balance: *total.unwrap_or(&current_payment.total),
         });
 
@@ -215,11 +233,13 @@ pub fn delete_payment(chat_id: &str, payment_id: &str) -> Result<Vec<Debt>, Proc
         .iter()
         .map(|debt| UserBalance {
             username: debt.0.to_string(),
+            currency: payment.currency,
             balance: debt.1,
         })
         .collect();
     changes.push(UserBalance {
         username: payment.creditor,
+        currency: payment.currency,
         balance: payment.total.neg(),
     });
 

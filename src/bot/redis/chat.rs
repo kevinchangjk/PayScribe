@@ -20,7 +20,7 @@ pub struct Debt {
     pub debtor: String,
     pub creditor: String,
     pub currency: String,
-    pub amount: f64,
+    pub amount: i64,
 }
 
 pub type Debts = Vec<Debt>;
@@ -308,13 +308,13 @@ mod tests {
                 debtor: "debtor1".to_string(),
                 creditor: "creditor1".to_string(),
                 currency: "USD".to_string(),
-                amount: 10.0,
+                amount: 1000,
             },
             Debt {
                 debtor: "debtor2".to_string(),
                 creditor: "creditor2".to_string(),
                 currency: "JPY".to_string(),
-                amount: 20.0,
+                amount: 2000,
             },
         ];
         assert!(set_chat_debt(&mut con, chat_id, &debts).is_ok());
