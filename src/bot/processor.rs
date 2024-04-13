@@ -41,6 +41,27 @@ fn auto_update_user(
     Ok(())
 }
 
+fn split_balances_currencies(balances: Vec<UserBalance>) -> Vec<Vec<UserBalance>> {
+    let mut currencies: Vec<&str> = Vec::new();
+    let mut splits: Vec<Vec<UserBalance>> = Vec::new();
+    for balance in &balances {
+        if currencies.contains(&balance.currency.as_str()) {
+            // Add to existing split
+            let index = currencies
+                .iter()
+                .position(|&x| x == balance.currency.as_str())
+                .unwrap();
+            splits[index].push(balance.clone());
+        } else {
+            // Create a new split
+            currencies.push(balance.currency.as_str());
+            splits.push(vec![balance.clone()]);
+        }
+    }
+
+    splits
+}
+
 fn update_balances_debts(
     chat_id: &str,
     changes: Vec<UserBalance>,
@@ -49,10 +70,15 @@ fn update_balances_debts(
     let balances = update_chat_balances(chat_id, changes)?;
 
     // Update group debts
-    let debts = optimize_debts(balances);
-    update_chat_debts(&chat_id, &debts)?;
+    let split_balances = split_balances_currencies(balances);
+    let mut all_debts = Vec::new();
+    for split in split_balances {
+        let debts = optimize_debts(split);
+        all_debts.extend(debts);
+    }
+    update_chat_debts(&chat_id, &all_debts)?;
 
-    Ok(debts)
+    Ok(all_debts)
 }
 
 /* Add a new payment entry in a group chat.

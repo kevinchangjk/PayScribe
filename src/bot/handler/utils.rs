@@ -30,9 +30,9 @@ pub const DEBT_RATIO_DESCRIPTION_MESSAGE: &str =
 pub const DEBT_EQUAL_INSTRUCTIONS_MESSAGE: &str =
     "Enter the usernames of those sharing the cost (including the payer if sharing too) as follows: \n\n@username__1\n@username__2\n@username__3\n...\n\n";
 pub const DEBT_EXACT_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and exact amounts as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\nAny leftover amount will be taken as the payer's share.";
+    "Enter the usernames and exact amounts (without currency) as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\nAny leftover amount will be taken as the payer's share.";
 pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and exact amounts as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n";
+    "Enter the usernames and exact amounts (without currency) as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n";
 pub const DEBT_RATIO_INSTRUCTIONS_MESSAGE: &str =
     "Enter the usernames and proportions as follows: \n\n@username__1 portion1\n@username__2 portion2\n@username__3 portion3\n...\n\nThe portions can be any whole or decimal number.";
 pub const COMMAND_HELP: &str = "/help";
@@ -84,7 +84,8 @@ impl From<ProcessError> for BotError {
 }
 
 // List of all supported currencies
-pub const CURRENCIES: [(&str, i32); 4] = [("JPY", 0), ("USD", 2), ("SGD", 2), ("MYR", 2)];
+pub const CURRENCIES: [(&str, i32); 5] =
+    [("JPY", 0), ("USD", 2), ("SGD", 2), ("MYR", 2), ("NIL", 2)];
 pub const CURRENCY_DEFAULT: (&str, i32) = ("NIL", 2);
 
 // Converts a (&str, i32) to a Currency.
@@ -129,20 +130,31 @@ pub fn display_amount(amount: i64, decimal_places: i32) -> String {
 
 // Displays an amount together with its currency
 pub fn display_currency_amount(amount: i64, currency: Currency) -> String {
-    format!("{} {}", display_amount(amount, currency.1), currency.0)
+    if currency.0 == "NIL" {
+        format!("{}", display_amount(amount, currency.1))
+    } else {
+        format!("{} {}", display_amount(amount, currency.1), currency.0)
+    }
 }
 
 // Displays balances in a more readable format.
 pub fn display_balances(debts: &Vec<Debt>) -> String {
     let mut message = String::new();
-    let currency = ("SGD".to_string(), 2); // TODO
     for debt in debts {
-        message.push_str(&format!(
-            "{} owes {}: {}\n",
-            display_username(&debt.debtor),
-            display_username(&debt.creditor),
-            display_currency_amount(debt.amount, currency.clone()),
-        ));
+        let currency = get_currency(&debt.currency);
+        match currency {
+            Ok(currency) => {
+                message.push_str(&format!(
+                    "{} owes {}: {}\n",
+                    display_username(&debt.debtor),
+                    display_username(&debt.creditor),
+                    display_currency_amount(debt.amount, currency),
+                ));
+            }
+            Err(_err) => {
+                continue;
+            }
+        }
     }
 
     if message.is_empty() {
@@ -237,13 +249,11 @@ pub fn parse_username(username: &str) -> Result<String, BotError> {
 
 // Parse an amount. Reads a string, returns i64 based on currency.
 pub fn parse_amount(text: &str, decimal_places: i32) -> Result<i64, BotError> {
+    let factor = 10.0_f64.powi(decimal_places);
     let amount = match text.parse::<i64>() {
-        Ok(val) => val,
+        Ok(val) => (val as f64 * factor).round() as i64,
         Err(_) => match text.parse::<f64>() {
-            Ok(val) => {
-                let factor = 10.0_f64.powi(decimal_places);
-                (val * factor).round() as i64
-            }
+            Ok(val) => (val * factor).round() as i64,
             Err(_) => {
                 return Err(BotError::UserError(
                     "❌ Please provide a valid number!".to_string(),

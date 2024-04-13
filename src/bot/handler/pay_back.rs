@@ -27,8 +27,13 @@ const CANCEL_MESSAGE: &str =
     "Sure, I've cancelled adding the payment. No changes have been made! 👌";
 
 fn display_pay_back_entry(payment: &PayBackParams) -> String {
+    let mut currency_info: String = "".to_string();
+    if payment.currency.0 != "NIL" {
+        currency_info = format!("in {} ", payment.currency.0);
+    }
     format!(
-        "You paid the following amounts to:\n{}",
+        "You paid the following amounts {}to:\n{}",
+        currency_info,
         display_debts(&payment.debts, payment.currency.1)
     )
 }
@@ -160,7 +165,7 @@ pub async fn action_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
     )
     .reply_markup(keyboard)
     .await?;
-    dialogue.update(State::PayBackCurrency).await?;
+    dialogue.update(State::PayBackCurrencyMenu).await?;
     Ok(())
 }
 
@@ -271,7 +276,7 @@ pub async fn action_pay_back_currency(
 pub async fn action_pay_back_debts(
     bot: Bot,
     dialogue: UserDialogue,
-    payment: PayBackParams,
+    currency: Currency,
     msg: Message,
 ) -> HandlerResult {
     match msg.text() {
@@ -290,7 +295,7 @@ pub async fn action_pay_back_debts(
                         return Ok(());
                     }
                     let username = username?;
-                    let debts = parse_debts_payback(text, payment.currency.clone(), &username);
+                    let debts = parse_debts_payback(text, currency.clone(), &username);
                     if let Err(err) = debts {
                         bot.send_message(msg.chat.id, err.to_string()).await?;
                         return Ok(());
@@ -303,7 +308,7 @@ pub async fn action_pay_back_debts(
                         sender_id: msg.from().as_ref().unwrap().id.to_string(),
                         sender_username: username,
                         datetime: msg.date.to_string(),
-                        currency: payment.currency,
+                        currency,
                         total,
                         debts,
                     };
@@ -342,19 +347,18 @@ pub async fn action_pay_back_confirm(
             }
             "Edit" => {
                 if let Some(Message { id, chat, .. }) = query.message {
+                    let buttons = vec!["Cancel", "Skip", "Set Currency"];
+                    let keyboard = make_keyboard(buttons, Some(3));
                     bot.edit_message_text(
                     chat.id,
                     id,
                     format!(
-                        "Sure! Who did you pay back and how much did you pay?\n\n{PAY_BACK_INSTRUCTIONS_MESSAGE}"
+                        "Alright! What currency did you pay in? You can also choose to skip and not enter a currency."
                         ),
                     )
+                        .reply_markup(keyboard)
                     .await?;
-                    dialogue
-                        .update(State::PayBackDebts {
-                            currency: payment.currency,
-                        })
-                        .await?;
+                    dialogue.update(State::PayBackCurrencyMenu).await?;
                 }
             }
             "Confirm" => {

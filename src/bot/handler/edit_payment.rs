@@ -21,6 +21,8 @@ use crate::bot::{
     processor::edit_payment,
 };
 
+use super::utils::display_currency_amount;
+
 /* Utilities */
 #[derive(Clone, Debug)]
 pub struct EditPaymentParams {
@@ -37,14 +39,18 @@ const CANCEL_MESSAGE: &str =
 /* Displays a payment entry by combining original entry and edited fields.
  */
 fn display_edit_payment(payment: Payment, edited_payment: EditPaymentParams) -> String {
+    let currency = edited_payment.currency.unwrap_or(payment.currency);
     format!(
         "Description: {}\nPayer: {}\nTotal: {}\nSplit:\n{}",
         edited_payment.description.unwrap_or(payment.description),
         display_username(&edited_payment.creditor.unwrap_or(payment.creditor)),
-        edited_payment.total.unwrap_or(payment.total),
+        display_currency_amount(
+            edited_payment.total.unwrap_or(payment.total),
+            currency.clone()
+        ),
         display_debts(
             &edited_payment.debts.unwrap_or(payment.debts.clone()),
-            edited_payment.currency.unwrap_or(payment.currency).1
+            currency.1
         )
     )
 }
@@ -311,7 +317,9 @@ pub async fn action_edit_payment_confirm(
                     bot.send_message(
                         chat.id,
                         format!("Current description: {}\n\nWhat do you want the new description to be?",
-                        payment.description),
+                                edited_payment.description.clone().unwrap_or(payment.description.clone())
+
+                        ),
                     )
                     .await?;
                     dialogue
@@ -329,7 +337,12 @@ pub async fn action_edit_payment_confirm(
                         chat.id,
                         format!(
                             "Current payer: {}\n\nWho should the payer be?",
-                            display_username(&payment.creditor)
+                            display_username(
+                                &edited_payment
+                                    .creditor
+                                    .clone()
+                                    .unwrap_or(payment.creditor.clone())
+                            )
                         ),
                     )
                     .await?;
@@ -347,8 +360,8 @@ pub async fn action_edit_payment_confirm(
                     bot.send_message(
                         chat.id,
                         format!(
-                            "Current total: {}\n\nWhat should the total be?\n\nOptional: You may also enter the currency of the amount.{TOTAL_INSTRUCTIONS_MESSAGE}",
-                            payment.total
+                            "Current total: {}\n\nWhat should the total be?\n\nOptional: You may also enter the currency of the amount. {TOTAL_INSTRUCTIONS_MESSAGE}",
+                            display_currency_amount(edited_payment.total.unwrap_or(payment.total), edited_payment.currency.clone().unwrap_or(payment.currency.clone()))
                         ),
                     )
                     .await?;
@@ -367,7 +380,7 @@ pub async fn action_edit_payment_confirm(
                         chat.id,
                         format!(
                             "Current splits:\n{}\n\nHow are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
-                            display_debts(&payment.debts, edited_payment.currency.clone().unwrap_or(payment.currency.clone()).1)
+                            display_debts(&edited_payment.debts.clone().unwrap_or(payment.debts.clone()), edited_payment.currency.clone().unwrap_or(payment.currency.clone()).1)
                         ),
                     ).reply_markup(make_keyboard_debt_selection())
                     .await?;
@@ -450,7 +463,7 @@ pub async fn action_edit_payment_debts(
                         .await?;
                 }
             }
-            "Ratio" => {
+            "Proportion" => {
                 if let Some(Message { id, chat, .. }) = query.message {
                     bot.edit_message_text(
                         chat.id,

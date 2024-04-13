@@ -572,7 +572,7 @@ pub async fn action_add_debt_selection(
                         .await?;
                 }
             }
-            "Ratio" => {
+            "Proportion" => {
                 if let Some(Message { id, chat, .. }) = query.message {
                     bot.edit_message_text(
                         chat.id,
@@ -702,8 +702,8 @@ pub async fn action_add_edit_menu(
                         chat.id,
                         id,
                         format!(
-                            "Current total: {}\n\nWhat should the total be?\n\nOptional: You may also enter the currency of the amount.{TOTAL_INSTRUCTIONS_MESSAGE}",
-                            payment_clone.total.unwrap()
+                            "Current total: {}\n\nWhat should the total be?\n\nOptional: You may also enter the currency of the amount. {TOTAL_INSTRUCTIONS_MESSAGE}",
+                            display_currency_amount(payment_clone.total.unwrap(), payment_clone.currency.unwrap())
                         ),
                     )
                     .await?;
