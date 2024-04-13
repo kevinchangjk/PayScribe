@@ -17,7 +17,9 @@ use crate::bot::{
 use super::{
     action_delete_payment, action_edit_payment, block_delete_payment, block_edit_payment,
     cancel_delete_payment, cancel_edit_payment, handle_repeated_delete_payment,
-    handle_repeated_edit_payment, utils::Currency, SelectPaymentType,
+    handle_repeated_edit_payment,
+    utils::{get_currency, Currency, CURRENCY_DEFAULT},
+    SelectPaymentType,
 };
 
 /* Utilities */
@@ -37,14 +39,28 @@ pub struct Payment {
 }
 
 fn unfold_payment(payment: UserPayment) -> Payment {
-    Payment {
-        payment_id: payment.payment_id,
-        chat_id: payment.chat_id,
-        datetime: payment.payment.datetime,
-        description: payment.payment.description,
-        creditor: payment.payment.creditor,
-        total: payment.payment.total,
-        debts: payment.payment.debts,
+    let currency = get_currency(&payment.payment.currency);
+    match currency {
+        Ok(currency) => Payment {
+            payment_id: payment.payment_id,
+            chat_id: payment.chat_id,
+            datetime: payment.payment.datetime,
+            description: payment.payment.description,
+            creditor: payment.payment.creditor,
+            currency,
+            total: payment.payment.total,
+            debts: payment.payment.debts,
+        },
+        Err(_) => Payment {
+            payment_id: payment.payment_id,
+            chat_id: payment.chat_id,
+            datetime: payment.payment.datetime,
+            description: payment.payment.description,
+            creditor: payment.payment.creditor,
+            currency: CURRENCY_DEFAULT,
+            total: payment.payment.total,
+            debts: payment.payment.debts,
+        },
     }
 }
 

@@ -79,6 +79,29 @@ impl From<ProcessError> for BotError {
     }
 }
 
+// List of all supported currencies
+pub const CURRENCIES: [Currency; 4] = [
+    ("JPY".to_string(), 0),
+    ("USD".to_string(), 2),
+    ("SGD".to_string(), 2),
+    ("MYR".to_string(), 2),
+];
+
+pub const CURRENCY_DEFAULT: Currency = ("NIL".to_string(), 2);
+
+// Retrieves the currency given a currency code.
+pub fn get_currency(code: &str) -> Result<Currency, BotError> {
+    for currency in &CURRENCIES {
+        if currency.0 == code {
+            return Ok(currency.clone());
+        }
+    }
+
+    Err(BotError::UserError(
+        "❌ Sorry, I don't have that currency!".to_string(),
+    ))
+}
+
 // Converts an amount from base value to actual representation in currency.
 pub fn display_amount(amount: i64, decimal_places: i32) -> String {
     if decimal_places == 0 {
