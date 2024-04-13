@@ -17,7 +17,7 @@ use crate::bot::{
 use super::{
     action_delete_payment, action_edit_payment, block_delete_payment, block_edit_payment,
     cancel_delete_payment, cancel_edit_payment, handle_repeated_delete_payment,
-    handle_repeated_edit_payment, SelectPaymentType,
+    handle_repeated_edit_payment, utils::Currency, SelectPaymentType,
 };
 
 /* Utilities */
@@ -31,8 +31,9 @@ pub struct Payment {
     pub datetime: String,
     pub description: String,
     pub creditor: String,
-    pub total: f64,
-    pub debts: Vec<(String, f64)>,
+    pub currency: Currency,
+    pub total: i64,
+    pub debts: Vec<(String, i64)>,
 }
 
 fn unfold_payment(payment: UserPayment) -> Payment {
