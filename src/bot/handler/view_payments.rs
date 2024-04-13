@@ -7,8 +7,8 @@ use teloxide::{
 use crate::bot::{
     dispatcher::State,
     handler::utils::{
-        display_payment, make_keyboard, HandlerResult, UserDialogue, COMMAND_ADD_PAYMENT,
-        UNKNOWN_ERROR_MESSAGE,
+        display_payment, get_currency, get_default_currency, make_keyboard, Currency,
+        HandlerResult, UserDialogue, COMMAND_ADD_PAYMENT, UNKNOWN_ERROR_MESSAGE,
     },
     processor::{view_payments, ProcessError},
     redis::{CrudError, UserPayment},
@@ -17,9 +17,7 @@ use crate::bot::{
 use super::{
     action_delete_payment, action_edit_payment, block_delete_payment, block_edit_payment,
     cancel_delete_payment, cancel_edit_payment, handle_repeated_delete_payment,
-    handle_repeated_edit_payment,
-    utils::{get_currency, Currency, CURRENCY_DEFAULT},
-    SelectPaymentType,
+    handle_repeated_edit_payment, SelectPaymentType,
 };
 
 /* Utilities */
@@ -57,7 +55,7 @@ fn unfold_payment(payment: UserPayment) -> Payment {
             datetime: payment.payment.datetime,
             description: payment.payment.description,
             creditor: payment.payment.creditor,
-            currency: CURRENCY_DEFAULT,
+            currency: get_default_currency(),
             total: payment.payment.total,
             debts: payment.payment.debts,
         },

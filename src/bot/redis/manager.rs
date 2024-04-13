@@ -145,13 +145,13 @@ pub fn update_chat_balances(
     let users = get_chat_users(&mut con, chat_id)?;
     let currencies = get_chat_currencies(&mut con, chat_id)?;
     for user in users {
-        for currency in currencies {
+        for currency in &currencies {
             if get_balance_exists(&mut con, chat_id, &user, &currency)? {
                 let balance = get_balance(&mut con, chat_id, &user, &currency)?;
                 let username = get_preferred_username(&mut con, &user)?;
                 updated_balances.push(UserBalance {
                     username,
-                    currency,
+                    currency: currency.to_string(),
                     balance,
                 });
             }
@@ -833,16 +833,6 @@ mod tests {
                 currency: "USD".to_string(),
             },
             UserBalance {
-                username: "manager_test_user_27".to_string(),
-                balance: -5000,
-                currency: "USD".to_string(),
-            },
-            UserBalance {
-                username: "manager_test_user_28".to_string(),
-                balance: -5000,
-                currency: "USD".to_string(),
-            },
-            UserBalance {
                 username: "manager_test_user_26".to_string(),
                 balance: -5000,
                 currency: "JPY".to_string(),
@@ -850,7 +840,17 @@ mod tests {
             UserBalance {
                 username: "manager_test_user_27".to_string(),
                 balance: -5000,
+                currency: "USD".to_string(),
+            },
+            UserBalance {
+                username: "manager_test_user_27".to_string(),
+                balance: -5000,
                 currency: "JPY".to_string(),
+            },
+            UserBalance {
+                username: "manager_test_user_28".to_string(),
+                balance: -5000,
+                currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_28".to_string(),
@@ -886,12 +886,14 @@ mod tests {
             Debt {
                 debtor: "manager_test_user_25".to_string(),
                 creditor: "manager_test_user_26".to_string(),
-                amount: 100.0,
+                currency: "USD".to_string(),
+                amount: 10000,
             },
             Debt {
                 debtor: "manager_test_user_27".to_string(),
                 creditor: "manager_test_user_28".to_string(),
-                amount: 50.0,
+                currency: "USD".to_string(),
+                amount: 5000,
             },
         ];
 
@@ -906,12 +908,14 @@ mod tests {
             Debt {
                 debtor: "manager_test_user_25".to_string(),
                 creditor: "manager_test_user_26".to_string(),
-                amount: 50.0,
+                currency: "USD".to_string(),
+                amount: 5000,
             },
             Debt {
                 debtor: "manager_test_user_27".to_string(),
                 creditor: "manager_test_user_28".to_string(),
-                amount: 100.0,
+                currency: "USD".to_string(),
+                amount: 10000,
             },
         ];
         assert!(update_chat_debts(chat_id, &new_debts).is_ok());

@@ -233,7 +233,7 @@ pub fn delete_payment(chat_id: &str, payment_id: &str) -> Result<Vec<Debt>, Proc
         .iter()
         .map(|debt| UserBalance {
             username: debt.0.to_string(),
-            currency: payment.currency,
+            currency: payment.currency.clone(),
             balance: debt.1,
         })
         .collect();

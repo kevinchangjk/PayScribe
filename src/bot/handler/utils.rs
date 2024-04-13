@@ -84,26 +84,29 @@ impl From<ProcessError> for BotError {
 }
 
 // List of all supported currencies
-pub const CURRENCIES: [Currency; 4] = [
-    ("JPY".to_string(), 0),
-    ("USD".to_string(), 2),
-    ("SGD".to_string(), 2),
-    ("MYR".to_string(), 2),
-];
+pub const CURRENCIES: [(&str, i32); 4] = [("JPY", 0), ("USD", 2), ("SGD", 2), ("MYR", 2)];
+pub const CURRENCY_DEFAULT: (&str, i32) = ("NIL", 2);
 
-pub const CURRENCY_DEFAULT: Currency = ("NIL".to_string(), 2);
+// Converts a (&str, i32) to a Currency.
+fn to_currency(currency: (&str, i32)) -> Currency {
+    (currency.0.to_string(), currency.1)
+}
 
 // Retrieves the currency given a currency code.
 pub fn get_currency(code: &str) -> Result<Currency, BotError> {
     for currency in &CURRENCIES {
         if currency.0 == code {
-            return Ok(currency.clone());
+            return Ok(to_currency(*currency));
         }
     }
 
     Err(BotError::UserError(
         "❌ Sorry, I don't have that currency!".to_string(),
     ))
+}
+
+pub fn get_default_currency() -> Currency {
+    to_currency(CURRENCY_DEFAULT)
 }
 
 // Converts an amount from base value to actual representation in currency.
@@ -138,7 +141,7 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
             "{} owes {}: {}\n",
             display_username(&debt.debtor),
             display_username(&debt.creditor),
-            display_currency_amount(debt.amount, currency),
+            display_currency_amount(debt.amount, currency.clone()),
         ));
     }
 
@@ -170,7 +173,7 @@ pub fn display_payment(payment: &Payment, serial_num: usize) -> String {
         payment.description,
         reformat_datetime(&payment.datetime),
         display_username(&payment.creditor),
-        display_currency_amount(payment.total, payment.currency),
+        display_currency_amount(payment.total, payment.currency.clone()),
         display_debts(&payment.debts, payment.currency.1)
     )
 }
@@ -297,7 +300,7 @@ pub fn parse_currency_amount(text: &str) -> Result<(i64, Currency), BotError> {
             "❌ Please use the following format!".to_string(),
         ));
     } else if items.len() == 1 {
-        let currency = CURRENCY_DEFAULT;
+        let currency = get_default_currency();
         let amount = parse_amount(items[0], currency.1)?;
         Ok((amount, currency))
     } else {
@@ -445,7 +448,7 @@ pub fn process_debts_ratio(text: &str, total: Option<i64>) -> Result<Vec<(String
     let mut exact_sum: i64 = 0;
     for debt in &mut debts_ratioed {
         let amount = ((debt.1 / sum) * total as f64).round() as i64;
-        debts.push((debt.0, amount));
+        debts.push((debt.0.clone(), amount));
         exact_sum += amount;
     }
 

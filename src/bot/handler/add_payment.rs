@@ -4,11 +4,11 @@ use crate::bot::{
     dispatcher::State,
     handler::utils::{
         display_balances, display_currency_amount, display_debts, display_username, make_keyboard,
-        parse_amount, parse_username, process_debts, HandlerResult, UserDialogue,
-        DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
-        DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
-        DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
-        TOTAL_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
+        parse_username, process_debts, HandlerResult, UserDialogue, DEBT_EQUAL_DESCRIPTION_MESSAGE,
+        DEBT_EQUAL_INSTRUCTIONS_MESSAGE, DEBT_EXACT_DESCRIPTION_MESSAGE,
+        DEBT_EXACT_INSTRUCTIONS_MESSAGE, DEBT_RATIO_DESCRIPTION_MESSAGE,
+        DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, TOTAL_INSTRUCTIONS_MESSAGE,
+        UNKNOWN_ERROR_MESSAGE,
     },
     processor::add_payment,
 };
@@ -65,7 +65,10 @@ fn display_add_payment(payment: &AddPaymentParams) -> String {
     };
     let total = match &payment.total {
         Some(total) => match &payment.currency {
-            Some(currency) => format!("Total: {}\n", display_currency_amount(*total, *currency)),
+            Some(currency) => format!(
+                "Total: {}\n",
+                display_currency_amount(*total, currency.clone())
+            ),
             None => "".to_string(),
         },
         None => "".to_string(),
