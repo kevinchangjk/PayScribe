@@ -6,9 +6,12 @@ use teloxide::{
 
 use crate::bot::{
     dispatcher::State,
-    handler::utils::{
-        display_payment, get_currency, get_default_currency, make_keyboard, Currency,
-        HandlerResult, UserDialogue, COMMAND_ADD_PAYMENT, UNKNOWN_ERROR_MESSAGE,
+    handler::{
+        constants::{COMMAND_ADD_PAYMENT, UNKNOWN_ERROR_MESSAGE},
+        utils::{
+            display_payment, get_currency, get_default_currency, make_keyboard, retrieve_time_zone,
+            Currency, HandlerResult, UserDialogue,
+        },
     },
     processor::{view_payments, ProcessError},
     redis::{CrudError, UserPayment},
@@ -62,7 +65,8 @@ fn unfold_payment(payment: UserPayment) -> Payment {
     }
 }
 
-fn display_payments_paged(payments: &Vec<Payment>, page: usize) -> String {
+fn display_payments_paged(payments: &Vec<Payment>, page: usize, chat_id: &str) -> String {
+    let time_zone = retrieve_time_zone(chat_id);
     let start_index = page * 5;
     let displayed_payments: &[Payment];
     if start_index + 5 >= payments.len() {
@@ -75,7 +79,7 @@ fn display_payments_paged(payments: &Vec<Payment>, page: usize) -> String {
     let formatted_payments = displayed_payments
         .iter()
         .enumerate()
-        .map(|(index, payment)| display_payment(payment, serial_num + index));
+        .map(|(index, payment)| display_payment(payment, serial_num + index, time_zone));
 
     format!("{}", formatted_payments.collect::<Vec<String>>().join(""))
 }
@@ -183,14 +187,14 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
                     "View Payments - User {} viewed payments for group {}, found: {}",
                     sender_id,
                     chat_id,
-                    display_payments_paged(&payments, 0)
+                    display_payments_paged(&payments, 0, &chat_id)
                 );
                 bot.send_message(
                     msg.chat.id,
                     format!(
                         "{HEADER_MESSAGE_FRONT}{}{HEADER_MESSAGE_BACK}{}",
                         &payments.len(),
-                        display_payments_paged(&payments, 0)
+                        display_payments_paged(&payments, 0, &chat_id)
                     ),
                 )
                 .reply_markup(get_navigation_menu())
@@ -237,16 +241,17 @@ pub async fn action_view_more(
         bot.answer_callback_query(query.id.to_string()).await?;
 
         if let Some(Message { id, chat, .. }) = query.message {
+            let chat_id = chat.id.to_string();
             match button.as_str() {
                 "Newer" => {
                     if page > 0 {
                         bot.edit_message_text(
-                            chat.id,
+                            chat_id.clone(),
                             id,
                             format!(
                                 "{HEADER_MESSAGE_FRONT}{}{HEADER_MESSAGE_BACK}{}",
                                 &payments.len(),
-                                display_payments_paged(&payments, page - 1)
+                                display_payments_paged(&payments, page - 1, &chat_id)
                             ),
                         )
                         .reply_markup(get_navigation_menu())
@@ -262,12 +267,12 @@ pub async fn action_view_more(
                 "Older" => {
                     if (page + 1) * 5 < payments.len() {
                         bot.edit_message_text(
-                            chat.id,
+                            chat_id.clone(),
                             id,
                             format!(
                                 "{HEADER_MESSAGE_FRONT}{}{HEADER_MESSAGE_BACK}{}",
                                 &payments.len(),
-                                display_payments_paged(&payments, page + 1)
+                                display_payments_paged(&payments, page + 1, &chat_id)
                             ),
                         )
                         .reply_markup(get_navigation_menu())

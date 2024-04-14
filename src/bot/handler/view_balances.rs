@@ -1,7 +1,10 @@
 use teloxide::{prelude::*, types::Message};
 
 use crate::bot::{
-    handler::utils::{display_balances, HandlerResult, UNKNOWN_ERROR_MESSAGE},
+    handler::{
+        constants::UNKNOWN_ERROR_MESSAGE,
+        utils::{display_balances, HandlerResult},
+    },
     processor::view_debts,
 };
 

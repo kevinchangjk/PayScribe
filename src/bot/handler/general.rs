@@ -2,9 +2,12 @@ use teloxide::{prelude::*, types::ParseMode, utils::command::BotCommands};
 
 use crate::bot::dispatcher::Command;
 
-use super::utils::{
-    HandlerResult, COMMAND_ADD_PAYMENT, COMMAND_DELETE_PAYMENT, COMMAND_EDIT_PAYMENT, COMMAND_HELP,
-    COMMAND_PAY_BACK, COMMAND_VIEW_BALANCES, COMMAND_VIEW_PAYMENTS,
+use super::{
+    constants::{
+        COMMAND_ADD_PAYMENT, COMMAND_DELETE_PAYMENT, COMMAND_EDIT_PAYMENT, COMMAND_HELP,
+        COMMAND_PAY_BACK, COMMAND_VIEW_BALANCES, COMMAND_VIEW_PAYMENTS,
+    },
+    utils::HandlerResult,
 };
 
 /* Invalid state.
@@ -26,9 +29,9 @@ pub async fn invalid_state(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn callback_invalid_message(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "Hey, you don't have to text me...🗿\nJust click on any of the buttons above 👆 to continue!",
-        )
-        .await?;
+        "Hey, you don't have to text me...\nJust click on any of the buttons above 👆 to continue!",
+    )
+    .await?;
     Ok(())
 }
 

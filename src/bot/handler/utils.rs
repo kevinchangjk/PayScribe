@@ -1,4 +1,5 @@
 use chrono::{DateTime, Local, NaiveDateTime};
+use chrono_tz::Tz;
 use regex::Regex;
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage, InMemStorageError},
@@ -6,43 +7,18 @@ use teloxide::{
     RequestError,
 };
 
-use crate::bot::{processor::ProcessError, redis::Debt, State};
+use crate::bot::{
+    processor::{get_chat_setting, ChatSetting, ProcessError},
+    redis::Debt,
+    State,
+};
 
-use super::{AddDebtsFormat, Payment};
+use super::{
+    constants::{all_time_zones, CURRENCIES, CURRENCY_DEFAULT, MAX_VALUE},
+    AddDebtsFormat, Payment,
+};
 
 /* Common utilites for handlers. */
-
-pub const MAX_VALUE: i64 = 1_000_000_000_000_000_000;
-pub const UNKNOWN_ERROR_MESSAGE: &str =
-    "❓ Hmm, something went wrong! Sorry, I can't do that right now, please try again later!\n\n";
-pub const NO_TEXT_MESSAGE: &str =
-    "❓ Sorry, I can't understand that! Please reply to me in text.\n\n";
-pub const TOTAL_INSTRUCTIONS_MESSAGE: &str =
-"Enter the amount followed by the 3 letter abbreviation for the currency.\nE.g. 7.50 USD, 28 EUR, 320 JPY, etc.";
-pub const CURRENCY_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the 3 letter shorthand for the currency. E.g. USD, EUR, JPY, etc.";
-pub const DEBT_EQUAL_DESCRIPTION_MESSAGE: &str =
-    "Equal — Divide the total amount equally among users\n";
-pub const DEBT_EXACT_DESCRIPTION_MESSAGE: &str =
-    "Exact — Share the total cost by specifying exact amounts for each user\n";
-pub const DEBT_RATIO_DESCRIPTION_MESSAGE: &str =
-"Proportion — Split the total cost by specifying relative proportions of the total that each user owes\n";
-pub const DEBT_EQUAL_INSTRUCTIONS_MESSAGE: &str =
-"Enter the usernames of those sharing the cost (including the payer if sharing too) as follows: \n\n@username__1\n@username__2\n@username__3\n...\n\n";
-pub const DEBT_EXACT_INSTRUCTIONS_MESSAGE: &str =
-"Enter the usernames and exact amounts (without currency) as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\nAny leftover amount will be taken as the payer's share.";
-pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
-"Enter the usernames and exact amounts (without currency) as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n";
-pub const DEBT_RATIO_INSTRUCTIONS_MESSAGE: &str =
-"Enter the usernames and proportions as follows: \n\n@username__1 portion1\n@username__2 portion2\n@username__3 portion3\n...\n\nThe portions can be any whole or decimal number.";
-pub const COMMAND_HELP: &str = "/help";
-pub const COMMAND_CURRENCIES: &str = "/currencies";
-pub const COMMAND_ADD_PAYMENT: &str = "/addpayment";
-pub const COMMAND_PAY_BACK: &str = "/payback";
-pub const COMMAND_VIEW_PAYMENTS: &str = "/viewpayments";
-pub const COMMAND_EDIT_PAYMENT: &str = "/editpayment";
-pub const COMMAND_DELETE_PAYMENT: &str = "/deletepayment";
-pub const COMMAND_VIEW_BALANCES: &str = "/viewbalances";
 
 /* Types */
 pub type UserDialogue = Dialogue<State, InMemStorage<State>>;
@@ -83,38 +59,6 @@ impl From<ProcessError> for BotError {
         BotError::ProcessError(process_error)
     }
 }
-
-// List of all supported currencies
-pub const CURRENCIES: [(&str, i32); 27] = [
-    ("AED", 2),
-    ("AUD", 2),
-    ("CAD", 2),
-    ("CHF", 2),
-    ("CNY", 2),
-    ("EUR", 2),
-    ("GBP", 2),
-    ("HKD", 2),
-    ("IDR", 0),
-    ("INR", 2),
-    ("JPY", 0),
-    ("KRW", 0),
-    ("MXN", 2),
-    ("MYR", 2),
-    ("MYR", 2),
-    ("NIL", 2),
-    ("NZD", 2),
-    ("PHP", 2),
-    ("RUB", 2),
-    ("SAR", 2),
-    ("SEK", 2),
-    ("SGD", 2),
-    ("THB", 2),
-    ("TRY", 2),
-    ("TWD", 2),
-    ("USD", 2),
-    ("VND", 0),
-];
-pub const CURRENCY_DEFAULT: (&str, i32) = ("NIL", 2);
 
 // Converts a (&str, i32) to a Currency.
 fn to_currency(currency: (&str, i32)) -> Currency {
@@ -208,12 +152,12 @@ pub fn display_debts(debts: &Vec<(String, i64)>, decimal_places: i32) -> String 
 }
 
 // Displays a single payment entry in a user-friendly format.
-pub fn display_payment(payment: &Payment, serial_num: usize) -> String {
+pub fn display_payment(payment: &Payment, serial_num: usize, time_zone: Tz) -> String {
     format!(
         "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {}\nSplit:\n{}",
         serial_num,
         payment.description,
-        reformat_datetime(&payment.datetime),
+        reformat_datetime(&payment.datetime, time_zone),
         display_username(&payment.creditor),
         display_currency_amount(payment.total, payment.currency.clone()),
         display_debts(&payment.debts, payment.currency.1)
@@ -552,8 +496,37 @@ pub fn parse_debts_payback(
     Ok(debts)
 }
 
+// Parses a string representing a time zone, and returns the TimeZone object
+pub fn parse_time_zone(text: &str) -> Result<Tz, BotError> {
+    let text = text.to_lowercase();
+    let time_zones = all_time_zones();
+    let time_zone = time_zones.get(&text);
+
+    match time_zone {
+        Some(time_zone) => Ok(*time_zone),
+        None => Err(BotError::UserError(
+            "❌ Sorry, I don't recognize that time zone!".to_string(),
+        )),
+    }
+}
+
+// Retrieves the time zone string from database, converts it to TimeZone object
+// Assumes that time zone is valid, thus does not return any error
+pub fn retrieve_time_zone(chat_id: &str) -> Tz {
+    let setting = ChatSetting::TimeZone(None);
+    let time_zone = get_chat_setting(&chat_id, setting);
+    if let Ok(ChatSetting::TimeZone(Some(time_zone))) = time_zone {
+        let time_zone = parse_time_zone(&time_zone);
+        if let Ok(time_zone) = time_zone {
+            return time_zone;
+        }
+    }
+
+    "UTC".parse::<Tz>().expect("UTC is a valid time zone")
+}
+
 // Parses a string representing a datetime, and returns the Datetime object
-pub fn parse_datetime(text: &str) -> DateTime<Local> {
+fn parse_datetime(text: &str, time_zone: Tz) -> DateTime<Tz> {
     // Checks if text contains "UTC" at the end
     let mut new_text = text.to_string();
     if text.ends_with(" UTC") {
@@ -561,17 +534,17 @@ pub fn parse_datetime(text: &str) -> DateTime<Local> {
     }
     let datetime = NaiveDateTime::parse_from_str(&new_text, "%Y-%m-%d %H:%M:%S");
     match datetime {
-        Ok(val) => val.and_utc().with_timezone(&Local),
-        Err(_) => Local::now(),
+        Ok(val) => val.and_utc().with_timezone(&time_zone),
+        Err(_) => Local::now().with_timezone(&time_zone),
     }
 }
 
 // Formats a Datetime object into an easy to read string
-pub fn format_datetime(datetime: &DateTime<Local>) -> String {
-    datetime.format("%e %b %Y").to_string()
+fn format_datetime(datetime: &DateTime<Tz>) -> String {
+    datetime.format("%e %b %Y %T").to_string()
 }
 
 // Combines both datetime functions to essentially reformat a string into an easier format
-pub fn reformat_datetime(text: &str) -> String {
-    format_datetime(&parse_datetime(text))
+fn reformat_datetime(text: &str, time_zone: Tz) -> String {
+    format_datetime(&parse_datetime(text, time_zone))
 }

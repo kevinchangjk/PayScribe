@@ -501,9 +501,22 @@ pub async fn run_dispatcher(bot: Bot) {
             }]
             .endpoint(action_edit_payment_edit),
         )
+        .branch(case![State::SettingsTimeZone].endpoint(action_settings_time_zone))
+        .branch(case![State::SettingsDefaultCurrency].endpoint(action_settings_default_currency))
+        .branch(case![State::AddDebtSelection { payment }].endpoint(callback_invalid_message))
         .branch(case![State::AddConfirm { payment }].endpoint(callback_invalid_message))
+        .branch(case![State::AddEditDebtsMenu { payment }].endpoint(callback_invalid_message))
         .branch(case![State::AddEditMenu { payment }].endpoint(callback_invalid_message))
+        .branch(case![State::PayBackCurrencyMenu].endpoint(callback_invalid_message))
         .branch(case![State::PayBackConfirm { payment }].endpoint(callback_invalid_message))
+        .branch(
+            case![State::SelectPayment {
+                payments,
+                page,
+                function
+            }]
+            .endpoint(callback_invalid_message),
+        )
         .branch(
             case![State::EditPayment {
                 payment,
@@ -513,8 +526,25 @@ pub async fn run_dispatcher(bot: Bot) {
             }]
             .endpoint(callback_invalid_message),
         )
-        .branch(case![State::SettingsTimeZone].endpoint(action_settings_time_zone))
-        .branch(case![State::SettingsDefaultCurrency].endpoint(action_settings_default_currency))
+        .branch(
+            case![State::EditPaymentDebtSelection {
+                payment,
+                edited_payment,
+                payments,
+                page
+            }]
+            .endpoint(callback_invalid_message),
+        )
+        .branch(
+            case![State::DeletePayment {
+                payment,
+                payments,
+                page
+            }]
+            .endpoint(callback_invalid_message),
+        )
+        .branch(case![State::SettingsMenu].endpoint(callback_invalid_message))
+        .branch(case![State::SettingsCurrencyConversion].endpoint(callback_invalid_message))
         .branch(case![State::Start].endpoint(invalid_state));
 
     let callback_query_handler = Update::filter_callback_query()

@@ -6,14 +6,14 @@ use teloxide::{
 use crate::bot::{
     dispatcher::State,
     handler::{
-        utils::{
-            display_balances, display_payment, make_keyboard, HandlerResult, UserDialogue,
-            COMMAND_VIEW_PAYMENTS,
-        },
+        constants::COMMAND_VIEW_PAYMENTS,
+        utils::{display_balances, display_payment, make_keyboard, HandlerResult, UserDialogue},
         Payment,
     },
     processor::delete_payment,
 };
+
+use super::utils::retrieve_time_zone;
 
 /* Utilities */
 
@@ -83,12 +83,14 @@ pub async fn action_delete_payment(
 ) -> HandlerResult {
     let payment = payments[index].clone();
     let keyboard = make_keyboard(vec!["Cancel", "Confirm"], Some(2));
+    let time_zone = retrieve_time_zone(&chat_id);
+
     bot.edit_message_text(
         chat_id,
         msg_id,
         format!(
             "Are you sure you want to delete the following payment?\n\n{}",
-            display_payment(&payment, index + 1)
+            display_payment(&payment, index + 1, time_zone)
         ),
     )
     .reply_markup(keyboard)
@@ -116,9 +118,11 @@ pub async fn action_delete_payment_confirm(
         bot.answer_callback_query(query.id.to_string()).await?;
 
         if let Some(Message { id, chat, .. }) = query.message {
+            let chat_id = chat.id.to_string();
+            let time_zone = retrieve_time_zone(&chat_id);
             match button.as_str() {
                 "Cancel" => {
-                    bot.edit_message_text(chat.id, id, format!("{CANCEL_MESSAGE}"))
+                    bot.edit_message_text(chat_id, id, format!("{CANCEL_MESSAGE}"))
                         .await?;
                     dialogue
                         .update(State::ViewPayments { payments, page })
@@ -126,17 +130,17 @@ pub async fn action_delete_payment_confirm(
                 }
                 "Confirm" => {
                     let payment_id = &payment.payment_id;
-                    let deletion = delete_payment(&chat.id.to_string(), payment_id);
+                    let deletion = delete_payment(&chat_id, payment_id);
 
                     match deletion {
                         Ok(balances) => {
                             log::info!(
                                 "Delete Payment Submission - payment deleted for chat {} with payment {}",
-                                chat.id,
-                                display_payment(&payment, 1)
+                                chat_id,
+                                display_payment(&payment, 1, time_zone)
                                 );
                             bot.edit_message_text(
-                                chat.id,
+                                chat_id,
                                 id,
                                 format!(
                                     "🎉 I've deleted the payment! 🎉\n\nHere are the updated balances:\n{}",
@@ -151,12 +155,12 @@ pub async fn action_delete_payment_confirm(
                         Err(err) => {
                             log::error!(
                                 "Delete Payment Submission - Processor failed to delete payment for chat {} with payment {}: {}",
-                                chat.id,
-                                display_payment(&payment, 1),
+                                chat_id,
+                                display_payment(&payment, 1, time_zone),
                                 err.to_string()
                                 );
                             bot.edit_message_text(
-                                chat.id,
+                                chat_id,
                                 id,
                                 format!("❓ Hmm, Something went wrong! Sorry, I can't delete the payment right now." ),
                                 )
@@ -170,7 +174,7 @@ pub async fn action_delete_payment_confirm(
                 _ => {
                     log::error!(
                         "Delete Payment Menu - Invalid button in chat {}: {}",
-                        chat.id,
+                        chat_id,
                         button
                     );
                     dialogue

@@ -7,14 +7,16 @@ use teloxide::{
 use crate::bot::{
     dispatcher::State,
     handler::{
+        constants::{
+            COMMAND_CURRENCIES, COMMAND_VIEW_PAYMENTS, DEBT_EQUAL_DESCRIPTION_MESSAGE,
+            DEBT_EQUAL_INSTRUCTIONS_MESSAGE, DEBT_EXACT_DESCRIPTION_MESSAGE,
+            DEBT_EXACT_INSTRUCTIONS_MESSAGE, DEBT_RATIO_DESCRIPTION_MESSAGE,
+            DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, TOTAL_INSTRUCTIONS_MESSAGE,
+        },
         utils::{
             display_balances, display_debts, display_payment, display_username, make_keyboard,
             make_keyboard_debt_selection, parse_currency_amount, parse_username, process_debts,
-            Currency, HandlerResult, UserDialogue, COMMAND_CURRENCIES, COMMAND_VIEW_PAYMENTS,
-            DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
-            DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
-            DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
-            TOTAL_INSTRUCTIONS_MESSAGE,
+            retrieve_time_zone, Currency, HandlerResult, UserDialogue,
         },
         AddDebtsFormat, AddPaymentEdit, Payment,
     },
@@ -126,9 +128,10 @@ async fn call_processor_edit_payment(
     query: CallbackQuery,
 ) -> HandlerResult {
     if let Some(Message { id, chat, .. }) = query.message {
+        let chat_id = chat.id.to_string();
         let edited_clone = edited_payment.clone();
         let edited = edit_payment(
-            &chat.id.to_string(),
+            &chat_id,
             &payment.payment_id,
             edited_payment.description.as_deref(),
             edited_payment.creditor.as_deref(),
@@ -142,14 +145,14 @@ async fn call_processor_edit_payment(
                 let edit_overview = display_edit_payment(payment, edited_clone);
                 log::info!(
                     "Edit Payment Submission - payment edited for chat {} with payment {}",
-                    chat.id,
+                    chat_id,
                     edit_overview
                 );
 
                 match balances {
                     Some(balances) => {
                         bot.edit_message_text(
-                            chat.id,
+                            chat_id,
                             id,
                             format!(
                                 "🎉 I've edited the payment! 🎉\n\n{}\nHere are the updated balances:\n{}",
@@ -161,7 +164,7 @@ async fn call_processor_edit_payment(
                     }
                     None => {
                         bot.edit_message_text(
-                            chat.id,
+                            chat_id,
                             id,
                             format!(
                                 "🎉 I've edited the payment! 🎉\n\n{}\nThere are no changes to the balances.",
@@ -176,10 +179,11 @@ async fn call_processor_edit_payment(
                     .await?;
             }
             Err(err) => {
+                let time_zone = retrieve_time_zone(&chat_id);
                 log::error!(
                     "Edit Payment Submission - Processor failed to edit payment for chat {} with payment {}: {}",
-                    chat.id,
-                    display_payment(&payment, 1),
+                    chat_id,
+                    display_payment(&payment, 1, time_zone),
                     err.to_string()
                     );
                 bot.edit_message_text(

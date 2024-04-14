@@ -6,12 +6,14 @@ use teloxide::{
 
 use crate::bot::{
     dispatcher::State,
-    handler::utils::{
-        get_currency, make_keyboard, HandlerResult, UserDialogue, COMMAND_CURRENCIES,
-        NO_TEXT_MESSAGE,
+    handler::{
+        constants::{COMMAND_CURRENCIES, NO_TEXT_MESSAGE},
+        utils::{get_currency, make_keyboard, HandlerResult, UserDialogue},
     },
     processor::{get_chat_setting, set_chat_setting, ChatSetting},
 };
+
+use super::utils::parse_time_zone;
 
 /* Utilities */
 const CANCEL_MESSAGE: &str = "Sure, no changes to the settings have been made! 👌";
@@ -186,21 +188,28 @@ pub async fn action_settings_time_zone(
     dialogue: UserDialogue,
     msg: Message,
 ) -> HandlerResult {
+    let chat_id = msg.chat.id.to_string();
     match msg.text() {
         Some(text) => {
-            // TODO: parse the time zone properly
-            let time_zone = text;
-            let setting = ChatSetting::TimeZone(Some(time_zone.to_string()));
-            set_chat_setting(&msg.chat.id.to_string(), setting)?;
-            bot.send_message(
-                msg.chat.id,
-                format!("The Time Zone has been set to {}! 👍", time_zone),
-            )
-            .await?;
-            dialogue.exit().await?;
+            let time_zone = parse_time_zone(text);
+            match time_zone {
+                Ok(time_zone) => {
+                    let setting = ChatSetting::TimeZone(Some(text.to_string()));
+                    set_chat_setting(&chat_id, setting)?;
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("The Time Zone has been set to {}! 👍", time_zone),
+                    )
+                    .await?;
+                    dialogue.exit().await?;
+                }
+                Err(err) => {
+                    bot.send_message(chat_id, format!("{}", err)).await?;
+                }
+            }
         }
         None => {
-            bot.send_message(msg.chat.id, format!("{NO_TEXT_MESSAGE}"))
+            bot.send_message(chat_id, format!("{NO_TEXT_MESSAGE}"))
                 .await?;
         }
     }

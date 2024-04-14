@@ -39,6 +39,7 @@ pub use self::settings::{
 
 // Submodules
 mod add_payment;
+mod constants;
 mod delete_payment;
 mod edit_payment;
 mod general;

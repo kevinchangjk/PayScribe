@@ -2,11 +2,16 @@ use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
 
 use crate::bot::{
     dispatcher::State,
-    handler::utils::{
-        display_balances, display_debts, display_username, get_currency, get_default_currency,
-        make_keyboard, parse_debts_payback, parse_username, Currency, HandlerResult, UserDialogue,
-        COMMAND_CURRENCIES, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
-        PAY_BACK_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
+    handler::{
+        constants::{
+            COMMAND_CURRENCIES, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            PAY_BACK_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
+        },
+        utils::{
+            display_balances, display_debts, display_username, get_currency, get_default_currency,
+            make_keyboard, parse_debts_payback, parse_username, Currency, HandlerResult,
+            UserDialogue,
+        },
     },
     processor::add_payment,
 };
