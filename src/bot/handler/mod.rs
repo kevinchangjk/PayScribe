@@ -31,12 +31,19 @@ pub use self::view_payments::{
     handle_repeated_select_payment, Payment,
 };
 
+pub use self::settings::{
+    action_settings, action_settings_currency_conversion, action_settings_default_currency,
+    action_settings_menu, action_settings_time_zone, block_settings, cancel_settings,
+    handle_repeated_settings,
+};
+
 // Submodules
 mod add_payment;
 mod delete_payment;
 mod edit_payment;
 mod general;
 mod pay_back;
+mod settings;
 mod utils;
 mod view_balances;
 mod view_payments;
