@@ -38,6 +38,8 @@ impl From<CrudError> for ProcessError {
     }
 }
 
+const CURRENCY_CODE_DEFAULT: &str = "NIL";
+
 /* Utility functions */
 fn auto_update_user(
     chat_id: &str,
@@ -50,20 +52,33 @@ fn auto_update_user(
     Ok(())
 }
 
-fn split_balances_currencies(balances: Vec<UserBalance>) -> Vec<Vec<UserBalance>> {
+// Splits balances by currencies. Sets "NIL" to default currency (which can be "NIL").
+fn split_balances_currencies(
+    mut balances: Vec<UserBalance>,
+    chat_id: &str,
+) -> Vec<Vec<UserBalance>> {
+    let default_currency = get_default_currency(chat_id);
+    let default_currency = match default_currency {
+        Ok(currency) => currency,
+        Err(_) => CURRENCY_CODE_DEFAULT.to_string(),
+    };
+
     let mut currencies: Vec<&str> = Vec::new();
     let mut splits: Vec<Vec<UserBalance>> = Vec::new();
-    for balance in &balances {
-        if currencies.contains(&balance.currency.as_str()) {
+    for balance in &mut balances {
+        // Replace NIL with default currency
+        if balance.currency.as_str() == CURRENCY_CODE_DEFAULT {
+            balance.currency = default_currency.clone();
+        }
+
+        let currency = balance.currency.as_str();
+        if currencies.contains(&currency) {
             // Add to existing split
-            let index = currencies
-                .iter()
-                .position(|&x| x == balance.currency.as_str())
-                .unwrap();
+            let index = currencies.iter().position(|&x| x == currency).unwrap();
             splits[index].push(balance.clone());
         } else {
             // Create a new split
-            currencies.push(balance.currency.as_str());
+            currencies.push(currency);
             splits.push(vec![balance.clone()]);
         }
     }
@@ -79,7 +94,7 @@ fn update_balances_debts(
     let balances = update_chat_balances(chat_id, changes)?;
 
     // Update group debts
-    let split_balances = split_balances_currencies(balances);
+    let split_balances = split_balances_currencies(balances, chat_id);
     let mut all_debts = Vec::new();
     for split in split_balances {
         let debts = optimize_debts(split);

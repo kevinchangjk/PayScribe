@@ -835,11 +835,6 @@ mod tests {
                     balance: -10000,
                     currency: "USD".to_string(),
                 },
-                UserBalance {
-                    username: "manager_test_user_22".to_string(),
-                    balance: 0,
-                    currency: "USD".to_string(),
-                },
             ]
         );
 
@@ -928,6 +923,16 @@ mod tests {
                 currency: "USD".to_string(),
             },
             UserBalance {
+                username: "manager_test_user_27".to_string(),
+                balance: -5000,
+                currency: "USD".to_string(),
+            },
+            UserBalance {
+                username: "manager_test_user_28".to_string(),
+                balance: -5000,
+                currency: "USD".to_string(),
+            },
+            UserBalance {
                 username: "manager_test_user_26".to_string(),
                 balance: -5000,
                 currency: "JPY".to_string(),
@@ -935,17 +940,7 @@ mod tests {
             UserBalance {
                 username: "manager_test_user_27".to_string(),
                 balance: -5000,
-                currency: "USD".to_string(),
-            },
-            UserBalance {
-                username: "manager_test_user_27".to_string(),
-                balance: -5000,
                 currency: "JPY".to_string(),
-            },
-            UserBalance {
-                username: "manager_test_user_28".to_string(),
-                balance: -5000,
-                currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_28".to_string(),
