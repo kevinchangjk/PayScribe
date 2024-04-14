@@ -5,7 +5,7 @@ use crate::bot::dispatcher::Command;
 use super::{
     constants::{
         COMMAND_ADD_PAYMENT, COMMAND_DELETE_PAYMENT, COMMAND_EDIT_PAYMENT, COMMAND_HELP,
-        COMMAND_PAY_BACK, COMMAND_VIEW_BALANCES, COMMAND_VIEW_PAYMENTS,
+        COMMAND_PAY_BACK, COMMAND_SETTINGS, COMMAND_VIEW_BALANCES, COMMAND_VIEW_PAYMENTS,
     },
     utils::HandlerResult,
 };
@@ -55,10 +55,11 @@ pub async fn action_help(bot: Bot, msg: Message) -> HandlerResult {
     let view_info = &format!("Use {COMMAND_VIEW_BALANCES} see how much everyone owes one another\\. To edit or delete payments, use {COMMAND_VIEW_PAYMENTS}, then {COMMAND_EDIT_PAYMENT} or {COMMAND_DELETE_PAYMENT}\\.");
     let payback_info = &format!("After paying back your friends, be sure to record those down with the {COMMAND_PAY_BACK} command\\!");
     let access_info = "You will have to directly reply to my messages for me to read your texts\\. If I'm being too nosy and responding to every message, you might have accidentally given me admin rights\\!";
+    let settings_info = &format!("With {COMMAND_SETTINGS}, you can configure settings for the chat\\. For reference, all supported time zones and currencies can be found [here](https://github.com/kevinchangjk/PayScribe/tree/feat/group-settings/src/docs)\\.");
 
     bot.send_message(
         msg.chat.id,
-        format!("{introduction}\n\n{add_info}\n\n{view_info}\n\n{payback_info}\n\n{access_info}\n\n*Check out all my commands here*:\n\n{}", commands),
+        format!("{introduction}\n\n{add_info}\n\n{view_info}\n\n{payback_info}\n\n{access_info}\n\n{settings_info}\n\n*Check out all my commands here*:\n\n{}", commands),
         )
         .parse_mode(ParseMode::MarkdownV2)
         .await?;
@@ -73,49 +74,6 @@ pub async fn action_cancel(bot: Bot, msg: Message) -> HandlerResult {
         msg.chat.id,
         "I'm not doing anything right now. There's nothing to cancel! 👀",
     )
-    .await?;
-    Ok(())
-}
-
-/* Currencies command.
- * Displays a list of all supported currencies
- */
-pub async fn action_currencies(bot: Bot, msg: Message) -> HandlerResult {
-    let currencies = vec![
-        "Australian Dollar — *AUD*",
-        "Canadian Dollar — *CAD*",
-        "Chinese Yuan — *CNY*",
-        "Euro — *EUR*",
-        "Great Britain Pound — *GBP*",
-        "Hong Kong Dollar — *HKD*",
-        "Indian Rupee — *INR*",
-        "Indonesian Rupiah — *IDR*",
-        "Japanese Yen — *JPY*",
-        "Malaysian Ringgit — *MYR*",
-        "Mexican Peso — *MXN*",
-        "New Zealand Dollar — *NZD*",
-        "Philippine Peso — *PHP*",
-        "Russian Ruble — *RUB*",
-        "Saudi Riyal — *SAR*",
-        "Singapore Dollar — *SGD*",
-        "South Korean Won — *KRW*",
-        "Swedish Krona — *SEK*",
-        "Swiss Franc — *CHF*",
-        "Taiwan Dollar — *TWD*",
-        "Thai Baht — *THB*",
-        "Turkish Lira — *TRY*",
-        "UAE Dirham — *AED*",
-        "United States Dollar — *USD*",
-        "Vietnamese Dong — *VND*",
-    ];
-    bot.send_message(
-        msg.chat.id,
-        format!(
-            "Here are the currencies I know\\!\n\n{}",
-            currencies.join("\n")
-        ),
-    )
-    .parse_mode(ParseMode::MarkdownV2)
     .await?;
     Ok(())
 }

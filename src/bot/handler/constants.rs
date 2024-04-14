@@ -25,7 +25,7 @@ pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
 pub const DEBT_RATIO_INSTRUCTIONS_MESSAGE: &str =
 "Enter the usernames and proportions as follows: \n\n@username__1 portion1\n@username__2 portion2\n@username__3 portion3\n...\n\nThe portions can be any whole or decimal number.";
 pub const COMMAND_HELP: &str = "/help";
-pub const COMMAND_CURRENCIES: &str = "/currencies";
+pub const COMMAND_SETTINGS: &str = "/settings";
 pub const COMMAND_ADD_PAYMENT: &str = "/addpayment";
 pub const COMMAND_PAY_BACK: &str = "/payback";
 pub const COMMAND_VIEW_PAYMENTS: &str = "/viewpayments";

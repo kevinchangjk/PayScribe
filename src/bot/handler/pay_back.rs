@@ -4,7 +4,7 @@ use crate::bot::{
     dispatcher::State,
     handler::{
         constants::{
-            COMMAND_CURRENCIES, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            COMMAND_HELP, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
             PAY_BACK_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
         },
         utils::{
@@ -266,7 +266,7 @@ pub async fn action_pay_back_currency(
                     bot.send_message(
                         msg.chat.id,
                         format!(
-                            "{} Check out the supported currencies with {COMMAND_CURRENCIES}.",
+                            "{} You can check out the supported currencies in the documentation with {COMMAND_HELP}.",
                             err.to_string()
                         ),
                     )

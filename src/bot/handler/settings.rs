@@ -7,7 +7,7 @@ use teloxide::{
 use crate::bot::{
     dispatcher::State,
     handler::{
-        constants::{COMMAND_CURRENCIES, NO_TEXT_MESSAGE},
+        constants::{COMMAND_HELP, NO_TEXT_MESSAGE},
         utils::{get_currency, make_keyboard, HandlerResult, UserDialogue},
     },
     processor::{get_chat_setting, set_chat_setting, ChatSetting},
@@ -242,7 +242,7 @@ pub async fn action_settings_default_currency(
                     bot.send_message(
                         msg.chat.id,
                         format!(
-                            "{} Check out the supported currencies with {COMMAND_CURRENCIES}.",
+                            "{} You can check out the supported currencies in the documentation with {COMMAND_HELP}.",
                             err
                         ),
                     )

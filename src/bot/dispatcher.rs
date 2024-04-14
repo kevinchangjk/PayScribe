@@ -113,8 +113,6 @@ pub enum Command {
     DeletePayment,
     #[command(description = "View the current balances for the group")]
     ViewBalances,
-    #[command(description = "Lists all supported currencies")]
-    Currencies,
     #[command(description = "View and edit bot settings for the chat")]
     Settings,
     #[command(description = "Cancels an ongoing action")]
@@ -130,7 +128,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::Start]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(action_cancel))
                 .branch(case![Command::AddPayment].endpoint(action_add_payment))
                 .branch(case![Command::ViewBalances].endpoint(action_view_balances))
@@ -144,7 +141,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::AddDescription]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
@@ -158,7 +154,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::AddCreditor { payment }]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
@@ -172,7 +167,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::AddTotal { payment }]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
@@ -186,7 +180,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::AddDebtSelection { payment }]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
@@ -203,7 +196,6 @@ pub async fn run_dispatcher(bot: Bot) {
             }]
             .branch(case![Command::Start].endpoint(action_start))
             .branch(case![Command::Help].endpoint(action_help))
-            .branch(case![Command::Currencies].endpoint(action_currencies))
             .branch(case![Command::Cancel].endpoint(cancel_add_payment))
             .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
             .branch(case![Command::ViewBalances].endpoint(block_add_payment))
@@ -217,7 +209,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::AddConfirm { payment }]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
@@ -231,7 +222,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::AddEditMenu { payment }]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
@@ -245,7 +235,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::AddEdit { payment, edit }]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_add_payment))
                 .branch(case![Command::AddPayment].endpoint(handle_repeated_add_payment))
                 .branch(case![Command::ViewBalances].endpoint(block_add_payment))
@@ -259,7 +248,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::PayBackCurrencyMenu]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_pay_back))
                 .branch(case![Command::AddPayment].endpoint(block_pay_back))
                 .branch(case![Command::ViewBalances].endpoint(block_pay_back))
@@ -273,7 +261,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::PayBackCurrency]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_pay_back))
                 .branch(case![Command::AddPayment].endpoint(block_pay_back))
                 .branch(case![Command::ViewBalances].endpoint(block_pay_back))
@@ -287,7 +274,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::PayBackDebts { currency }]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_pay_back))
                 .branch(case![Command::AddPayment].endpoint(block_pay_back))
                 .branch(case![Command::ViewBalances].endpoint(block_pay_back))
@@ -301,7 +287,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::PayBackConfirm { payment }]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_pay_back))
                 .branch(case![Command::AddPayment].endpoint(block_pay_back))
                 .branch(case![Command::ViewBalances].endpoint(block_pay_back))
@@ -315,7 +300,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::ViewPayments { payments, page }]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(action_cancel))
                 .branch(case![Command::AddPayment].endpoint(action_add_payment))
                 .branch(case![Command::ViewBalances].endpoint(action_view_balances))
@@ -333,7 +317,6 @@ pub async fn run_dispatcher(bot: Bot) {
             }]
             .branch(case![Command::Start].endpoint(action_start))
             .branch(case![Command::Help].endpoint(action_help))
-            .branch(case![Command::Currencies].endpoint(action_currencies))
             .branch(case![Command::Cancel].endpoint(cancel_select_payment))
             .branch(case![Command::AddPayment].endpoint(block_select_payment))
             .branch(case![Command::ViewBalances].endpoint(block_select_payment))
@@ -352,7 +335,6 @@ pub async fn run_dispatcher(bot: Bot) {
             }]
             .branch(case![Command::Start].endpoint(action_start))
             .branch(case![Command::Help].endpoint(action_help))
-            .branch(case![Command::Currencies].endpoint(action_currencies))
             .branch(case![Command::Cancel].endpoint(cancel_edit_payment))
             .branch(case![Command::AddPayment].endpoint(block_edit_payment))
             .branch(case![Command::ViewBalances].endpoint(block_edit_payment))
@@ -371,7 +353,6 @@ pub async fn run_dispatcher(bot: Bot) {
             }]
             .branch(case![Command::Start].endpoint(action_start))
             .branch(case![Command::Help].endpoint(action_help))
-            .branch(case![Command::Currencies].endpoint(action_currencies))
             .branch(case![Command::Cancel].endpoint(cancel_edit_payment))
             .branch(case![Command::AddPayment].endpoint(block_edit_payment))
             .branch(case![Command::ViewBalances].endpoint(block_edit_payment))
@@ -391,7 +372,6 @@ pub async fn run_dispatcher(bot: Bot) {
             }]
             .branch(case![Command::Start].endpoint(action_start))
             .branch(case![Command::Help].endpoint(action_help))
-            .branch(case![Command::Currencies].endpoint(action_currencies))
             .branch(case![Command::Cancel].endpoint(cancel_edit_payment))
             .branch(case![Command::AddPayment].endpoint(block_edit_payment))
             .branch(case![Command::ViewBalances].endpoint(block_edit_payment))
@@ -409,7 +389,6 @@ pub async fn run_dispatcher(bot: Bot) {
             }]
             .branch(case![Command::Start].endpoint(action_start))
             .branch(case![Command::Help].endpoint(action_help))
-            .branch(case![Command::Currencies].endpoint(action_currencies))
             .branch(case![Command::Cancel].endpoint(cancel_delete_payment))
             .branch(case![Command::AddPayment].endpoint(block_delete_payment))
             .branch(case![Command::ViewBalances].endpoint(block_delete_payment))
@@ -423,7 +402,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::SettingsMenu]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_settings))
                 .branch(case![Command::AddPayment].endpoint(block_settings))
                 .branch(case![Command::ViewBalances].endpoint(block_settings))
@@ -437,7 +415,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::SettingsTimeZone]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_settings))
                 .branch(case![Command::AddPayment].endpoint(block_settings))
                 .branch(case![Command::ViewBalances].endpoint(block_settings))
@@ -451,7 +428,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::SettingsDefaultCurrency]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_settings))
                 .branch(case![Command::AddPayment].endpoint(block_settings))
                 .branch(case![Command::ViewBalances].endpoint(block_settings))
@@ -465,7 +441,6 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::SettingsCurrencyConversion]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
-                .branch(case![Command::Currencies].endpoint(action_currencies))
                 .branch(case![Command::Cancel].endpoint(cancel_settings))
                 .branch(case![Command::AddPayment].endpoint(block_settings))
                 .branch(case![Command::ViewBalances].endpoint(block_settings))

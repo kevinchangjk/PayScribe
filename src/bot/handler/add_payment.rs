@@ -4,7 +4,7 @@ use crate::bot::{
     dispatcher::State,
     handler::{
         constants::{
-            COMMAND_CURRENCIES, DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
+            COMMAND_HELP, DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
             DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
             DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
             TOTAL_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
@@ -511,7 +511,7 @@ pub async fn action_add_total(
                 Err(err) => {
                     bot.send_message(
                         msg.chat.id,
-                        format!("{} Check out the supported currencies with {COMMAND_CURRENCIES}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string()),
+                        format!("{} You can check out the supported currencies in the documentation with {COMMAND_HELP}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string()),
                         )
                         .await?;
                     return Ok(());
@@ -819,7 +819,7 @@ pub async fn action_add_edit(
                     }
                     Err(err) => {
                         bot.send_message(msg.chat.id,
-                                         format!("{} Check out the supported currencies with {COMMAND_CURRENCIES}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string())
+                                         format!("{} You can check out the supported currencies in the documentation with {COMMAND_HELP}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string())
                                         ).await?;
                         return Ok(());
                     }
