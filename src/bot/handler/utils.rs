@@ -123,6 +123,7 @@ fn to_currency(currency: (&str, i32)) -> Currency {
 
 // Retrieves the currency given a currency code.
 pub fn get_currency(code: &str) -> Result<Currency, BotError> {
+    let code = code.to_uppercase();
     for currency in &CURRENCIES {
         if currency.0 == code {
             return Ok(to_currency(*currency));
@@ -343,7 +344,7 @@ pub fn parse_currency_amount(text: &str) -> Result<(i64, Currency), BotError> {
         let amount = parse_amount(items[0], currency.1)?;
         Ok((amount, currency))
     } else {
-        let currency = get_currency(&items[1].to_uppercase())?;
+        let currency = get_currency(&items[1])?;
         let amount = parse_amount(items[0], currency.1)?;
         Ok((amount, currency))
     }
