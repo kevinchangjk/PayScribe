@@ -34,7 +34,7 @@ pub const COMMAND_DELETE_PAYMENT: &str = "/deletepayment";
 pub const COMMAND_VIEW_BALANCES: &str = "/viewbalances";
 
 // List of all supported currencies
-pub const CURRENCIES: [(&str, i32); 166] = [
+pub const CURRENCIES: [(&str, i32); 167] = [
     ("AED", 2),
     ("AFN", 2),
     ("ALL", 2),
@@ -201,6 +201,7 @@ pub const CURRENCIES: [(&str, i32); 166] = [
     ("ZAR", 2),
     ("ZMW", 2),
     ("ZWL", 2),
+    ("NIL", 2),
 ];
 pub const CURRENCY_DEFAULT: (&str, i32) = ("NIL", 2);
 
