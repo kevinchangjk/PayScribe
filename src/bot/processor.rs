@@ -3,9 +3,11 @@ use std::ops::Neg;
 use super::{
     optimizer::optimize_debts,
     redis::{
-        add_payment_entry, delete_payment_entry, get_chat_payments_details, get_payment_entry,
-        retrieve_chat_debts, update_chat, update_chat_balances, update_chat_debts,
-        update_payment_entry, update_user, CrudError, Debt, Payment, UserBalance, UserPayment,
+        add_payment_entry, delete_payment_entry, get_chat_payments_details,
+        get_currency_conversion, get_default_currency, get_payment_entry, get_time_zone,
+        retrieve_chat_debts, set_currency_conversion, set_default_currency, set_time_zone,
+        update_chat, update_chat_balances, update_chat_debts, update_payment_entry, update_user,
+        CrudError, Debt, Payment, UserBalance, UserPayment,
     },
 };
 
@@ -15,6 +17,13 @@ use super::{
  * It defines and executes the main functions required of the bot,
  * and handles exceptions and errors in the back.
  */
+
+#[derive(Debug, Clone)]
+pub enum ChatSetting {
+    TimeZone(Option<String>),
+    DefaultCurrency(Option<String>),
+    CurrencyConversion(Option<bool>),
+}
 
 #[derive(thiserror::Error, Debug, PartialEq)]
 pub enum ProcessError {
@@ -284,4 +293,46 @@ pub fn view_debts(
 
     let debts = retrieve_chat_debts(&chat_id)?;
     Ok(debts)
+}
+
+/* Retrieves a group chat setting.
+ */
+pub fn get_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<ChatSetting, ProcessError> {
+    match setting {
+        ChatSetting::TimeZone(_) => {
+            let time_zone = get_time_zone(chat_id)?;
+            Ok(ChatSetting::TimeZone(Some(time_zone)))
+        }
+        ChatSetting::DefaultCurrency(_) => {
+            let currency = get_default_currency(chat_id)?;
+            Ok(ChatSetting::DefaultCurrency(Some(currency)))
+        }
+        ChatSetting::CurrencyConversion(_) => {
+            let convert = get_currency_conversion(chat_id)?;
+            Ok(ChatSetting::CurrencyConversion(Some(convert)))
+        }
+    }
+}
+
+/* Sets a group chat setting.
+ */
+pub fn set_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<(), ProcessError> {
+    match setting {
+        ChatSetting::TimeZone(time_zone) => {
+            if let Some(time_zone) = time_zone {
+                set_time_zone(chat_id, &time_zone)?;
+            }
+        }
+        ChatSetting::DefaultCurrency(currency) => {
+            if let Some(currency) = currency {
+                set_default_currency(chat_id, &currency)?;
+            }
+        }
+        ChatSetting::CurrencyConversion(convert) => {
+            if let Some(convert) = convert {
+                set_currency_conversion(chat_id, convert)?;
+            }
+        }
+    }
+    Ok(())
 }

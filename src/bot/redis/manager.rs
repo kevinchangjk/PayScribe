@@ -113,7 +113,7 @@ pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> Result<(), CrudErro
 
 /* Initialises chat settings to default.
  */
-pub fn init_chat_settings(chat_id: &str) -> Result<(), CrudError> {
+fn init_chat_settings(chat_id: &str) -> Result<(), CrudError> {
     let mut con = connect()?;
 
     // Set default time zone
