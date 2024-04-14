@@ -229,16 +229,18 @@ pub fn update_chat_balances(
     let mut updated_balances: Vec<UserBalance> = Vec::new();
     let users = get_chat_users(&mut con, chat_id)?;
     let currencies = get_chat_currencies(&mut con, chat_id)?;
-    for user in users {
-        for currency in &currencies {
-            if get_balance_exists(&mut con, chat_id, &user, &currency)? {
-                let balance = get_balance(&mut con, chat_id, &user, &currency)?;
-                let username = get_preferred_username(&mut con, &user)?;
-                updated_balances.push(UserBalance {
-                    username,
-                    currency: currency.to_string(),
-                    balance,
-                });
+    for currency in &currencies {
+        for user in &users {
+            if get_balance_exists(&mut con, chat_id, user, &currency)? {
+                let balance = get_balance(&mut con, chat_id, user, &currency)?;
+                if balance != 0 {
+                    let username = get_preferred_username(&mut con, user)?;
+                    updated_balances.push(UserBalance {
+                        username,
+                        currency: currency.to_string(),
+                        balance,
+                    });
+                }
             }
         }
     }
