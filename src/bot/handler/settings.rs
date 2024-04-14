@@ -1,4 +1,8 @@
-use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
+use teloxide::{
+    payloads::SendMessageSetters,
+    prelude::*,
+    types::{Message, ParseMode},
+};
 
 use crate::bot::{
     dispatcher::State,
@@ -11,12 +15,11 @@ use crate::bot::{
 
 /* Utilities */
 const CANCEL_MESSAGE: &str = "Sure, no changes to the settings have been made! 👌";
-const TIME_ZONE_DESCRIPTION: &str =
-    "Time Zone — A common time zone for this chat to display date and time.";
+const TIME_ZONE_DESCRIPTION: &str = "*Time Zone* — Time zone to display date and time";
 const DEFAULT_CURRENCY_DESCRIPTION: &str =
-    "Default Currency — The currency used by default if left blank. ";
+    "*Default Currency* — Currency used by default if left blank";
 const CURRENCY_CONVERSION_DESCRIPTION: &str =
-    "Currency Conversion — When showing balances, convert all currencies to the default currency.";
+    "*Currency Conversion* — Convert currencies when simplifying balances";
 
 /* Handles a repeated call to edit/delete payment entry.
  * Does nothing, simply notifies the user.
@@ -50,9 +53,15 @@ pub async fn block_settings(bot: Bot, msg: Message) -> HandlerResult {
 }
 
 async fn display_settings_menu(bot: Bot, dialogue: UserDialogue, chat_id: String) -> HandlerResult {
-    let buttons = vec!["Time Zone", "Default Currency", "Currency Conversion"];
-    let keyboard = make_keyboard(buttons, Some(3));
-    bot.send_message(chat_id, format!("Of course! Here are the settings you can configure for me. What would you like to view or edit?\n\n{TIME_ZONE_DESCRIPTION}\n{DEFAULT_CURRENCY_DESCRIPTION}\n{CURRENCY_CONVERSION_DESCRIPTION}"))
+    let buttons = vec![
+        "Time Zone",
+        "Default Currency",
+        "Currency Conversion",
+        "Cancel",
+    ];
+    let keyboard = make_keyboard(buttons, Some(2));
+    bot.send_message(chat_id, format!("Of course\\! Here are the settings you can configure\\. What would you like to view or edit?\n\n{TIME_ZONE_DESCRIPTION}\n{DEFAULT_CURRENCY_DESCRIPTION}\n{CURRENCY_CONVERSION_DESCRIPTION}"))
+        .parse_mode(ParseMode::MarkdownV2)
         .reply_markup(keyboard)
         .await?;
     dialogue.update(State::SettingsMenu).await?;
@@ -150,6 +159,9 @@ pub async fn action_settings_menu(
                         dialogue.update(State::SettingsCurrencyConversion).await?;
                     }
                 }
+                "Cancel" => {
+                    cancel_settings(bot, dialogue, msg).await?;
+                }
                 _ => {
                     if let Some(user) = msg.from() {
                         log::error!(
@@ -208,7 +220,7 @@ pub async fn action_settings_default_currency(
             let currency = get_currency(text);
             match currency {
                 Ok(currency) => {
-                    let setting = ChatSetting::TimeZone(Some(currency.0.clone()));
+                    let setting = ChatSetting::DefaultCurrency(Some(currency.0.clone()));
                     set_chat_setting(&msg.chat.id.to_string(), setting)?;
                     bot.send_message(
                         msg.chat.id,
