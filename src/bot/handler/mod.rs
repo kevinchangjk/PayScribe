@@ -15,13 +15,15 @@ pub use self::edit_payment::{
     handle_repeated_edit_payment, no_edit_payment, EditPaymentParams,
 };
 pub use self::general::{
-    action_cancel, action_help, action_start, callback_invalid_message, invalid_state,
+    action_cancel, action_currencies, action_help, action_start, callback_invalid_message,
+    invalid_state,
 };
 pub use self::pay_back::{
-    action_pay_back, action_pay_back_confirm, action_pay_back_debts, block_pay_back,
-    cancel_pay_back, handle_repeated_pay_back, PayBackParams,
+    action_pay_back, action_pay_back_confirm, action_pay_back_currency,
+    action_pay_back_currency_menu, action_pay_back_debts, block_pay_back, cancel_pay_back,
+    handle_repeated_pay_back, PayBackParams,
 };
-pub use self::utils::SelectPaymentType;
+pub use self::utils::{Currency, SelectPaymentType};
 pub use self::view_balances::action_view_balances;
 pub use self::view_payments::{
     action_select_payment_delete, action_select_payment_edit, action_select_payment_number,

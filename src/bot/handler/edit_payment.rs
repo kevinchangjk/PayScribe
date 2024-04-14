@@ -9,39 +9,49 @@ use crate::bot::{
     handler::{
         utils::{
             display_balances, display_debts, display_payment, display_username, make_keyboard,
-            parse_amount, parse_username, process_debts, HandlerResult, UserDialogue,
-            COMMAND_VIEW_PAYMENTS, DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
+            make_keyboard_debt_selection, parse_currency_amount, parse_username, process_debts,
+            Currency, HandlerResult, UserDialogue, COMMAND_CURRENCIES, COMMAND_VIEW_PAYMENTS,
+            DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
             DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
             DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            TOTAL_INSTRUCTIONS_MESSAGE,
         },
         AddDebtsFormat, AddPaymentEdit, Payment,
     },
     processor::edit_payment,
 };
 
-use super::utils::make_keyboard_debt_selection;
+use super::utils::display_currency_amount;
 
 /* Utilities */
 #[derive(Clone, Debug)]
 pub struct EditPaymentParams {
     description: Option<String>,
     creditor: Option<String>,
-    total: Option<f64>,
-    debts: Option<Vec<(String, f64)>>,
+    currency: Option<Currency>,
+    total: Option<i64>,
+    debts: Option<Vec<(String, i64)>>,
 }
 
 const CANCEL_MESSAGE: &str =
     "Sure, I've cancelled editing the payment. No changes have been made! 👌";
 
 /* Displays a payment entry by combining original entry and edited fields.
- */
+*/
 fn display_edit_payment(payment: Payment, edited_payment: EditPaymentParams) -> String {
+    let currency = edited_payment.currency.unwrap_or(payment.currency);
     format!(
-        "Description: {}\nPayer: {}\nTotal: {:.2}\nSplit:\n{}",
+        "Description: {}\nPayer: {}\nTotal: {}\nSplit:\n{}",
         edited_payment.description.unwrap_or(payment.description),
         display_username(&edited_payment.creditor.unwrap_or(payment.creditor)),
-        edited_payment.total.unwrap_or(payment.total),
-        display_debts(&edited_payment.debts.unwrap_or(payment.debts.clone()))
+        display_currency_amount(
+            edited_payment.total.unwrap_or(payment.total),
+            currency.clone()
+        ),
+        display_debts(
+            &edited_payment.debts.unwrap_or(payment.debts.clone()),
+            currency.1
+        )
     )
 }
 
@@ -105,7 +115,7 @@ async fn display_edit_overview(
 }
 
 /* Calls processor to execute the edit of the payment entry.
- */
+*/
 async fn call_processor_edit_payment(
     bot: Bot,
     dialogue: UserDialogue,
@@ -122,6 +132,7 @@ async fn call_processor_edit_payment(
             &payment.payment_id,
             edited_payment.description.as_deref(),
             edited_payment.creditor.as_deref(),
+            edited_payment.currency.unzip().0.as_deref(),
             edited_payment.total.as_ref(),
             edited_payment.debts,
         );
@@ -144,9 +155,9 @@ async fn call_processor_edit_payment(
                                 "🎉 I've edited the payment! 🎉\n\n{}\nHere are the updated balances:\n{}",
                                 edit_overview,
                                 display_balances(&balances)
-                            ),
-                        )
-                        .await?;
+                                ),
+                                )
+                            .await?;
                     }
                     None => {
                         bot.edit_message_text(
@@ -155,9 +166,9 @@ async fn call_processor_edit_payment(
                             format!(
                                 "🎉 I've edited the payment! 🎉\n\n{}\nThere are no changes to the balances.",
                                 edit_overview
-                            ),
-                        )
-                        .await?;
+                                ),
+                                )
+                            .await?;
                     }
                 }
                 dialogue
@@ -170,7 +181,7 @@ async fn call_processor_edit_payment(
                     chat.id,
                     display_payment(&payment, 1),
                     err.to_string()
-                );
+                    );
                 bot.edit_message_text(
                     chat.id,
                     id,
@@ -198,7 +209,7 @@ pub async fn handle_repeated_edit_payment(bot: Bot, msg: Message) -> HandlerResu
     bot.send_message(
         msg.chat.id,
         "🚫 You are already editing a payment entry! Please complete or cancel the current operation before starting a new one.",
-    ).await?;
+        ).await?;
     Ok(())
 }
 
@@ -218,7 +229,7 @@ pub async fn block_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
         "🚫 You are currently editing a payment entry! Please complete or cancel the current payment entry before starting another command.",
-    ).await?;
+        ).await?;
     Ok(())
 }
 
@@ -250,6 +261,7 @@ pub async fn action_edit_payment(
     let edited_payment = EditPaymentParams {
         description: None,
         creditor: None,
+        currency: None,
         total: None,
         debts: None,
     };
@@ -305,9 +317,11 @@ pub async fn action_edit_payment_confirm(
                     bot.send_message(
                         chat.id,
                         format!("Current description: {}\n\nWhat do you want the new description to be?",
-                        payment.description),
-                    )
-                    .await?;
+                                edited_payment.description.clone().unwrap_or(payment.description.clone())
+
+                               ),
+                               )
+                        .await?;
                     dialogue
                         .update(State::EditPaymentDetails {
                             payment,
@@ -323,7 +337,12 @@ pub async fn action_edit_payment_confirm(
                         chat.id,
                         format!(
                             "Current payer: {}\n\nWho should the payer be?",
-                            display_username(&payment.creditor)
+                            display_username(
+                                &edited_payment
+                                    .creditor
+                                    .clone()
+                                    .unwrap_or(payment.creditor.clone())
+                            )
                         ),
                     )
                     .await?;
@@ -341,11 +360,11 @@ pub async fn action_edit_payment_confirm(
                     bot.send_message(
                         chat.id,
                         format!(
-                            "Current total: {}\n\nWhat should the total be?",
-                            payment.total
-                        ),
-                    )
-                    .await?;
+                            "Current total: {}\n\nWhat should the total be?\n\nOptional: You may also enter the currency of the amount. {TOTAL_INSTRUCTIONS_MESSAGE}",
+                            display_currency_amount(edited_payment.total.unwrap_or(payment.total), edited_payment.currency.clone().unwrap_or(payment.currency.clone()))
+                            ),
+                            )
+                        .await?;
                     dialogue
                         .update(State::EditPaymentDetails {
                             payment,
@@ -361,10 +380,10 @@ pub async fn action_edit_payment_confirm(
                         chat.id,
                         format!(
                             "Current splits:\n{}\n\nHow are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
-                            display_debts(&payment.debts)
-                        ),
-                    ).reply_markup(make_keyboard_debt_selection())
-                    .await?;
+                            display_debts(&edited_payment.debts.clone().unwrap_or(payment.debts.clone()), edited_payment.currency.clone().unwrap_or(payment.currency.clone()).1)
+                            ),
+                            ).reply_markup(make_keyboard_debt_selection())
+                        .await?;
                     dialogue
                         .update(State::EditPaymentDebtSelection {
                             payment,
@@ -411,9 +430,9 @@ pub async fn action_edit_payment_debts(
                         id,
                         format!(
                             "Okay, who is involved in the payment?\n\n{DEBT_EQUAL_INSTRUCTIONS_MESSAGE}",
-                        ),
-                    )
-                    .await?;
+                            ),
+                            )
+                        .await?;
                     dialogue
                         .update(State::EditPaymentDetails {
                             payment,
@@ -432,7 +451,7 @@ pub async fn action_edit_payment_debts(
                         id,
                         format!(
                             "Okay, who is involved and how much do they owe?\n\n{DEBT_EXACT_INSTRUCTIONS_MESSAGE}",
-                        )).await?;
+                            )).await?;
                     dialogue
                         .update(State::EditPaymentDetails {
                             payment,
@@ -444,14 +463,14 @@ pub async fn action_edit_payment_debts(
                         .await?;
                 }
             }
-            "Ratio" => {
+            "Proportion" => {
                 if let Some(Message { id, chat, .. }) = query.message {
                     bot.edit_message_text(
                         chat.id,
                         id,
                         format!(
                             "Okay, who is involved and what proportions do they owe?\n\n{DEBT_RATIO_INSTRUCTIONS_MESSAGE}",
-                        )).await?;
+                            )).await?;
                     dialogue
                         .update(State::EditPaymentDetails {
                             payment,
@@ -493,6 +512,7 @@ pub async fn action_edit_payment_edit(
                 let new_edited_payment = EditPaymentParams {
                     description: Some(text.to_string()),
                     creditor: edited_payment.creditor,
+                    currency: edited_payment.currency,
                     total: edited_payment.total,
                     debts: edited_payment.debts,
                 };
@@ -523,6 +543,7 @@ pub async fn action_edit_payment_edit(
                 let new_edited_payment = EditPaymentParams {
                     description: edited_payment.description,
                     creditor: Some(username?),
+                    currency: edited_payment.currency,
                     total: edited_payment.total,
                     debts: edited_payment.debts,
                 };
@@ -545,44 +566,48 @@ pub async fn action_edit_payment_edit(
                 .await?;
             }
             AddPaymentEdit::Total => {
-                let total = parse_amount(text, Some(2));
-                if let Err(err) = total {
-                    bot.send_message(
-                        msg.chat.id,
-                        format!("{}\n\nWhat should the total be?", err.to_string()),
-                    )
-                    .await?;
-                    return Ok(());
+                let currency_amount = parse_currency_amount(text);
+                match currency_amount {
+                    Ok((total, currency)) => {
+                        let new_edited_payment = EditPaymentParams {
+                            description: edited_payment.description,
+                            creditor: edited_payment.creditor,
+                            currency: Some(currency),
+                            total: Some(total),
+                            debts: None,
+                        };
+
+                        log::info!(
+                            "Edit Payment - Total updated successfully for user {} in chat {}: {:?}",
+                            msg.from().unwrap().id,
+                            msg.chat.id,
+                            display_edit_payment(payment.clone(), new_edited_payment.clone())
+                            );
+
+                        bot.send_message(
+                            msg.chat.id,
+                            format!("How are we splitting this new total?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}")
+                            )
+                            .reply_markup(make_keyboard_debt_selection())
+                            .await?;
+                        dialogue
+                            .update(State::EditPaymentDebtSelection {
+                                payment,
+                                edited_payment: new_edited_payment,
+                                payments,
+                                page,
+                            })
+                            .await?;
+                    }
+                    Err(err) => {
+                        bot.send_message(
+                            msg.chat.id,
+                            format!("{} Check out the supported currencies with {COMMAND_CURRENCIES}.\n\nWhat should the total be?", err.to_string()),
+                            )
+                            .await?;
+                        return Ok(());
+                    }
                 }
-
-                let new_edited_payment = EditPaymentParams {
-                    description: edited_payment.description,
-                    creditor: edited_payment.creditor,
-                    total: Some(total.unwrap()),
-                    debts: None,
-                };
-
-                log::info!(
-                    "Edit Payment - Total updated successfully for user {} in chat {}: {:?}",
-                    msg.from().unwrap().id,
-                    msg.chat.id,
-                    display_edit_payment(payment.clone(), new_edited_payment.clone())
-                );
-
-                bot.send_message(
-                    msg.chat.id,
-                    format!("How are we splitting this new total?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}")
-                )
-                .reply_markup(make_keyboard_debt_selection())
-                .await?;
-                dialogue
-                    .update(State::EditPaymentDebtSelection {
-                        payment,
-                        edited_payment: new_edited_payment,
-                        payments,
-                        page,
-                    })
-                    .await?;
             }
             AddPaymentEdit::DebtsEqual
             | AddPaymentEdit::DebtsExact
@@ -607,6 +632,10 @@ pub async fn action_edit_payment_edit(
                                 .creditor
                                 .clone()
                                 .or(Some(payment.creditor.clone())),
+                            edited_payment
+                                .currency
+                                .clone()
+                                .or(Some(payment.currency.clone())),
                             edited_payment.total.or(Some(payment.total)),
                         );
                         if let Err(err) = debts {
@@ -621,16 +650,17 @@ pub async fn action_edit_payment_edit(
                         let new_edited_payment = EditPaymentParams {
                             description: edited_payment.description,
                             creditor: edited_payment.creditor,
+                            currency: edited_payment.currency,
                             total: edited_payment.total,
                             debts: Some(debts.unwrap()),
                         };
 
                         log::info!(
-                        "Edit Payment - Creditor updated successfully for user {} in chat {}: {:?}",
-                        msg.from().unwrap().id,
-                        msg.chat.id,
-                        display_edit_payment(payment.clone(), new_edited_payment.clone())
-                    );
+                                "Edit Payment - Creditor updated successfully for user {} in chat {}: {:?}",
+                                msg.from().unwrap().id,
+                                msg.chat.id,
+                                display_edit_payment(payment.clone(), new_edited_payment.clone())
+                                );
                         display_edit_overview(
                             bot,
                             dialogue,

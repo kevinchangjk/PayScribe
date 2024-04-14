@@ -27,7 +27,6 @@ fn sort_balances(balances: &mut Vec<UserBalance>) -> () {
 /* Main function of Optimizer.
 * Takes in a vector of balances and returns a vector of debts.
 * Important: implicitly assumed that all balances sum up to 0.
-* Important: debt amounts have floating point errors, round them to 2 decimal places.
 */
 pub fn optimize_debts(balances: Vec<UserBalance>) -> Vec<Debt> {
     let mut sorted_balances = balances.clone();
@@ -45,10 +44,11 @@ pub fn optimize_debts(balances: Vec<UserBalance>) -> Vec<Debt> {
             .min(sorted_balances[right].balance);
 
         // Add debt to the list
-        if amount >= 0.01 {
+        if amount > 0 {
             let debt = Debt {
                 debtor: sorted_balances[left].username.clone(),
                 creditor: sorted_balances[right].username.clone(),
+                currency: sorted_balances[left].currency.clone(),
                 amount,
             };
             debts.push(debt);
@@ -81,27 +81,27 @@ mod tests {
 
     // Utility function to check if the optimized solution is correct
     fn is_solution_correct(balances: Vec<UserBalance>, debts: Vec<Debt>) -> bool {
-        let mut resulting_balances: HashMap<String, f64> = HashMap::new();
+        let mut resulting_balances: HashMap<String, i64> = HashMap::new();
         for balance in balances {
             resulting_balances.insert(balance.username, balance.balance);
         }
 
         for debt in debts {
             // Owed amount cannot be negative
-            if debt.amount < 0.0 {
+            if debt.amount < 0 {
                 return false;
             }
 
             let new_debtor_balance =
-                resulting_balances.get(&debt.debtor).unwrap_or(&0.0) + debt.amount;
+                resulting_balances.get(&debt.debtor).unwrap_or(&0) + debt.amount;
             let new_creditor_balance =
-                resulting_balances.get(&debt.creditor).unwrap_or(&0.0) - debt.amount;
+                resulting_balances.get(&debt.creditor).unwrap_or(&0) - debt.amount;
             resulting_balances.insert(debt.debtor, new_debtor_balance);
             resulting_balances.insert(debt.creditor, new_creditor_balance);
         }
 
         for (_, balance) in resulting_balances {
-            if balance.abs() >= 0.01 {
+            if balance != 0 {
                 return false;
             }
         }
@@ -114,11 +114,13 @@ mod tests {
         let balances = vec![
             UserBalance {
                 username: "user1".to_string(),
-                balance: 10.0,
+                currency: "USD".to_string(),
+                balance: 1000,
             },
             UserBalance {
                 username: "user2".to_string(),
-                balance: -10.0,
+                currency: "USD".to_string(),
+                balance: -1000,
             },
         ];
 
@@ -130,23 +132,28 @@ mod tests {
         let mut balances = vec![
             UserBalance {
                 username: "user1".to_string(),
-                balance: 10.0,
+                currency: "USD".to_string(),
+                balance: 1000,
             },
             UserBalance {
                 username: "user2".to_string(),
-                balance: -10.0,
+                currency: "USD".to_string(),
+                balance: -1000,
             },
             UserBalance {
                 username: "user3".to_string(),
-                balance: 0.0,
+                currency: "USD".to_string(),
+                balance: 0,
             },
             UserBalance {
                 username: "user4".to_string(),
-                balance: 5.0,
+                currency: "USD".to_string(),
+                balance: 500,
             },
             UserBalance {
                 username: "user5".to_string(),
-                balance: -5.0,
+                currency: "USD".to_string(),
+                balance: -500,
             },
         ];
 
@@ -159,23 +166,28 @@ mod tests {
             vec![
                 UserBalance {
                     username: "user2".to_string(),
-                    balance: -10.0,
+                    currency: "USD".to_string(),
+                    balance: -1000,
                 },
                 UserBalance {
                     username: "user5".to_string(),
-                    balance: -5.0,
+                    currency: "USD".to_string(),
+                    balance: -500,
                 },
                 UserBalance {
                     username: "user3".to_string(),
-                    balance: 0.0,
+                    currency: "USD".to_string(),
+                    balance: 0,
                 },
                 UserBalance {
                     username: "user4".to_string(),
-                    balance: 5.0,
+                    currency: "USD".to_string(),
+                    balance: 500,
                 },
                 UserBalance {
                     username: "user1".to_string(),
-                    balance: 10.0,
+                    currency: "USD".to_string(),
+                    balance: 1000,
                 },
             ]
         );
@@ -187,11 +199,13 @@ mod tests {
         let balances_1 = vec![
             UserBalance {
                 username: "user1".to_string(),
-                balance: 10.0,
+                currency: "USD".to_string(),
+                balance: 1000,
             },
             UserBalance {
                 username: "user2".to_string(),
-                balance: -10.0,
+                currency: "USD".to_string(),
+                balance: -1000,
             },
         ];
 
@@ -199,7 +213,8 @@ mod tests {
         let solution_1 = vec![Debt {
             debtor: "user2".to_string(),
             creditor: "user1".to_string(),
-            amount: 10.0,
+            currency: "USD".to_string(),
+            amount: 1000,
         }];
 
         assert_eq!(optimize_debts(balances_1.clone()), solution_1);
@@ -208,23 +223,28 @@ mod tests {
         let balances_2 = vec![
             UserBalance {
                 username: "user1".to_string(),
-                balance: 10.0,
+                currency: "USD".to_string(),
+                balance: 1000,
             },
             UserBalance {
                 username: "user2".to_string(),
-                balance: -10.0,
+                currency: "USD".to_string(),
+                balance: -1000,
             },
             UserBalance {
                 username: "user3".to_string(),
-                balance: 10.0,
+                currency: "USD".to_string(),
+                balance: 1000,
             },
             UserBalance {
                 username: "user4".to_string(),
-                balance: -10.0,
+                currency: "USD".to_string(),
+                balance: -1000,
             },
             UserBalance {
                 username: "user5".to_string(),
-                balance: 0.0,
+                currency: "USD".to_string(),
+                balance: 0,
             },
         ];
 
@@ -237,23 +257,28 @@ mod tests {
         let balances_3 = vec![
             UserBalance {
                 username: "user1".to_string(),
-                balance: 12.0,
+                currency: "USD".to_string(),
+                balance: 1200,
             },
             UserBalance {
                 username: "user2".to_string(),
-                balance: -6.7,
+                currency: "USD".to_string(),
+                balance: -670,
             },
             UserBalance {
                 username: "user3".to_string(),
-                balance: 5.13,
+                currency: "USD".to_string(),
+                balance: 513,
             },
             UserBalance {
                 username: "user4".to_string(),
-                balance: -3.0,
+                currency: "USD".to_string(),
+                balance: -300,
             },
             UserBalance {
                 username: "user5".to_string(),
-                balance: -7.43,
+                currency: "USD".to_string(),
+                balance: -743,
             },
         ];
 
@@ -263,22 +288,26 @@ mod tests {
             Debt {
                 debtor: "user5".to_string(),
                 creditor: "user1".to_string(),
-                amount: 7.43,
+                currency: "USD".to_string(),
+                amount: 743,
             },
             Debt {
                 debtor: "user2".to_string(),
                 creditor: "user1".to_string(),
-                amount: 4.57,
+                currency: "USD".to_string(),
+                amount: 457,
             },
             Debt {
                 debtor: "user2".to_string(),
                 creditor: "user3".to_string(),
-                amount: 2.13,
+                currency: "USD".to_string(),
+                amount: 213,
             },
             Debt {
                 debtor: "user4".to_string(),
                 creditor: "user3".to_string(),
-                amount: 3.0,
+                currency: "USD".to_string(),
+                amount: 300,
             },
         ];
 
@@ -292,83 +321,103 @@ mod tests {
         let balances_4 = vec![
             UserBalance {
                 username: "user1".to_string(),
-                balance: -291.17,
+                currency: "USD".to_string(),
+                balance: -29117,
             },
             UserBalance {
                 username: "user2".to_string(),
-                balance: -73.86,
+                currency: "USD".to_string(),
+                balance: -7386,
             },
             UserBalance {
                 username: "user3".to_string(),
-                balance: -119.28,
+                currency: "USD".to_string(),
+                balance: -11928,
             },
             UserBalance {
                 username: "user4".to_string(),
-                balance: -73.88,
+                currency: "USD".to_string(),
+                balance: -7388,
             },
             UserBalance {
                 username: "user5".to_string(),
-                balance: -33.27,
+                currency: "USD".to_string(),
+                balance: -3327,
             },
             UserBalance {
                 username: "user6".to_string(),
-                balance: 516.79,
+                currency: "USD".to_string(),
+                balance: 51679,
             },
             UserBalance {
                 username: "user7".to_string(),
-                balance: -0.7,
+                currency: "USD".to_string(),
+                balance: -70,
             },
             UserBalance {
                 username: "user8".to_string(),
-                balance: -32.28,
+                currency: "USD".to_string(),
+                balance: -3228,
             },
             UserBalance {
                 username: "user9".to_string(),
-                balance: -0.71,
+                currency: "USD".to_string(),
+                balance: -71,
             },
             UserBalance {
                 username: "user10".to_string(),
-                balance: 74.67,
+                currency: "USD".to_string(),
+                balance: 7467,
             },
             UserBalance {
                 username: "user11".to_string(),
-                balance: 30.11,
+                currency: "USD".to_string(),
+                balance: 3011,
             },
             UserBalance {
                 username: "user12".to_string(),
-                balance: 3.58,
+                currency: "USD".to_string(),
+                balance: 358,
             },
             UserBalance {
                 username: "user13".to_string(),
-                balance: 47.87,
+                currency: "USD".to_string(),
+                balance: 4787,
             },
             UserBalance {
                 username: "user14".to_string(),
-                balance: 168.26,
+                currency: "USD".to_string(),
+                balance: 16826,
             },
             UserBalance {
                 username: "user15".to_string(),
-                balance: 138.47,
+                currency: "USD".to_string(),
+                balance: 13847,
             },
             UserBalance {
                 username: "user16".to_string(),
-                balance: -165.61,
+                currency: "USD".to_string(),
+                balance: -16561,
             },
             UserBalance {
                 username: "user17".to_string(),
-                balance: -188.99,
+                currency: "USD".to_string(),
+                balance: -18899,
             },
             UserBalance {
                 username: "user18".to_string(),
-                balance: 118.64,
+                currency: "USD".to_string(),
+                balance: 11864,
             },
             UserBalance {
                 username: "user19".to_string(),
-                balance: -118.64,
+                currency: "USD".to_string(),
+                balance: -11864,
             },
             UserBalance {
                 username: "user20".to_string(),
-                balance: 0.0,
+                currency: "USD".to_string(),
+                balance: 0,
             },
         ];
 

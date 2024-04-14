@@ -3,16 +3,20 @@ use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
 use crate::bot::{
     dispatcher::State,
     handler::utils::{
-        display_balances, display_debts, display_username, make_keyboard, parse_amount,
-        parse_username, process_debts, HandlerResult, UserDialogue, DEBT_EQUAL_DESCRIPTION_MESSAGE,
-        DEBT_EQUAL_INSTRUCTIONS_MESSAGE, DEBT_EXACT_DESCRIPTION_MESSAGE,
-        DEBT_EXACT_INSTRUCTIONS_MESSAGE, DEBT_RATIO_DESCRIPTION_MESSAGE,
-        DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, UNKNOWN_ERROR_MESSAGE,
+        display_balances, display_currency_amount, display_debts, display_username, make_keyboard,
+        parse_username, process_debts, HandlerResult, UserDialogue, COMMAND_CURRENCIES,
+        DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
+        DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
+        DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+        TOTAL_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
     },
     processor::add_payment,
 };
 
-use super::utils::make_keyboard_debt_selection;
+use super::{
+    utils::{make_keyboard_debt_selection, parse_currency_amount},
+    Currency,
+};
 
 /* Utilities */
 #[derive(Clone, Debug)]
@@ -23,8 +27,9 @@ pub struct AddPaymentParams {
     datetime: String,
     description: Option<String>,
     creditor: Option<String>,
-    total: Option<f64>,
-    debts: Option<Vec<(String, f64)>>,
+    currency: Option<Currency>,
+    total: Option<i64>,
+    debts: Option<Vec<(String, i64)>>,
 }
 
 #[derive(Clone, Debug)]
@@ -48,7 +53,7 @@ const CANCEL_MESSAGE: &str =
     "Sure, I've cancelled adding the payment. No changes have been made! 👌";
 
 /* Displays a payment entry (being added) in String format.
- */
+*/
 fn display_add_payment(payment: &AddPaymentParams) -> String {
     let description = match &payment.description {
         Some(desc) => format!("Description: {}\n", desc),
@@ -59,11 +64,20 @@ fn display_add_payment(payment: &AddPaymentParams) -> String {
         None => "".to_string(),
     };
     let total = match &payment.total {
-        Some(total) => format!("Total: {}\n", total),
+        Some(total) => match &payment.currency {
+            Some(currency) => format!(
+                "Total: {}\n",
+                display_currency_amount(*total, currency.clone())
+            ),
+            None => "".to_string(),
+        },
         None => "".to_string(),
     };
     let debts = match &payment.debts {
-        Some(debts) => format!("Split:\n{}", display_debts(&debts)),
+        Some(debts) => match &payment.currency {
+            Some(currency) => format!("Split:\n{}", display_debts(&debts, currency.1)),
+            None => "".to_string(),
+        },
         None => "".to_string(),
     };
 
@@ -118,7 +132,7 @@ async fn display_add_edit_menu(
 }
 
 /* Parses a string representing debts, and handles it accordingly
- */
+*/
 async fn handle_debts(
     bot: Bot,
     dialogue: UserDialogue,
@@ -133,7 +147,13 @@ async fn handle_debts(
     };
     match msg.text() {
         Some(text) => {
-            let debts = process_debts(debts_format, text, &payment.creditor, payment.total);
+            let debts = process_debts(
+                debts_format,
+                text,
+                &payment.creditor,
+                payment.currency.clone(),
+                payment.total,
+            );
             if let Err(err) = debts {
                 bot.send_message(msg.chat.id, format!("{}\n\n{error_msg}", err.to_string()))
                     .await?;
@@ -147,6 +167,7 @@ async fn handle_debts(
                 datetime: payment.datetime,
                 description: payment.description,
                 creditor: payment.creditor,
+                currency: payment.currency,
                 total: payment.total,
                 debts: Some(debts?),
             };
@@ -161,7 +182,7 @@ async fn handle_debts(
 }
 
 /* Calls processor to execute the adding of the payment entry.
- */
+*/
 async fn call_processor_add_payment(
     bot: Bot,
     dialogue: UserDialogue,
@@ -188,6 +209,19 @@ async fn call_processor_add_payment(
             None => {
                 log::error!(
                     "Add Payment Submission - Creditor not found for payment: {:?}",
+                    payment_clone
+                );
+                bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
+                    .await?;
+                dialogue.exit().await?;
+                return Ok(());
+            }
+        };
+        let currency = match payment.currency {
+            Some(curr) => curr,
+            None => {
+                log::error!(
+                    "Add Payment Submission - Currency not found for payment: {:?}",
                     payment_clone
                 );
                 bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
@@ -230,6 +264,7 @@ async fn call_processor_add_payment(
             payment.datetime,
             &description,
             &creditor,
+            &currency.0,
             total,
             debts,
         );
@@ -241,7 +276,7 @@ async fn call_processor_add_payment(
                     payment_clone.chat_id,
                     payment_clone,
                     err.to_string()
-                );
+                    );
                 bot.edit_message_text(
                     chat.id,
                     id,
@@ -257,7 +292,7 @@ async fn call_processor_add_payment(
                     payment_clone.sender_id,
                     payment_clone.chat_id,
                     payment_clone
-                );
+                    );
                 bot.edit_message_text(
                     chat.id,
                     id,
@@ -284,7 +319,7 @@ pub async fn handle_repeated_add_payment(bot: Bot, msg: Message) -> HandlerResul
     bot.send_message(
         msg.chat.id,
         "🚫 You are already adding a payment entry! Please complete or cancel the current operation before starting a new one.",
-    ).await?;
+        ).await?;
     Ok(())
 }
 
@@ -304,7 +339,7 @@ pub async fn block_add_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
         "🚫 You are currently adding a payment entry! Please complete or cancel the current payment entry before starting another command.",
-    ).await?;
+        ).await?;
     Ok(())
 }
 
@@ -353,6 +388,7 @@ pub async fn action_add_description(
                         datetime: msg.date.to_string(),
                         description: Some(text.to_string()),
                         creditor: None,
+                        currency: None,
                         total: None,
                         debts: None,
                     };
@@ -402,17 +438,18 @@ pub async fn action_add_creditor(
                 datetime: payment.datetime,
                 description: payment.description,
                 creditor: Some(text?),
+                currency: None,
                 total: None,
                 debts: None,
             };
             bot.send_message(
                 msg.chat.id,
                 format!(
-                    "{}Nice! How much was the total amount?",
+                    "{}Nice! How much was the total amount?\n\nOptional: You may also enter the currency of the amount. {TOTAL_INSTRUCTIONS_MESSAGE}",
                     display_add_payment(&new_payment)
-                ),
-            )
-            .await?;
+                    ),
+                    )
+                .await?;
             dialogue
                 .update(State::AddTotal {
                     payment: new_payment,
@@ -438,35 +475,44 @@ pub async fn action_add_total(
 ) -> HandlerResult {
     match msg.text() {
         Some(text) => {
-            let total = parse_amount(text, Some(2));
-            if let Err(err) = total {
-                bot.send_message(msg.chat.id, err.to_string()).await?;
-                return Ok(());
+            let currency_amount = parse_currency_amount(text);
+            match currency_amount {
+                Ok((total, currency)) => {
+                    let new_payment = AddPaymentParams {
+                        chat_id: payment.chat_id,
+                        sender_id: payment.sender_id,
+                        sender_username: payment.sender_username,
+                        datetime: payment.datetime,
+                        description: payment.description,
+                        creditor: payment.creditor,
+                        currency: Some(currency),
+                        total: Some(total),
+                        debts: None,
+                    };
+                    bot.send_message(
+                        msg.chat.id,
+                        format!(
+                            "{}Cool! How are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
+                            display_add_payment(&new_payment)
+                            ),
+                            )
+                        .reply_markup(make_keyboard_debt_selection())
+                        .await?;
+                    dialogue
+                        .update(State::AddDebtSelection {
+                            payment: new_payment,
+                        })
+                        .await?;
+                }
+                Err(err) => {
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("{} Check out the supported currencies with {COMMAND_CURRENCIES}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string()),
+                        )
+                        .await?;
+                    return Ok(());
+                }
             }
-            let new_payment = AddPaymentParams {
-                chat_id: payment.chat_id,
-                sender_id: payment.sender_id,
-                sender_username: payment.sender_username,
-                datetime: payment.datetime,
-                description: payment.description,
-                creditor: payment.creditor,
-                total: Some(total?),
-                debts: None,
-            };
-            bot.send_message(
-                msg.chat.id,
-                format!(
-                    "{}Cool! How are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
-                    display_add_payment(&new_payment)
-                ),
-            )
-            .reply_markup(make_keyboard_debt_selection())
-            .await?;
-            dialogue
-                .update(State::AddDebtSelection {
-                    payment: new_payment,
-                })
-                .await?;
         }
         None => {
             bot.send_message(msg.chat.id, format!("{NO_TEXT_MESSAGE}"))
@@ -498,9 +544,9 @@ pub async fn action_add_debt_selection(
                         format!(
                             "{}Okay, who is involved in the payment?\n\n{DEBT_EQUAL_INSTRUCTIONS_MESSAGE}",
                             display_add_payment(&payment)
-                        ),
-                    )
-                    .await?;
+                            ),
+                            )
+                        .await?;
                     dialogue
                         .update(State::AddDebt {
                             payment,
@@ -526,7 +572,7 @@ pub async fn action_add_debt_selection(
                         .await?;
                 }
             }
-            "Ratio" => {
+            "Proportion" => {
                 if let Some(Message { id, chat, .. }) = query.message {
                     bot.edit_message_text(
                         chat.id,
@@ -624,9 +670,9 @@ pub async fn action_add_edit_menu(
                         format!(
                             "Current description: {}\n\nWhat do you want the new description to be?",
                             payment_clone.description.unwrap()
-                        ),
-                    )
-                    .await?;
+                            ),
+                            )
+                        .await?;
                     dialogue
                         .update(State::AddEdit {
                             payment,
@@ -656,11 +702,11 @@ pub async fn action_add_edit_menu(
                         chat.id,
                         id,
                         format!(
-                            "Current total: {}\n\nWhat should the total be?",
-                            payment_clone.total.unwrap()
-                        ),
-                    )
-                    .await?;
+                            "Current total: {}\n\nWhat should the total be?\n\nOptional: You may also enter the currency of the amount. {TOTAL_INSTRUCTIONS_MESSAGE}",
+                            display_currency_amount(payment_clone.total.unwrap(), payment_clone.currency.unwrap())
+                            ),
+                            )
+                        .await?;
                     dialogue
                         .update(State::AddEdit {
                             payment,
@@ -674,10 +720,10 @@ pub async fn action_add_edit_menu(
                         id,
                         format!(
                             "Current splits:\n{}\nHow are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
-                            display_debts(&payment_clone.debts.unwrap())
-                        ),
-                    ).reply_markup(make_keyboard_debt_selection())
-                    .await?;
+                            display_debts(&payment_clone.debts.unwrap(), payment_clone.currency.unwrap().1)
+                            ),
+                            ).reply_markup(make_keyboard_debt_selection())
+                        .await?;
                     dialogue.update(State::AddDebtSelection { payment }).await?;
                 }
                 "Back" => {
@@ -714,6 +760,7 @@ pub async fn action_add_edit(
                     datetime: payment.datetime,
                     description: Some(text.to_string()),
                     creditor: payment.creditor,
+                    currency: payment.currency,
                     total: payment.total,
                     debts: payment.debts,
                 };
@@ -734,39 +781,45 @@ pub async fn action_add_edit(
                     datetime: payment.datetime,
                     description: payment.description,
                     creditor: Some(username?),
+                    currency: payment.currency,
                     total: payment.total,
                     debts: payment.debts,
                 };
                 display_add_overview(bot, dialogue, new_payment).await?;
             }
             AddPaymentEdit::Total => {
-                let total = parse_amount(text, Some(2));
-                if let Err(err) = total {
-                    bot.send_message(msg.chat.id, err.to_string()).await?;
-                    return Ok(());
+                let currency_amount = parse_currency_amount(text);
+                match currency_amount {
+                    Ok((total, currency)) => {
+                        let new_payment = AddPaymentParams {
+                            chat_id: payment.chat_id,
+                            sender_id: payment.sender_id,
+                            sender_username: payment.sender_username,
+                            datetime: payment.datetime,
+                            description: payment.description,
+                            creditor: payment.creditor,
+                            currency: Some(currency),
+                            total: Some(total),
+                            debts: payment.debts,
+                        };
+                        bot.send_message(
+                            msg.chat.id,
+                            format!("How are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",),
+                            ).reply_markup(make_keyboard_debt_selection())
+                            .await?;
+                        dialogue
+                            .update(State::AddDebtSelection {
+                                payment: new_payment,
+                            })
+                            .await?;
+                    }
+                    Err(err) => {
+                        bot.send_message(msg.chat.id,
+                                         format!("{} Check out the supported currencies with {COMMAND_CURRENCIES}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string())
+                                        ).await?;
+                        return Ok(());
+                    }
                 }
-
-                let new_payment = AddPaymentParams {
-                    chat_id: payment.chat_id,
-                    sender_id: payment.sender_id,
-                    sender_username: payment.sender_username,
-                    datetime: payment.datetime,
-                    description: payment.description,
-                    creditor: payment.creditor,
-                    total: Some(total?),
-                    debts: None,
-                };
-
-                bot.send_message(
-                    msg.chat.id,
-                    format!("How are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",),
-                ).reply_markup(make_keyboard_debt_selection())
-                .await?;
-                dialogue
-                    .update(State::AddDebtSelection {
-                        payment: new_payment,
-                    })
-                    .await?;
             }
             AddPaymentEdit::DebtsEqual => {
                 handle_debts(bot, dialogue, msg, payment, AddDebtsFormat::Equal).await?;

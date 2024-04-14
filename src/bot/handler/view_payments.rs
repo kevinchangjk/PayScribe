@@ -7,8 +7,8 @@ use teloxide::{
 use crate::bot::{
     dispatcher::State,
     handler::utils::{
-        display_payment, make_keyboard, HandlerResult, UserDialogue, COMMAND_ADD_PAYMENT,
-        UNKNOWN_ERROR_MESSAGE,
+        display_payment, get_currency, get_default_currency, make_keyboard, Currency,
+        HandlerResult, UserDialogue, COMMAND_ADD_PAYMENT, UNKNOWN_ERROR_MESSAGE,
     },
     processor::{view_payments, ProcessError},
     redis::{CrudError, UserPayment},
@@ -31,19 +31,34 @@ pub struct Payment {
     pub datetime: String,
     pub description: String,
     pub creditor: String,
-    pub total: f64,
-    pub debts: Vec<(String, f64)>,
+    pub currency: Currency,
+    pub total: i64,
+    pub debts: Vec<(String, i64)>,
 }
 
 fn unfold_payment(payment: UserPayment) -> Payment {
-    Payment {
-        payment_id: payment.payment_id,
-        chat_id: payment.chat_id,
-        datetime: payment.payment.datetime,
-        description: payment.payment.description,
-        creditor: payment.payment.creditor,
-        total: payment.payment.total,
-        debts: payment.payment.debts,
+    let currency = get_currency(&payment.payment.currency);
+    match currency {
+        Ok(currency) => Payment {
+            payment_id: payment.payment_id,
+            chat_id: payment.chat_id,
+            datetime: payment.payment.datetime,
+            description: payment.payment.description,
+            creditor: payment.payment.creditor,
+            currency,
+            total: payment.payment.total,
+            debts: payment.payment.debts,
+        },
+        Err(_) => Payment {
+            payment_id: payment.payment_id,
+            chat_id: payment.chat_id,
+            datetime: payment.payment.datetime,
+            description: payment.payment.description,
+            creditor: payment.payment.creditor,
+            currency: get_default_currency(),
+            total: payment.payment.total,
+            debts: payment.payment.debts,
+        },
     }
 }
 
@@ -211,7 +226,7 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
 }
 
 /* Navigation function for user to interact with payment pagination menu.
- */
+*/
 pub async fn action_view_more(
     bot: Bot,
     dialogue: UserDialogue,

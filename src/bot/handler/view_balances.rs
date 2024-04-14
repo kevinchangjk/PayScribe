@@ -8,7 +8,7 @@ use crate::bot::{
 /* Utilities */
 
 /* View the balances for the group.
- */
+*/
 pub async fn action_view_balances(bot: Bot, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id.to_string();
     if let Some(user) = msg.from() {

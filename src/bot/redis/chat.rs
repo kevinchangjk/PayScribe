@@ -13,12 +13,14 @@ use serde::{Deserialize, Serialize};
 const CHAT_KEY: &str = "chat";
 const CHAT_PAYMENT_KEY: &str = "chat_payment";
 const CHAT_DEBT_KEY: &str = "chat_debt";
+const CHAT_CURRENCY_KEY: &str = "chat_currency";
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Debt {
     pub debtor: String,
     pub creditor: String,
-    pub amount: f64,
+    pub currency: String,
+    pub amount: i64,
 }
 
 pub type Debts = Vec<Debt>;
@@ -132,6 +134,25 @@ pub fn get_chat_debt(con: &mut Connection, chat_id: &str) -> RedisResult<Debts> 
 #[allow(dead_code)]
 pub fn delete_chat_debt(con: &mut Connection, chat_id: &str) -> RedisResult<()> {
     con.del(format!("{CHAT_DEBT_KEY}:{chat_id}"))
+}
+
+/* Chat Currency CRUD Operations */
+// Adds a currency to a chat
+pub fn add_chat_currency(con: &mut Connection, chat_id: &str, currency: &str) -> RedisResult<()> {
+    con.rpush(format!("{CHAT_CURRENCY_KEY}:{chat_id}"), currency)
+}
+
+// Gets all currencies from a chat
+pub fn get_chat_currencies(con: &mut Connection, chat_id: &str) -> RedisResult<Vec<String>> {
+    con.lrange(format!("{CHAT_CURRENCY_KEY}:{chat_id}"), 0, -1)
+}
+
+// Deletes all currencies from a chat
+// Mainly for testing purposes
+// In application, no real need to delete keys
+#[allow(dead_code)]
+pub fn delete_chat_currencies(con: &mut Connection, chat_id: &str) -> RedisResult<()> {
+    con.del(format!("{CHAT_CURRENCY_KEY}:{chat_id}"))
 }
 
 #[cfg(test)]
@@ -286,16 +307,39 @@ mod tests {
             Debt {
                 debtor: "debtor1".to_string(),
                 creditor: "creditor1".to_string(),
-                amount: 10.0,
+                currency: "USD".to_string(),
+                amount: 1000,
             },
             Debt {
                 debtor: "debtor2".to_string(),
                 creditor: "creditor2".to_string(),
-                amount: 20.0,
+                currency: "JPY".to_string(),
+                amount: 2000,
             },
         ];
         assert!(set_chat_debt(&mut con, chat_id, &debts).is_ok());
         assert_eq!(get_chat_debt(&mut con, chat_id).unwrap(), debts);
         assert!(delete_chat_debt(&mut con, chat_id).is_ok());
+    }
+
+    #[test]
+    fn test_add_get_chat_currency() {
+        let mut con = connect().unwrap();
+
+        let chat_id = "123456789";
+        let currency = "USD";
+        assert!(add_chat_currency(&mut con, chat_id, currency).is_ok());
+        assert_eq!(
+            get_chat_currencies(&mut con, chat_id).unwrap(),
+            vec![currency]
+        );
+
+        let second_currency = "EUR";
+        assert!(add_chat_currency(&mut con, chat_id, second_currency).is_ok());
+        assert_eq!(
+            get_chat_currencies(&mut con, chat_id).unwrap(),
+            vec![currency, second_currency]
+        );
+        assert!(delete_chat_currencies(&mut con, chat_id).is_ok());
     }
 }

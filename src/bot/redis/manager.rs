@@ -3,9 +3,9 @@ use redis::RedisError;
 use super::{
     balance::{get_balance, get_balance_exists, set_balance},
     chat::{
-        add_chat, add_chat_payment, add_chat_user_multiple, delete_chat_payment, get_chat_debt,
-        get_chat_exists, get_chat_payment_exists, get_chat_payments, get_chat_users, set_chat_debt,
-        Debt,
+        add_chat, add_chat_currency, add_chat_payment, add_chat_user_multiple, delete_chat_payment,
+        get_chat_currencies, get_chat_debt, get_chat_exists, get_chat_payment_exists,
+        get_chat_payments, get_chat_users, set_chat_debt, Debt,
     },
     connect::{connect, DBError},
     payment::{add_payment, delete_payment, get_payment, update_payment, Payment},
@@ -18,7 +18,8 @@ use super::{
 #[derive(Debug, PartialEq, Clone)]
 pub struct UserBalance {
     pub username: String,
-    pub balance: f64,
+    pub currency: String,
+    pub balance: i64,
 }
 
 #[derive(Debug, PartialEq)]
@@ -121,23 +122,39 @@ pub fn update_chat_balances(
     for change in changes {
         let username = change.username.to_lowercase();
         let balance = change.balance;
-        if let Ok(false) = get_balance_exists(&mut con, chat_id, &username) {
-            set_balance(&mut con, chat_id, &username, balance)?;
+        let currency = change.currency;
+
+        // Update currency into chat first
+        let currencies = get_chat_currencies(&mut con, chat_id)?;
+        if !currencies.contains(&currency) {
+            add_chat_currency(&mut con, chat_id, &currency)?;
+        }
+
+        // Update balance
+        if let Ok(false) = get_balance_exists(&mut con, chat_id, &username, &currency) {
+            set_balance(&mut con, chat_id, &username, &currency, balance)?;
         } else {
-            let current_balance = get_balance(&mut con, chat_id, &username)?;
+            let current_balance = get_balance(&mut con, chat_id, &username, &currency)?;
             let new_balance = current_balance + balance;
-            set_balance(&mut con, chat_id, &username, new_balance)?;
+            set_balance(&mut con, chat_id, &username, &currency, new_balance)?;
         }
     }
 
     // Retrieve all balances
     let mut updated_balances: Vec<UserBalance> = Vec::new();
     let users = get_chat_users(&mut con, chat_id)?;
+    let currencies = get_chat_currencies(&mut con, chat_id)?;
     for user in users {
-        if get_balance_exists(&mut con, chat_id, &user)? {
-            let balance = get_balance(&mut con, chat_id, &user)?;
-            let username = get_preferred_username(&mut con, &user)?;
-            updated_balances.push(UserBalance { username, balance });
+        for currency in &currencies {
+            if get_balance_exists(&mut con, chat_id, &user, &currency)? {
+                let balance = get_balance(&mut con, chat_id, &user, &currency)?;
+                let username = get_preferred_username(&mut con, &user)?;
+                updated_balances.push(UserBalance {
+                    username,
+                    currency: currency.to_string(),
+                    balance,
+                });
+            }
         }
     }
 
@@ -235,8 +252,9 @@ pub fn update_payment_entry(
     payment_id: &str,
     description: Option<&str>,
     creditor: Option<&str>,
-    total: Option<&f64>,
-    debts: Option<Vec<(String, f64)>>,
+    currency: Option<&str>,
+    total: Option<&i64>,
+    debts: Option<Vec<(String, i64)>>,
 ) -> Result<(), CrudError> {
     let mut con = connect()?;
 
@@ -246,7 +264,15 @@ pub fn update_payment_entry(
     }
 
     // Updates payment
-    update_payment(&mut con, payment_id, description, creditor, total, debts)?;
+    update_payment(
+        &mut con,
+        payment_id,
+        description,
+        creditor,
+        currency,
+        total,
+        debts,
+    )?;
 
     Ok(())
 }
@@ -273,7 +299,7 @@ pub fn delete_payment_entry(chat_id: &str, payment_id: &str) -> Result<(), CrudE
 mod tests {
     use crate::bot::redis::{
         balance::delete_balance,
-        chat::{delete_chat, delete_chat_debt, get_chat_users},
+        chat::{delete_chat, delete_chat_currencies, delete_chat_debt, get_chat_users},
         user::{delete_preferred_username, delete_user, get_preferred_username, get_user_chats},
     };
 
@@ -475,10 +501,11 @@ mod tests {
             description: "manager_test_payment".to_string(),
             datetime: "2021-01-01T00:00:00".to_string(),
             creditor: "manager_test_user_10".to_string(),
-            total: 100.0,
+            currency: "USD".to_string(),
+            total: 10000,
             debts: vec![
-                ("manager_test_user_11".to_string(), 50.0),
-                ("manager_test_user_12".to_string(), 50.0),
+                ("manager_test_user_11".to_string(), 5000),
+                ("manager_test_user_12".to_string(), 5000),
             ],
         };
 
@@ -489,10 +516,11 @@ mod tests {
             description: "manager_test_payment_2".to_string(),
             datetime: "2021-01-01T00:00:01".to_string(),
             creditor: "manager_test_user_13".to_string(),
-            total: 200.0,
+            currency: "USD".to_string(),
+            total: 20000,
             debts: vec![
-                ("manager_test_user_14".to_string(), 100.0),
-                ("manager_test_user_15".to_string(), 100.0),
+                ("manager_test_user_14".to_string(), 10000),
+                ("manager_test_user_15".to_string(), 10000),
             ],
         };
 
@@ -510,16 +538,18 @@ mod tests {
         // Updates second payment
         let updated_description = "manager_test_payment_3";
         let updated_creditor = "manager_test_user_16";
-        let updated_total = 300.0;
+        let updated_currency = "JPY";
+        let updated_total = 30000;
         let updated_debts = vec![
-            ("manager_test_user_17".to_string(), 150.0),
-            ("manager_test_user_18".to_string(), 150.0),
+            ("manager_test_user_17".to_string(), 15000),
+            ("manager_test_user_18".to_string(), 15000),
         ];
 
         assert!(update_payment_entry(
             &second_id,
             Some(updated_description),
             Some(updated_creditor),
+            Some(updated_currency),
             Some(&updated_total),
             Some(updated_debts.clone()),
         )
@@ -537,6 +567,7 @@ mod tests {
                         description: updated_description.to_string(),
                         datetime: "2021-01-01T00:00:01".to_string(),
                         creditor: updated_creditor.to_string(),
+                        currency: updated_currency.to_string(),
                         total: updated_total,
                         debts: updated_debts.clone(),
                     },
@@ -563,10 +594,11 @@ mod tests {
             description: "manager_test_user_20".to_string(),
             datetime: "2021-01-01T00:00:00".to_string(),
             creditor: "manager_test_user_21".to_string(),
-            total: 100.0,
+            currency: "USD".to_string(),
+            total: 10000,
             debts: vec![
-                ("manager_test_user_22".to_string(), 50.0),
-                ("manager_test_user_23".to_string(), 50.0),
+                ("manager_test_user_22".to_string(), 5000),
+                ("manager_test_user_23".to_string(), 5000),
             ],
         };
 
@@ -585,10 +617,11 @@ mod tests {
                 "nonexistent_payment",
                 Some("manager_test_payment_3"),
                 Some("manager_test_user_16"),
-                Some(&300.0),
+                Some("JPY"),
+                Some(&30000),
                 Some(vec![
-                    ("manager_test_user_17".to_string(), 150.0),
-                    ("manager_test_user_18".to_string(), 150.0),
+                    ("manager_test_user_17".to_string(), 15000),
+                    ("manager_test_user_18".to_string(), 15000),
                 ]),
             )
             .unwrap_err(),
@@ -633,15 +666,18 @@ mod tests {
         let changes = vec![
             UserBalance {
                 username: "manager_test_user_20".to_string(),
-                balance: 100.0,
+                balance: 10000,
+                currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_21".to_string(),
-                balance: -50.0,
+                balance: -5000,
+                currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_22".to_string(),
-                balance: -50.0,
+                balance: -5000,
+                currency: "USD".to_string(),
             },
         ];
 
@@ -654,15 +690,18 @@ mod tests {
             vec![
                 UserBalance {
                     username: "manager_test_user_20".to_string(),
-                    balance: 100.0
+                    balance: 10000,
+                    currency: "USD".to_string(),
                 },
                 UserBalance {
                     username: "manager_test_user_21".to_string(),
-                    balance: -50.0
+                    balance: -5000,
+                    currency: "USD".to_string(),
                 },
                 UserBalance {
                     username: "manager_test_user_22".to_string(),
-                    balance: -50.0
+                    balance: -5000,
+                    currency: "USD".to_string(),
                 },
             ]
         );
@@ -671,15 +710,18 @@ mod tests {
         let new_changes = vec![
             UserBalance {
                 username: "manager_test_user_20".to_string(),
-                balance: -50.0,
+                balance: -5000,
+                currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_21".to_string(),
-                balance: -50.0,
+                balance: -5000,
+                currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_22".to_string(),
-                balance: 50.0,
+                balance: 5000,
+                currency: "USD".to_string(),
             },
         ];
 
@@ -691,22 +733,25 @@ mod tests {
             vec![
                 UserBalance {
                     username: "manager_test_user_20".to_string(),
-                    balance: 50.0
+                    balance: 5000,
+                    currency: "USD".to_string(),
                 },
                 UserBalance {
                     username: "manager_test_user_21".to_string(),
-                    balance: -100.0
+                    balance: -10000,
+                    currency: "USD".to_string(),
                 },
                 UserBalance {
                     username: "manager_test_user_22".to_string(),
-                    balance: 0.0
+                    balance: 0,
+                    currency: "USD".to_string(),
                 },
             ]
         );
 
         // Deletes balances
         for balance in initial_balances {
-            delete_balance(&mut con, chat_id, &balance.username).unwrap();
+            delete_balance(&mut con, chat_id, &balance.username, "USD").unwrap();
         }
 
         // Deletes usernames
@@ -717,6 +762,119 @@ mod tests {
 
         // Deletes chat
         delete_chat(&mut con, chat_id).unwrap();
+        delete_chat_currencies(&mut con, chat_id).unwrap();
+    }
+
+    #[test]
+    fn test_multiple_currencies_balances() {
+        let mut con = connect().unwrap();
+
+        let chat_id = "manager_1234567899";
+
+        // Add users to chat
+        let usernames = vec![
+            "manager_test_user_26".to_string(),
+            "manager_test_user_27".to_string(),
+            "manager_test_user_28".to_string(),
+        ];
+        update_chat(chat_id, usernames.clone()).unwrap();
+
+        for username in &usernames {
+            update_user(&username, chat_id, None).unwrap();
+        }
+
+        // Add first changes
+        let changes = vec![
+            UserBalance {
+                username: "manager_test_user_26".to_string(),
+                balance: 10000,
+                currency: "USD".to_string(),
+            },
+            UserBalance {
+                username: "manager_test_user_27".to_string(),
+                balance: -5000,
+                currency: "JPY".to_string(),
+            },
+            UserBalance {
+                username: "manager_test_user_28".to_string(),
+                balance: 10000,
+                currency: "JPY".to_string(),
+            },
+        ];
+
+        update_chat_balances(chat_id, changes.clone()).unwrap();
+
+        // Add second changes
+        let new_changes = vec![
+            UserBalance {
+                username: "manager_test_user_26".to_string(),
+                balance: -5000,
+                currency: "JPY".to_string(),
+            },
+            UserBalance {
+                username: "manager_test_user_27".to_string(),
+                balance: -5000,
+                currency: "USD".to_string(),
+            },
+            UserBalance {
+                username: "manager_test_user_28".to_string(),
+                balance: -5000,
+                currency: "USD".to_string(),
+            },
+        ];
+
+        let new_balances = update_chat_balances(chat_id, new_changes.clone()).unwrap();
+
+        // Check balances
+        let balances = vec![
+            UserBalance {
+                username: "manager_test_user_26".to_string(),
+                balance: 10000,
+                currency: "USD".to_string(),
+            },
+            UserBalance {
+                username: "manager_test_user_26".to_string(),
+                balance: -5000,
+                currency: "JPY".to_string(),
+            },
+            UserBalance {
+                username: "manager_test_user_27".to_string(),
+                balance: -5000,
+                currency: "USD".to_string(),
+            },
+            UserBalance {
+                username: "manager_test_user_27".to_string(),
+                balance: -5000,
+                currency: "JPY".to_string(),
+            },
+            UserBalance {
+                username: "manager_test_user_28".to_string(),
+                balance: -5000,
+                currency: "USD".to_string(),
+            },
+            UserBalance {
+                username: "manager_test_user_28".to_string(),
+                balance: 10000,
+                currency: "JPY".to_string(),
+            },
+        ];
+
+        assert_eq!(new_balances, balances);
+
+        // Deletes balances
+        for balance in balances {
+            delete_balance(&mut con, chat_id, &balance.username, &balance.currency).unwrap();
+        }
+
+        // Deletes usernames
+        for username in &usernames {
+            delete_user(&mut con, &username).unwrap();
+            delete_preferred_username(&mut con, username).unwrap();
+        }
+
+        // Deletes chat
+        delete_chat(&mut con, chat_id).unwrap();
+        delete_chat_currencies(&mut con, chat_id).unwrap();
     }
 
     #[test]
@@ -728,12 +886,14 @@ mod tests {
             Debt {
                 debtor: "manager_test_user_25".to_string(),
                 creditor: "manager_test_user_26".to_string(),
-                amount: 100.0,
+                currency: "USD".to_string(),
+                amount: 10000,
             },
             Debt {
                 debtor: "manager_test_user_27".to_string(),
                 creditor: "manager_test_user_28".to_string(),
-                amount: 50.0,
+                currency: "USD".to_string(),
+                amount: 5000,
             },
         ];
 
@@ -748,12 +908,14 @@ mod tests {
             Debt {
                 debtor: "manager_test_user_25".to_string(),
                 creditor: "manager_test_user_26".to_string(),
-                amount: 50.0,
+                currency: "USD".to_string(),
+                amount: 5000,
             },
             Debt {
                 debtor: "manager_test_user_27".to_string(),
                 creditor: "manager_test_user_28".to_string(),
-                amount: 100.0,
+                currency: "USD".to_string(),
+                amount: 10000,
             },
         ];
         assert!(update_chat_debts(chat_id, &new_debts).is_ok());

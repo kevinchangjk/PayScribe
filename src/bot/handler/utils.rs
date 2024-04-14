@@ -12,26 +12,31 @@ use super::{AddDebtsFormat, Payment};
 
 /* Common utilites for handlers. */
 
-pub const MAX_VALUE: f64 = 10_000_000_000_000.00;
+pub const MAX_VALUE: i64 = 1_000_000_000_000_000_000;
 pub const UNKNOWN_ERROR_MESSAGE: &str =
     "❓ Hmm, something went wrong! Sorry, I can't do that right now, please try again later!\n\n";
 pub const NO_TEXT_MESSAGE: &str =
     "❓ Sorry, I can't understand that! Please reply to me in text.\n\n";
+pub const TOTAL_INSTRUCTIONS_MESSAGE: &str =
+"Enter the amount followed by the 3 letter abbreviation for the currency.\nE.g. 7.50 USD, 28 EUR, 320 JPY, etc.";
+pub const CURRENCY_INSTRUCTIONS_MESSAGE: &str =
+    "Enter the 3 letter shorthand for the currency. E.g. USD, EUR, JPY, etc.";
 pub const DEBT_EQUAL_DESCRIPTION_MESSAGE: &str =
     "Equal — Divide the total amount equally among users\n";
 pub const DEBT_EXACT_DESCRIPTION_MESSAGE: &str =
     "Exact — Share the total cost by specifying exact amounts for each user\n";
 pub const DEBT_RATIO_DESCRIPTION_MESSAGE: &str =
-    "Proportion — Split the total cost by specifying relative proportions of the total that each user owes\n";
+"Proportion — Split the total cost by specifying relative proportions of the total that each user owes\n";
 pub const DEBT_EQUAL_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames of those sharing the cost (including the payer if sharing too) as follows: \n\n@username__1\n@username__2\n@username__3\n...\n\n";
+"Enter the usernames of those sharing the cost (including the payer if sharing too) as follows: \n\n@username__1\n@username__2\n@username__3\n...\n\n";
 pub const DEBT_EXACT_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and exact amounts as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\nAny leftover amount will be taken as the payer's share.";
+"Enter the usernames and exact amounts (without currency) as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\nAny leftover amount will be taken as the payer's share.";
 pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and exact amounts as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n";
+"Enter the usernames and exact amounts (without currency) as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n";
 pub const DEBT_RATIO_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the usernames and proportions as follows: \n\n@username__1 portion1\n@username__2 portion2\n@username__3 portion3\n...\n\nThe portions can be any whole or decimal number.";
+"Enter the usernames and proportions as follows: \n\n@username__1 portion1\n@username__2 portion2\n@username__3 portion3\n...\n\nThe portions can be any whole or decimal number.";
 pub const COMMAND_HELP: &str = "/help";
+pub const COMMAND_CURRENCIES: &str = "/currencies";
 pub const COMMAND_ADD_PAYMENT: &str = "/addpayment";
 pub const COMMAND_PAY_BACK: &str = "/payback";
 pub const COMMAND_VIEW_PAYMENTS: &str = "/viewpayments";
@@ -42,6 +47,8 @@ pub const COMMAND_VIEW_BALANCES: &str = "/viewbalances";
 /* Types */
 pub type UserDialogue = Dialogue<State, InMemStorage<State>>;
 pub type HandlerResult = Result<(), BotError>;
+// Represents a currency with a code and decimal places.
+pub type Currency = (String, i32);
 
 #[derive(Debug, Clone)]
 pub enum SelectPaymentType {
@@ -77,22 +84,107 @@ impl From<ProcessError> for BotError {
     }
 }
 
-// Rounds a floating number to a specified precision.
-pub fn round_to_dp(num: f64, dp: i32) -> f64 {
-    let factor = 10.0_f64.powi(dp);
-    (num * factor).round() / factor
+// List of all supported currencies
+pub const CURRENCIES: [(&str, i32); 27] = [
+    ("AED", 2),
+    ("AUD", 2),
+    ("CAD", 2),
+    ("CHF", 2),
+    ("CNY", 2),
+    ("EUR", 2),
+    ("GBP", 2),
+    ("HKD", 2),
+    ("IDR", 0),
+    ("INR", 2),
+    ("JPY", 0),
+    ("KRW", 0),
+    ("MXN", 2),
+    ("MYR", 2),
+    ("MYR", 2),
+    ("NIL", 2),
+    ("NZD", 2),
+    ("PHP", 2),
+    ("RUB", 2),
+    ("SAR", 2),
+    ("SEK", 2),
+    ("SGD", 2),
+    ("THB", 2),
+    ("TRY", 2),
+    ("TWD", 2),
+    ("USD", 2),
+    ("VND", 0),
+];
+pub const CURRENCY_DEFAULT: (&str, i32) = ("NIL", 2);
+
+// Converts a (&str, i32) to a Currency.
+fn to_currency(currency: (&str, i32)) -> Currency {
+    (currency.0.to_string(), currency.1)
+}
+
+// Retrieves the currency given a currency code.
+pub fn get_currency(code: &str) -> Result<Currency, BotError> {
+    let code = code.to_uppercase();
+    for currency in &CURRENCIES {
+        if currency.0 == code {
+            return Ok(to_currency(*currency));
+        }
+    }
+
+    Err(BotError::UserError(
+        "❌ Sorry, I don't have that currency!".to_string(),
+    ))
+}
+
+pub fn get_default_currency() -> Currency {
+    to_currency(CURRENCY_DEFAULT)
+}
+
+// Converts an amount from base value to actual representation in currency.
+pub fn display_amount(amount: i64, decimal_places: i32) -> String {
+    if decimal_places == 0 {
+        return amount.to_string();
+    } else if amount == 0 {
+        return "0".to_string();
+    }
+
+    // Amount is not 0, and decimal places are not 0
+    let factor = 10.0_f64.powi(decimal_places);
+    let actual_amount = amount as f64 / factor;
+    format!(
+        "{:.decimals$}",
+        actual_amount,
+        decimals = decimal_places as usize
+    )
+}
+
+// Displays an amount together with its currency
+pub fn display_currency_amount(amount: i64, currency: Currency) -> String {
+    if currency.0 == "NIL" {
+        format!("{}", display_amount(amount, currency.1))
+    } else {
+        format!("{} {}", display_amount(amount, currency.1), currency.0)
+    }
 }
 
 // Displays balances in a more readable format.
 pub fn display_balances(debts: &Vec<Debt>) -> String {
     let mut message = String::new();
     for debt in debts {
-        message.push_str(&format!(
-            "{} owes {}: {:.2}\n",
-            display_username(&debt.debtor),
-            display_username(&debt.creditor),
-            debt.amount
-        ));
+        let currency = get_currency(&debt.currency);
+        match currency {
+            Ok(currency) => {
+                message.push_str(&format!(
+                    "{} owes {}: {}\n",
+                    display_username(&debt.debtor),
+                    display_username(&debt.creditor),
+                    display_currency_amount(debt.amount, currency),
+                ));
+            }
+            // Should not occur, since code is already processed and stored in database
+            Err(_err) => {
+                continue;
+            }
+        }
     }
 
     if message.is_empty() {
@@ -103,13 +195,13 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
 }
 
 // Displays debts in a more readable format.
-pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
+pub fn display_debts(debts: &Vec<(String, i64)>, decimal_places: i32) -> String {
     let mut message = String::new();
     for debt in debts {
         message.push_str(&format!(
-            "    {}: {:.2}\n",
+            "    {}: {}\n",
             display_username(&debt.0),
-            debt.1
+            display_amount(debt.1, decimal_places),
         ));
     }
     message
@@ -118,13 +210,13 @@ pub fn display_debts(debts: &Vec<(String, f64)>) -> String {
 // Displays a single payment entry in a user-friendly format.
 pub fn display_payment(payment: &Payment, serial_num: usize) -> String {
     format!(
-        "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {:.2}\nSplit:\n{}",
+        "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {}\nSplit:\n{}",
         serial_num,
         payment.description,
         reformat_datetime(&payment.datetime),
         display_username(&payment.creditor),
-        payment.total,
-        display_debts(&payment.debts)
+        display_currency_amount(payment.total, payment.currency.clone()),
+        display_debts(&payment.debts, payment.currency.1)
     )
 }
 
@@ -153,7 +245,7 @@ pub fn make_keyboard(options: Vec<&str>, columns: Option<usize>) -> InlineKeyboa
 
 // Make debt selection keyboard
 pub fn make_keyboard_debt_selection() -> InlineKeyboardMarkup {
-    let buttons = vec!["Equal", "Exact", "Ratio"];
+    let buttons = vec!["Equal", "Exact", "Proportion"];
     make_keyboard(buttons, Some(3))
 }
 
@@ -185,17 +277,13 @@ pub fn parse_username(username: &str) -> Result<String, BotError> {
     ))
 }
 
-// Parse an amount. Reads a string, returns f64 to specific precision.
-pub fn parse_amount(text: &str, round: Option<i32>) -> Result<f64, BotError> {
-    let text = text
-        .chars()
-        .filter(|&c| c.is_digit(10) || c == '.')
-        .collect::<String>();
-
-    let amount = match text.parse::<f64>() {
-        Ok(val) => val,
-        Err(_) => match text.parse::<i32>() {
-            Ok(val) => val as f64,
+// Parse an amount. Reads a string, returns i64 based on currency.
+pub fn parse_amount(text: &str, decimal_places: i32) -> Result<i64, BotError> {
+    let factor = 10.0_f64.powi(decimal_places);
+    let amount = match text.parse::<i64>() {
+        Ok(val) => (val as f64 * factor).round() as i64,
+        Err(_) => match text.parse::<f64>() {
+            Ok(val) => (val * factor).round() as i64,
             Err(_) => {
                 return Err(BotError::UserError(
                     "❌ Please provide a valid number!".to_string(),
@@ -208,20 +296,62 @@ pub fn parse_amount(text: &str, round: Option<i32>) -> Result<f64, BotError> {
         Err(BotError::UserError(
             "❌ This number is too large for me to process!".to_string(),
         ))
+    } else if amount <= 0 {
+        Err(BotError::UserError(
+            "❌ Please provide a positive value!".to_string(),
+        ))
+    } else {
+        Ok(amount)
+    }
+}
+
+// Parse a float. Reads a string, returns f64.
+pub fn parse_float(text: &str) -> Result<f64, BotError> {
+    let amount = match text.parse::<f64>() {
+        Ok(val) => val,
+        Err(_) => match text.parse::<i32>() {
+            Ok(val) => val as f64,
+            Err(_) => {
+                return Err(BotError::UserError(
+                    "❌ Please provide a valid number!".to_string(),
+                ))
+            }
+        },
+    };
+
+    if amount > MAX_VALUE as f64 {
+        Err(BotError::UserError(
+            "❌ This number is too large for me to process!".to_string(),
+        ))
     } else if amount <= 0.0 {
         Err(BotError::UserError(
             "❌ Please provide a positive value!".to_string(),
         ))
     } else {
-        match round {
-            Some(dp) => Ok(round_to_dp(amount, dp)),
-            None => Ok(amount),
-        }
+        Ok(amount)
+    }
+}
+
+// Parse a string representing an amount and a currency
+pub fn parse_currency_amount(text: &str) -> Result<(i64, Currency), BotError> {
+    let items = text.split_whitespace().collect::<Vec<&str>>();
+    if items.len() > 2 {
+        return Err(BotError::UserError(
+            "❌ Please use the following format!".to_string(),
+        ));
+    } else if items.len() == 1 {
+        let currency = get_default_currency();
+        let amount = parse_amount(items[0], currency.1)?;
+        Ok((amount, currency))
+    } else {
+        let currency = get_currency(&items[1])?;
+        let amount = parse_amount(items[0], currency.1)?;
+        Ok((amount, currency))
     }
 }
 
 // Parse and process a string to retrieve a list of debts, for split by equal amount.
-pub fn process_debts_equal(text: &str, total: Option<f64>) -> Result<Vec<(String, f64)>, BotError> {
+pub fn process_debts_equal(text: &str, total: Option<i64>) -> Result<Vec<(String, i64)>, BotError> {
     let users = text.split_whitespace().collect::<Vec<&str>>();
     if users.len() == 0 {
         return Err(BotError::UserError(
@@ -238,9 +368,9 @@ pub fn process_debts_equal(text: &str, total: Option<f64>) -> Result<Vec<(String
         }
     };
 
-    let amount = round_to_dp(total / users.len() as f64, 2);
-    let diff = total - amount * users.len() as f64;
-    let mut debts: Vec<(String, f64)> = Vec::new();
+    let amount = (total as f64 / users.len() as f64).round() as i64;
+    let diff = total - amount * users.len() as i64;
+    let mut debts: Vec<(String, i64)> = Vec::new();
     for user in &users {
         let debt = (parse_username(user)?, amount);
         debts.push(debt);
@@ -256,55 +386,62 @@ pub fn process_debts_equal(text: &str, total: Option<f64>) -> Result<Vec<(String
 pub fn process_debts_exact(
     text: &str,
     creditor: &Option<String>,
-    total: Option<f64>,
-) -> Result<Vec<(String, f64)>, BotError> {
-    let mut debts: Vec<(String, f64)> = Vec::new();
-    let mut sum: f64 = 0.0;
-    let items: Vec<&str> = text.split_whitespace().collect();
-    if items.len() % 2 != 0 {
-        return Err(BotError::UserError(
-            "❌ Please use the following format!".to_string(),
-        ));
-    }
-
-    for i in (0..items.len()).step_by(2) {
-        let username = parse_username(items[i])?;
-        let amount = parse_amount(items[i + 1], Some(2))?;
-        sum += amount;
-
-        let mut found = false;
-        for debt in &mut debts {
-            if debt.0 == username {
-                debt.1 += amount;
-                found = true;
-                break;
-            }
-        }
-
-        if !found {
-            debts.push((username, amount));
-        }
-    }
-
+    currency: Option<Currency>,
+    total: Option<i64>,
+) -> Result<Vec<(String, i64)>, BotError> {
     if let Some(creditor) = creditor {
         if let Some(total) = total {
-            if sum > total {
-                Err(BotError::UserError(
-                    "❌ Something's wrong! The sum of the amounts exceeds the total paid."
-                        .to_string(),
-                ))
-            } else if sum < total {
-                for debt in &mut debts {
-                    if debt.0 == creditor.to_string() {
-                        debt.1 += total - sum;
-                        return Ok(debts);
+            if let Some(currency) = currency {
+                let mut debts: Vec<(String, i64)> = Vec::new();
+                let mut sum: i64 = 0;
+                let items: Vec<&str> = text.split_whitespace().collect();
+                if items.len() % 2 != 0 {
+                    return Err(BotError::UserError(
+                        "❌ Please use the following format!".to_string(),
+                    ));
+                }
+
+                for i in (0..items.len()).step_by(2) {
+                    let username = parse_username(items[i])?;
+                    let amount = parse_amount(items[i + 1], currency.1)?;
+                    sum += amount;
+
+                    let mut found = false;
+                    for debt in &mut debts {
+                        if debt.0 == username {
+                            debt.1 += amount;
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if !found {
+                        debts.push((username, amount));
                     }
                 }
 
-                debts.push((creditor.to_string(), total - sum));
-                Ok(debts)
+                if sum > total {
+                    Err(BotError::UserError(
+                        "❌ Something's wrong! The sum of the amounts exceeds the total paid."
+                            .to_string(),
+                    ))
+                } else if sum < total {
+                    for debt in &mut debts {
+                        if debt.0 == creditor.to_string() {
+                            debt.1 += total - sum;
+                            return Ok(debts);
+                        }
+                    }
+
+                    debts.push((creditor.to_string(), total - sum));
+                    Ok(debts)
+                } else {
+                    Ok(debts)
+                }
             } else {
-                Ok(debts)
+                Err(BotError::UserError(
+                    "❌ Something's wrong! The currency isn't provided.".to_string(),
+                ))
             }
         } else {
             Err(BotError::UserError(
@@ -319,9 +456,10 @@ pub fn process_debts_exact(
 }
 
 // Parse and process a string to retrieve a list of debts, for split by ratio.
-pub fn process_debts_ratio(text: &str, total: Option<f64>) -> Result<Vec<(String, f64)>, BotError> {
+pub fn process_debts_ratio(text: &str, total: Option<i64>) -> Result<Vec<(String, i64)>, BotError> {
     let items: Vec<&str> = text.split_whitespace().collect();
-    let mut debts: Vec<(String, f64)> = Vec::new();
+    let mut debts_ratioed: Vec<(String, f64)> = Vec::new();
+    let mut debts: Vec<(String, i64)> = Vec::new();
     let mut sum: f64 = 0.0;
 
     if items.len() % 2 != 0 {
@@ -332,10 +470,10 @@ pub fn process_debts_ratio(text: &str, total: Option<f64>) -> Result<Vec<(String
 
     for i in (0..items.len()).step_by(2) {
         let username = parse_username(items[i])?;
-        let ratio = parse_amount(items[i + 1], None)?;
+        let ratio = parse_float(items[i + 1])?;
 
         sum += ratio;
-        debts.push((username, ratio));
+        debts_ratioed.push((username, ratio));
     }
 
     let total = match total {
@@ -347,10 +485,10 @@ pub fn process_debts_ratio(text: &str, total: Option<f64>) -> Result<Vec<(String
         }
     };
 
-    let mut exact_sum: f64 = 0.0;
-    for debt in &mut debts {
-        let amount = round_to_dp((debt.1 / sum) * total, 2);
-        debt.1 = amount;
+    let mut exact_sum: i64 = 0;
+    for debt in &mut debts_ratioed {
+        let amount = ((debt.1 / sum) * total as f64).round() as i64;
+        debts.push((debt.0.clone(), amount));
         exact_sum += amount;
     }
 
@@ -366,18 +504,23 @@ pub fn process_debts(
     debts_format: AddDebtsFormat,
     text: &str,
     creditor: &Option<String>,
-    total: Option<f64>,
-) -> Result<Vec<(String, f64)>, BotError> {
+    currency: Option<Currency>,
+    total: Option<i64>,
+) -> Result<Vec<(String, i64)>, BotError> {
     match debts_format {
         AddDebtsFormat::Equal => process_debts_equal(text, total),
-        AddDebtsFormat::Exact => process_debts_exact(text, creditor, total),
+        AddDebtsFormat::Exact => process_debts_exact(text, creditor, currency, total),
         AddDebtsFormat::Ratio => process_debts_ratio(text, total),
     }
 }
 
 // Parses a string of debts and returns a vector of debts
-pub fn parse_debts_payback(text: &str, sender: &str) -> Result<Vec<(String, f64)>, BotError> {
-    let mut debts: Vec<(String, f64)> = Vec::new();
+pub fn parse_debts_payback(
+    text: &str,
+    currency: Currency,
+    sender: &str,
+) -> Result<Vec<(String, i64)>, BotError> {
+    let mut debts: Vec<(String, i64)> = Vec::new();
     let items: Vec<&str> = text.split_whitespace().collect();
     if items.len() % 2 != 0 {
         return Err(BotError::UserError(
@@ -387,7 +530,7 @@ pub fn parse_debts_payback(text: &str, sender: &str) -> Result<Vec<(String, f64)
 
     for i in (0..items.len()).step_by(2) {
         let username = parse_username(items[i])?;
-        let amount = parse_amount(items[i + 1], Some(2))?;
+        let amount = parse_amount(items[i + 1], currency.1)?;
         if username == sender {
             return Err(BotError::UserError(
                 "❌ You can't pay back yourself!".to_string(),
