@@ -7,7 +7,7 @@ use super::{
         get_currency_conversion, get_default_currency, get_payment_entry, get_time_zone,
         retrieve_chat_debts, set_currency_conversion, set_default_currency, set_time_zone,
         update_chat, update_chat_balances, update_chat_debts, update_payment_entry, update_user,
-        CrudError, Debt, Payment, UserBalance, UserPayment,
+        CrudError, Debt, Payment, UserBalance, UserPayment, CURRENCY_CODE_DEFAULT,
     },
 };
 
@@ -37,8 +37,6 @@ impl From<CrudError> for ProcessError {
         ProcessError::CrudError(crud_error)
     }
 }
-
-const CURRENCY_CODE_DEFAULT: &str = "NIL";
 
 /* Utility functions */
 fn auto_update_user(
@@ -74,8 +72,21 @@ fn split_balances_currencies(
         let currency = balance.currency.as_str();
         if currencies.contains(&currency) {
             // Add to existing split
-            let index = currencies.iter().position(|&x| x == currency).unwrap();
-            splits[index].push(balance.clone());
+            let index = currencies
+                .iter()
+                .position(|&curr| curr == currency)
+                .unwrap();
+            let user_index = splits[index]
+                .iter()
+                .position(|bal| bal.username == balance.username);
+            match user_index {
+                Some(user_index) => {
+                    splits[index][user_index].balance += balance.balance;
+                }
+                None => {
+                    splits[index].push(balance.clone());
+                }
+            }
         } else {
             // Create a new split
             currencies.push(currency);

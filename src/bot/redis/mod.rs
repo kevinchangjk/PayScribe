@@ -7,7 +7,7 @@ pub use self::manager::{
 };
 
 // Exported structs and types
-pub use self::chat::Debt;
+pub use self::chat::{Debt, CURRENCY_CODE_DEFAULT};
 pub use self::manager::{CrudError, UserBalance, UserPayment};
 pub use self::payment::Payment;
 

@@ -83,6 +83,23 @@ pub fn get_default_currency() -> Currency {
     to_currency(CURRENCY_DEFAULT)
 }
 
+// Retrieves the default currency of a chat. Does not return an error, assumes default.
+pub fn get_chat_default_currency(chat_id: &str) -> Currency {
+    let setting = ChatSetting::DefaultCurrency(None);
+    let currency = get_chat_setting(&chat_id, setting);
+    match currency {
+        Ok(ChatSetting::DefaultCurrency(Some(currency))) => {
+            let currency = get_currency(&currency);
+            if let Ok(currency) = currency {
+                return currency;
+            }
+        }
+        // Skips error, assumes default
+        _ => {}
+    }
+    get_default_currency()
+}
+
 // Converts an amount from base value to actual representation in currency.
 pub fn display_amount(amount: i64, decimal_places: i32) -> String {
     if decimal_places == 0 {
@@ -102,16 +119,29 @@ pub fn display_amount(amount: i64, decimal_places: i32) -> String {
 }
 
 // Displays an amount together with its currency
-pub fn display_currency_amount(amount: i64, currency: Currency) -> String {
-    if currency.0 == "NIL" {
-        format!("{}", display_amount(amount, currency.1))
+pub fn display_currency_amount(
+    amount: i64,
+    currency: Currency,
+    default_currency: &Currency,
+) -> String {
+    if currency.0 == CURRENCY_DEFAULT.0 {
+        if default_currency.0 == CURRENCY_DEFAULT.0 {
+            format!("{}", display_amount(amount, currency.1))
+        } else {
+            format!(
+                "{} {}",
+                display_amount(amount, default_currency.1),
+                default_currency.0
+            )
+        }
     } else {
         format!("{} {}", display_amount(amount, currency.1), currency.0)
     }
 }
 
 // Displays balances in a more readable format.
-pub fn display_balances(debts: &Vec<Debt>) -> String {
+pub fn display_balances(debts: &Vec<Debt>, chat_id: &str) -> String {
+    let default_currency = get_chat_default_currency(chat_id);
     let mut message = String::new();
     for debt in debts {
         let currency = get_currency(&debt.currency);
@@ -121,7 +151,7 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
                     "{} owes {}: {}\n",
                     display_username(&debt.debtor),
                     display_username(&debt.creditor),
-                    display_currency_amount(debt.amount, currency),
+                    display_currency_amount(debt.amount, currency, &default_currency),
                 ));
             }
             // Should not occur, since code is already processed and stored in database
@@ -153,13 +183,14 @@ pub fn display_debts(debts: &Vec<(String, i64)>, decimal_places: i32) -> String 
 
 // Displays a single payment entry in a user-friendly format.
 pub fn display_payment(payment: &Payment, serial_num: usize, time_zone: Tz) -> String {
+    let default_currency = get_chat_default_currency(&payment.chat_id);
     format!(
         "__________________________\n{}. {}\nDate: {}\nPayer: {}\nTotal: {}\nSplit:\n{}",
         serial_num,
         payment.description,
         reformat_datetime(&payment.datetime, time_zone),
         display_username(&payment.creditor),
-        display_currency_amount(payment.total, payment.currency.clone()),
+        display_currency_amount(payment.total, payment.currency.clone(), &default_currency),
         display_debts(&payment.debts, payment.currency.1)
     )
 }

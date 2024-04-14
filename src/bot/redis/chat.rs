@@ -21,6 +21,9 @@ const SETTING_TIME_ZONE: &str = "time_zone";
 const SETTING_DEFAULT_CURRENCY: &str = "default_currency";
 const SETTING_CURRENCY_CONVERSION: &str = "currency_conversion";
 
+// Constants
+pub const CURRENCY_CODE_DEFAULT: &str = "NIL";
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Debt {
     pub debtor: String,

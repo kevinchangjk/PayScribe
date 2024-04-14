@@ -140,11 +140,11 @@ pub async fn action_delete_payment_confirm(
                                 display_payment(&payment, 1, time_zone)
                                 );
                             bot.edit_message_text(
-                                chat_id,
+                                chat_id.clone(),
                                 id,
                                 format!(
                                     "🎉 I've deleted the payment! 🎉\n\nHere are the updated balances:\n{}",
-                                    display_balances(&balances)
+                                    display_balances(&balances, &chat_id)
                                     ),
                                     )
                                 .await?;

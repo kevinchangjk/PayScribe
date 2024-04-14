@@ -15,6 +15,7 @@ use super::{
         add_user, get_preferred_username, get_user_chats, get_user_exists, set_preferred_username,
         update_user_chats,
     },
+    CURRENCY_CODE_DEFAULT,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -121,8 +122,7 @@ fn init_chat_settings(chat_id: &str) -> Result<(), CrudError> {
     set_chat_time_zone(&mut con, chat_id, default_time_zone)?;
 
     // Set default currency
-    let default_currency = "NIL";
-    set_chat_default_currency(&mut con, chat_id, default_currency)?;
+    set_chat_default_currency(&mut con, chat_id, CURRENCY_CODE_DEFAULT)?;
 
     // Set default currency conversion
     set_chat_currency_conversion(&mut con, chat_id, false)?;
@@ -168,7 +168,7 @@ pub fn get_default_currency(chat_id: &str) -> Result<String, CrudError> {
     let currency = get_chat_default_currency(&mut con, chat_id)?;
     match currency {
         Some(currency) => Ok(currency.to_string()),
-        None => Ok("NIL".to_string()),
+        None => Ok(CURRENCY_CODE_DEFAULT.to_string()),
     }
 }
 
@@ -549,7 +549,10 @@ mod tests {
             ]
         );
         assert_eq!(get_time_zone(chat_id).unwrap(), "UTC".to_string());
-        assert_eq!(get_default_currency(chat_id).unwrap(), "NIL".to_string());
+        assert_eq!(
+            get_default_currency(chat_id).unwrap(),
+            CURRENCY_CODE_DEFAULT.to_string()
+        );
         assert_eq!(get_currency_conversion(chat_id).unwrap(), false);
 
         // Call again, add both groups of usernames
@@ -1031,13 +1034,19 @@ mod tests {
 
         // Checks "default" chat settings
         assert_eq!(get_time_zone(chat_id).unwrap(), "UTC".to_string());
-        assert_eq!(get_default_currency(chat_id).unwrap(), "NIL".to_string());
+        assert_eq!(
+            get_default_currency(chat_id).unwrap(),
+            CURRENCY_CODE_DEFAULT.to_string()
+        );
         assert_eq!(get_currency_conversion(chat_id).unwrap(), false);
 
         // Adds chat
         assert!(update_chat(chat_id, usernames.clone()).is_ok());
         assert_eq!(get_time_zone(chat_id).unwrap(), "UTC".to_string());
-        assert_eq!(get_default_currency(chat_id).unwrap(), "NIL".to_string());
+        assert_eq!(
+            get_default_currency(chat_id).unwrap(),
+            CURRENCY_CODE_DEFAULT.to_string()
+        );
         assert_eq!(get_currency_conversion(chat_id).unwrap(), false);
 
         // Sets various chat settings

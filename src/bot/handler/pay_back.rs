@@ -4,13 +4,13 @@ use crate::bot::{
     dispatcher::State,
     handler::{
         constants::{
-            COMMAND_HELP, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            COMMAND_HELP, CURRENCY_DEFAULT, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
             PAY_BACK_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
         },
         utils::{
-            display_balances, display_debts, display_username, get_currency, get_default_currency,
-            make_keyboard, parse_debts_payback, parse_username, Currency, HandlerResult,
-            UserDialogue,
+            display_balances, display_debts, display_username, get_chat_default_currency,
+            get_currency, get_default_currency, make_keyboard, parse_debts_payback, parse_username,
+            Currency, HandlerResult, UserDialogue,
         },
     },
     processor::add_payment,
@@ -32,10 +32,18 @@ const CANCEL_MESSAGE: &str =
     "Sure, I've cancelled adding the payment. No changes have been made! 👌";
 
 fn display_pay_back_entry(payment: &PayBackParams) -> String {
-    let mut currency_info: String = "".to_string();
-    if payment.currency.0 != "NIL" {
+    let default_currency = get_chat_default_currency(&payment.chat_id);
+    let currency_info: String;
+    if payment.currency.0 == CURRENCY_DEFAULT.0 {
+        if default_currency.0 == CURRENCY_DEFAULT.0 {
+            currency_info = "".to_string();
+        } else {
+            currency_info = format!("in {} ", default_currency.0);
+        }
+    } else {
         currency_info = format!("in {} ", payment.currency.0);
     }
+
     format!(
         "You paid the following amounts {}to:\n{}",
         currency_info,
@@ -114,7 +122,7 @@ async fn call_processor_pay_back(
                     format!(
                         "🎉 I've added the payment! 🎉\n\n{}\nHere are the updated balances:\n{}",
                         payment_overview,
-                        display_balances(&balances)
+                        display_balances(&balances, &chat.id.to_string())
                     ),
                 )
                 .await?;
