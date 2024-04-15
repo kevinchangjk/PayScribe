@@ -143,6 +143,10 @@ async fn update_balances_debts(
     update_chat_balances(chat_id, changes)?;
     let balances = get_chat_balances(chat_id)?;
 
+    if balances.is_empty() {
+        return Ok(Vec::new());
+    }
+
     // Update group debts
     let mut all_debts = Vec::new();
     let conversion = get_currency_conversion(chat_id)?;
@@ -423,36 +427,44 @@ pub async fn update_chat_default_currency(
     let old_currency = get_default_currency(chat_id)?;
 
     // Update all payments to old currency
-    let payments = get_chat_payments_details(chat_id)?;
-    for payment in payments {
-        if payment.payment.currency == CURRENCY_CODE_DEFAULT {
-            update_payment_entry(
-                &payment.payment_id,
-                None,
-                None,
-                Some(&old_currency),
-                None,
-                None,
-            )?;
-        }
-    }
-
-    // Update all balances to old currency
-    let balances = get_chat_balances(chat_id)?;
+    let payments = get_chat_payments_details(chat_id);
     let mut changes: Vec<UserBalance> = Vec::new();
-    for balance in balances {
-        if balance.currency == CURRENCY_CODE_DEFAULT {
-            let change_sub = UserBalance {
-                username: balance.username.clone(),
-                currency: balance.currency,
-                balance: balance.balance.neg(),
-            };
-            let change_add = UserBalance {
-                username: balance.username.clone(),
-                currency: old_currency.clone(),
-                balance: balance.balance,
-            };
-            changes.extend(vec![change_sub, change_add]);
+
+    match payments {
+        Ok(payments) => {
+            for payment in payments {
+                if payment.payment.currency == CURRENCY_CODE_DEFAULT {
+                    update_payment_entry(
+                        &payment.payment_id,
+                        None,
+                        None,
+                        Some(&old_currency),
+                        None,
+                        None,
+                    )?;
+                }
+            }
+
+            // Update all balances to old currency
+            let balances = get_chat_balances(chat_id)?;
+            for balance in balances {
+                if balance.currency == CURRENCY_CODE_DEFAULT {
+                    let change_sub = UserBalance {
+                        username: balance.username.clone(),
+                        currency: balance.currency,
+                        balance: balance.balance.neg(),
+                    };
+                    let change_add = UserBalance {
+                        username: balance.username.clone(),
+                        currency: old_currency.clone(),
+                        balance: balance.balance,
+                    };
+                    changes.extend(vec![change_sub, change_add]);
+                }
+            }
+        }
+        Err(_) => {
+            // This means that there were no payments found
         }
     }
 
