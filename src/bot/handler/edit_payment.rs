@@ -14,10 +14,9 @@ use crate::bot::{
             DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, TOTAL_INSTRUCTIONS_MESSAGE,
         },
         utils::{
-            display_balances, display_debts, display_payment, display_username,
-            get_chat_default_currency, make_keyboard, make_keyboard_debt_selection,
-            parse_currency_amount, parse_username, process_debts, retrieve_time_zone, Currency,
-            HandlerResult, UserDialogue,
+            display_balances, display_debts, display_payment, display_username, make_keyboard,
+            make_keyboard_debt_selection, parse_currency_amount, parse_username, process_debts,
+            retrieve_time_zone, use_currency, Currency, HandlerResult, UserDialogue,
         },
         AddDebtsFormat, AddPaymentEdit, Payment,
     },
@@ -43,15 +42,13 @@ const CANCEL_MESSAGE: &str =
 */
 fn display_edit_payment(payment: Payment, edited_payment: EditPaymentParams) -> String {
     let currency = edited_payment.currency.unwrap_or(payment.currency);
-    let default_currency = get_chat_default_currency(&payment.chat_id);
     format!(
         "Description: {}\nPayer: {}\nTotal: {}\nSplit:\n{}",
         edited_payment.description.unwrap_or(payment.description),
         display_username(&edited_payment.creditor.unwrap_or(payment.creditor)),
         display_currency_amount(
             edited_payment.total.unwrap_or(payment.total),
-            currency.clone(),
-            &default_currency
+            use_currency(currency.clone(), &payment.chat_id),
         ),
         display_debts(
             &edited_payment.debts.unwrap_or(payment.debts.clone()),
@@ -364,12 +361,16 @@ pub async fn action_edit_payment_confirm(
                         .await?;
                 }
                 "Total" => {
-                    let default_currency = get_chat_default_currency(&payment.chat_id);
+                    let currency = edited_payment
+                        .currency
+                        .clone()
+                        .unwrap_or(payment.currency.clone());
+                    let actual_currency = use_currency(currency, &payment.chat_id);
                     bot.send_message(
                         chat.id,
                         format!(
                             "Current total: {}\n\nWhat should the total be?\n\nOptional: You may also enter the currency of the amount. {TOTAL_INSTRUCTIONS_MESSAGE}",
-                            display_currency_amount(edited_payment.total.unwrap_or(payment.total), edited_payment.currency.clone().unwrap_or(payment.currency.clone()), &default_currency)
+                            display_currency_amount(edited_payment.total.unwrap_or(payment.total), actual_currency)
                             ),
                             )
                         .await?;

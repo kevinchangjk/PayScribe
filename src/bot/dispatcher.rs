@@ -89,9 +89,10 @@ pub enum State {
         page: usize,
     },
     SettingsMenu,
+    SettingsTimeZoneMenu,
     SettingsTimeZone,
-    SettingsDefaultCurrency,
     SettingsDefaultCurrencyMenu,
+    SettingsDefaultCurrency,
     SettingsCurrencyConversion,
 }
 
@@ -413,7 +414,33 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::Settings].endpoint(handle_repeated_settings)),
         )
         .branch(
+            case![State::SettingsTimeZoneMenu]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::Cancel].endpoint(cancel_settings))
+                .branch(case![Command::AddPayment].endpoint(block_settings))
+                .branch(case![Command::ViewBalances].endpoint(block_settings))
+                .branch(case![Command::PayBack].endpoint(block_settings))
+                .branch(case![Command::ViewPayments].endpoint(block_settings))
+                .branch(case![Command::EditPayment].endpoint(block_settings))
+                .branch(case![Command::DeletePayment].endpoint(block_settings))
+                .branch(case![Command::Settings].endpoint(handle_repeated_settings)),
+        )
+        .branch(
             case![State::SettingsTimeZone]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::Cancel].endpoint(cancel_settings))
+                .branch(case![Command::AddPayment].endpoint(block_settings))
+                .branch(case![Command::ViewBalances].endpoint(block_settings))
+                .branch(case![Command::PayBack].endpoint(block_settings))
+                .branch(case![Command::ViewPayments].endpoint(block_settings))
+                .branch(case![Command::EditPayment].endpoint(block_settings))
+                .branch(case![Command::DeletePayment].endpoint(block_settings))
+                .branch(case![Command::Settings].endpoint(handle_repeated_settings)),
+        )
+        .branch(
+            case![State::SettingsDefaultCurrencyMenu]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
                 .branch(case![Command::Cancel].endpoint(cancel_settings))
@@ -520,6 +547,8 @@ pub async fn run_dispatcher(bot: Bot) {
             .endpoint(callback_invalid_message),
         )
         .branch(case![State::SettingsMenu].endpoint(callback_invalid_message))
+        .branch(case![State::SettingsTimeZoneMenu].endpoint(callback_invalid_message))
+        .branch(case![State::SettingsDefaultCurrencyMenu].endpoint(callback_invalid_message))
         .branch(case![State::SettingsCurrencyConversion].endpoint(callback_invalid_message))
         .branch(case![State::Start].endpoint(invalid_state));
 
@@ -566,6 +595,8 @@ pub async fn run_dispatcher(bot: Bot) {
             .endpoint(action_delete_payment_confirm),
         )
         .branch(case![State::SettingsMenu].endpoint(action_settings_menu))
+        .branch(case![State::SettingsTimeZoneMenu].endpoint(action_time_zone_menu))
+        .branch(case![State::SettingsDefaultCurrencyMenu].endpoint(action_default_currency_menu))
         .branch(
             case![State::SettingsCurrencyConversion].endpoint(action_settings_currency_conversion),
         );

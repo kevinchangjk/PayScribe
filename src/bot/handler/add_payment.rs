@@ -11,7 +11,7 @@ use crate::bot::{
         },
         utils::{
             display_balances, display_currency_amount, display_debts, display_username,
-            get_chat_default_currency, make_keyboard, parse_username, process_debts, HandlerResult,
+            make_keyboard, parse_username, process_debts, use_currency, HandlerResult,
             UserDialogue,
         },
     },
@@ -60,8 +60,6 @@ const CANCEL_MESSAGE: &str =
 /* Displays a payment entry (being added) in String format.
 */
 fn display_add_payment(payment: &AddPaymentParams) -> String {
-    let default_currency = get_chat_default_currency(&payment.chat_id);
-
     let description = match &payment.description {
         Some(desc) => format!("Description: {}\n", desc),
         None => "".to_string(),
@@ -74,7 +72,7 @@ fn display_add_payment(payment: &AddPaymentParams) -> String {
         Some(total) => match &payment.currency {
             Some(currency) => format!(
                 "Total: {}\n",
-                display_currency_amount(*total, currency.clone(), &default_currency)
+                display_currency_amount(*total, use_currency(currency.clone(), &payment.chat_id))
             ),
             None => "".to_string(),
         },
@@ -705,13 +703,12 @@ pub async fn action_add_edit_menu(
                         .await?;
                 }
                 "Total" => {
-                    let default_currency = get_chat_default_currency(&payment_clone.chat_id);
                     bot.edit_message_text(
                         chat.id,
                         id,
                         format!(
                             "Current total: {}\n\nWhat should the total be?\n\nOptional: You may also enter the currency of the amount. {TOTAL_INSTRUCTIONS_MESSAGE}",
-                            display_currency_amount(payment_clone.total.unwrap(), payment_clone.currency.unwrap(), &default_currency)
+                            display_currency_amount(payment_clone.total.unwrap(), use_currency(payment_clone.currency.unwrap(), &payment_clone.chat_id))
                             ),
                             )
                         .await?;

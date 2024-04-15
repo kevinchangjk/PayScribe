@@ -31,9 +31,9 @@ pub use self::view_payments::{
 };
 
 pub use self::settings::{
-    action_settings, action_settings_currency_conversion, action_settings_default_currency,
-    action_settings_menu, action_settings_time_zone, block_settings, cancel_settings,
-    handle_repeated_settings,
+    action_default_currency_menu, action_settings, action_settings_currency_conversion,
+    action_settings_default_currency, action_settings_menu, action_settings_time_zone,
+    action_time_zone_menu, block_settings, cancel_settings, handle_repeated_settings,
 };
 
 // Submodules

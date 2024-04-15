@@ -3,7 +3,7 @@ use std::ops::Neg;
 use super::{
     optimizer::optimize_debts,
     redis::{
-        add_payment_entry, delete_payment_entry, get_chat_payments_details,
+        add_payment_entry, delete_payment_entry, get_chat_balances, get_chat_payments_details,
         get_currency_conversion, get_default_currency, get_payment_entry, get_time_zone,
         retrieve_chat_debts, set_currency_conversion, set_default_currency, set_time_zone,
         update_chat, update_chat_balances, update_chat_debts, update_payment_entry, update_user,
@@ -102,7 +102,8 @@ fn update_balances_debts(
     changes: Vec<UserBalance>,
 ) -> Result<Vec<Debt>, ProcessError> {
     // Update balances
-    let balances = update_chat_balances(chat_id, changes)?;
+    update_chat_balances(chat_id, changes)?;
+    let balances = get_chat_balances(chat_id)?;
 
     // Update group debts
     let split_balances = split_balances_currencies(balances, chat_id);
@@ -360,5 +361,70 @@ pub fn set_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<(), Proce
             }
         }
     }
+    Ok(())
+}
+
+/* Changes the default currency of a group chat.
+ * Also handles all the conversion logic for past payments.
+ */
+pub fn update_chat_default_currency(chat_id: &str, currency: &str) -> Result<(), ProcessError> {
+    let old_currency = get_default_currency(chat_id)?;
+    log::info!(
+        "Changing default currency of chat {} from {} to {}",
+        chat_id,
+        old_currency,
+        currency
+    );
+
+    // Update all payments to old currency
+    let payments = get_chat_payments_details(chat_id)?;
+    for payment in payments {
+        if payment.payment.currency == CURRENCY_CODE_DEFAULT {
+            update_payment_entry(
+                &payment.payment_id,
+                None,
+                None,
+                Some(&old_currency),
+                None,
+                None,
+            )?;
+            log::info!(
+                "Updating payment {} from {} to {}",
+                payment.payment_id,
+                CURRENCY_CODE_DEFAULT,
+                old_currency
+            );
+        }
+    }
+
+    // Update all balances to old currency
+    let balances = get_chat_balances(chat_id)?;
+    let mut changes: Vec<UserBalance> = Vec::new();
+    for balance in balances {
+        if balance.currency == CURRENCY_CODE_DEFAULT {
+            let change_sub = UserBalance {
+                username: balance.username.clone(),
+                currency: balance.currency,
+                balance: balance.balance.neg(),
+            };
+            let change_add = UserBalance {
+                username: balance.username.clone(),
+                currency: old_currency.clone(),
+                balance: balance.balance,
+            };
+            changes.extend(vec![change_sub, change_add]);
+            log::info!(
+                "Updating balance of {} from {} to {}",
+                balance.username,
+                CURRENCY_CODE_DEFAULT,
+                old_currency
+            );
+        }
+    }
+    update_chat_balances(chat_id, changes)?;
+
+    // Update default currency in settings
+    set_default_currency(chat_id, &currency)?;
+
     Ok(())
 }

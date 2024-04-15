@@ -193,14 +193,40 @@ pub fn get_currency_conversion(chat_id: &str) -> Result<bool, CrudError> {
     }
 }
 
+/* Gets all balances for a chat.
+ * Used when updating default currencies for a chat.
+ */
+pub fn get_chat_balances(chat_id: &str) -> Result<Vec<UserBalance>, CrudError> {
+    let mut con = connect()?;
+
+    // Retrieve all balances
+    let mut balances: Vec<UserBalance> = Vec::new();
+    let users = get_chat_users(&mut con, chat_id)?;
+    let currencies = get_chat_currencies(&mut con, chat_id)?;
+    for currency in &currencies {
+        for user in &users {
+            if get_balance_exists(&mut con, chat_id, user, &currency)? {
+                let balance = get_balance(&mut con, chat_id, user, &currency)?;
+                if balance != 0 {
+                    let username = get_preferred_username(&mut con, user)?;
+                    balances.push(UserBalance {
+                        username,
+                        currency: currency.to_string(),
+                        balance,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(balances)
+}
+
 /* Updates balances for a chat based on given change amounts.
  * If balance does not exist, creates it.
  * Returns the updated balances.
  */
-pub fn update_chat_balances(
-    chat_id: &str,
-    changes: Vec<UserBalance>,
-) -> Result<Vec<UserBalance>, CrudError> {
+pub fn update_chat_balances(chat_id: &str, changes: Vec<UserBalance>) -> Result<(), CrudError> {
     let mut con = connect()?;
 
     // Update balances through changes
@@ -225,27 +251,7 @@ pub fn update_chat_balances(
         }
     }
 
-    // Retrieve all balances
-    let mut updated_balances: Vec<UserBalance> = Vec::new();
-    let users = get_chat_users(&mut con, chat_id)?;
-    let currencies = get_chat_currencies(&mut con, chat_id)?;
-    for currency in &currencies {
-        for user in &users {
-            if get_balance_exists(&mut con, chat_id, user, &currency)? {
-                let balance = get_balance(&mut con, chat_id, user, &currency)?;
-                if balance != 0 {
-                    let username = get_preferred_username(&mut con, user)?;
-                    updated_balances.push(UserBalance {
-                        username,
-                        currency: currency.to_string(),
-                        balance,
-                    });
-                }
-            }
-        }
-    }
-
-    Ok(updated_balances)
+    Ok(())
 }
 
 /* Sets the latest state of simplified debts for a chat.
@@ -779,7 +785,8 @@ mod tests {
         ];
 
         // Adds initial balances
-        let initial_balances = update_chat_balances(chat_id, changes.clone()).unwrap();
+        assert!(update_chat_balances(chat_id, changes.clone()).is_ok());
+        let initial_balances = get_chat_balances(chat_id).unwrap();
 
         // Checks that balances are correct
         assert_eq!(
@@ -822,7 +829,8 @@ mod tests {
             },
         ];
 
-        let new_balances = update_chat_balances(chat_id, new_changes.clone()).unwrap();
+        assert!(update_chat_balances(chat_id, new_changes.clone()).is_ok());
+        let new_balances = get_chat_balances(chat_id).unwrap();
 
         // Checks that balances are correct
         assert_eq!(
@@ -916,7 +924,8 @@ mod tests {
             },
         ];
 
-        let new_balances = update_chat_balances(chat_id, new_changes.clone()).unwrap();
+        assert!(update_chat_balances(chat_id, new_changes.clone()).is_ok());
+        let new_balances = get_chat_balances(chat_id).unwrap();
 
         // Check balances
         let balances = vec![

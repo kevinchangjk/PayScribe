@@ -10,7 +10,7 @@ use crate::bot::{
         utils::{
             display_balances, display_debts, display_username, get_chat_default_currency,
             get_currency, get_default_currency, make_keyboard, parse_debts_payback, parse_username,
-            Currency, HandlerResult, UserDialogue,
+            use_currency, Currency, HandlerResult, UserDialogue,
         },
     },
     processor::add_payment,
@@ -32,22 +32,18 @@ const CANCEL_MESSAGE: &str =
     "Sure, I've cancelled adding the payment. No changes have been made! 👌";
 
 fn display_pay_back_entry(payment: &PayBackParams) -> String {
-    let default_currency = get_chat_default_currency(&payment.chat_id);
     let currency_info: String;
-    if payment.currency.0 == CURRENCY_DEFAULT.0 {
-        if default_currency.0 == CURRENCY_DEFAULT.0 {
-            currency_info = "".to_string();
-        } else {
-            currency_info = format!("in {} ", default_currency.0);
-        }
+    let actual_currency = use_currency(payment.currency.clone(), &payment.chat_id);
+    if actual_currency.0 == CURRENCY_DEFAULT.0 {
+        currency_info = "".to_string();
     } else {
-        currency_info = format!("in {} ", payment.currency.0);
+        currency_info = format!("in {} ", actual_currency.0);
     }
 
     format!(
         "You paid the following amounts {}to:\n{}",
         currency_info,
-        display_debts(&payment.debts, payment.currency.1)
+        display_debts(&payment.debts, actual_currency.1)
     )
 }
 
@@ -299,6 +295,7 @@ pub async fn action_pay_back_debts(
     currency: Currency,
     msg: Message,
 ) -> HandlerResult {
+    let chat_id = msg.chat.id.to_string();
     match msg.text() {
         Some(text) => {
             if let Some(user) = msg.from() {
@@ -308,23 +305,29 @@ pub async fn action_pay_back_debts(
                         log::error!(
                             "Pay Back - User {} in chat {} failed to parse username: {}",
                             user.id,
-                            msg.chat.id,
+                            chat_id,
                             err
                         );
-                        bot.send_message(msg.chat.id, UNKNOWN_ERROR_MESSAGE).await?;
+                        bot.send_message(chat_id, UNKNOWN_ERROR_MESSAGE).await?;
                         return Ok(());
                     }
                     let username = username?;
-                    let debts = parse_debts_payback(text, currency.clone(), &username);
+                    let actual_currency: Currency;
+                    if currency.0 == CURRENCY_DEFAULT.0 {
+                        actual_currency = get_chat_default_currency(&chat_id);
+                    } else {
+                        actual_currency = currency.clone();
+                    }
+                    let debts = parse_debts_payback(text, actual_currency.clone(), &username);
                     if let Err(err) = debts {
-                        bot.send_message(msg.chat.id, err.to_string()).await?;
+                        bot.send_message(chat_id, err.to_string()).await?;
                         return Ok(());
                     }
 
                     let debts = debts?;
                     let total = debts.iter().fold(0, |curr, next| curr + next.1);
                     let payment = PayBackParams {
-                        chat_id: msg.chat.id.to_string(),
+                        chat_id,
                         sender_id: msg.from().as_ref().unwrap().id.to_string(),
                         sender_username: username,
                         datetime: msg.date.to_string(),
@@ -337,7 +340,7 @@ pub async fn action_pay_back_debts(
             }
         }
         None => {
-            bot.send_message(msg.chat.id, format!("{NO_TEXT_MESSAGE}"))
+            bot.send_message(chat_id, format!("{NO_TEXT_MESSAGE}"))
                 .await?;
         }
     }

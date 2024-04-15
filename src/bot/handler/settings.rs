@@ -7,13 +7,16 @@ use teloxide::{
 use crate::bot::{
     dispatcher::State,
     handler::{
-        constants::{COMMAND_CANCEL, COMMAND_HELP, NO_TEXT_MESSAGE},
+        constants::{COMMAND_HELP, NO_TEXT_MESSAGE},
         utils::{get_currency, make_keyboard, HandlerResult, UserDialogue},
     },
-    processor::{get_chat_setting, set_chat_setting, ChatSetting},
+    processor::{get_chat_setting, set_chat_setting, update_chat_default_currency, ChatSetting},
 };
 
-use super::{constants::CURRENCY_DEFAULT, utils::parse_time_zone};
+use super::{
+    constants::CURRENCY_DEFAULT,
+    utils::{parse_time_zone, retrieve_time_zone},
+};
 
 /* Utilities */
 const CANCEL_MESSAGE: &str = "Sure, no changes to the settings have been made! 👌";
@@ -22,6 +25,23 @@ const DEFAULT_CURRENCY_DESCRIPTION: &str =
     "*Default Currency* — Currency used by default if left blank";
 const CURRENCY_CONVERSION_DESCRIPTION: &str =
     "*Currency Conversion* — Convert currencies when simplifying balances";
+
+// Displays the first settings menu.
+async fn display_settings_menu(bot: Bot, dialogue: UserDialogue, chat_id: String) -> HandlerResult {
+    let buttons = vec![
+        "Time Zone",
+        "Default Currency",
+        "Currency Conversion",
+        "Cancel",
+    ];
+    let keyboard = make_keyboard(buttons, Some(2));
+    bot.send_message(chat_id, format!("Of course\\! Here are the settings you can configure\\. What would you like to view or edit?\n\n{TIME_ZONE_DESCRIPTION}\n{DEFAULT_CURRENCY_DESCRIPTION}\n{CURRENCY_CONVERSION_DESCRIPTION}"))
+        .parse_mode(ParseMode::MarkdownV2)
+        .reply_markup(keyboard)
+        .await?;
+    dialogue.update(State::SettingsMenu).await?;
+    Ok(())
+}
 
 /* Handles a repeated call to edit/delete payment entry.
  * Does nothing, simply notifies the user.
@@ -54,22 +74,6 @@ pub async fn block_settings(bot: Bot, msg: Message) -> HandlerResult {
     Ok(())
 }
 
-async fn display_settings_menu(bot: Bot, dialogue: UserDialogue, chat_id: String) -> HandlerResult {
-    let buttons = vec![
-        "Time Zone",
-        "Default Currency",
-        "Currency Conversion",
-        "Cancel",
-    ];
-    let keyboard = make_keyboard(buttons, Some(2));
-    bot.send_message(chat_id, format!("Of course\\! Here are the settings you can configure\\. What would you like to view or edit?\n\n{TIME_ZONE_DESCRIPTION}\n{DEFAULT_CURRENCY_DESCRIPTION}\n{CURRENCY_CONVERSION_DESCRIPTION}"))
-        .parse_mode(ParseMode::MarkdownV2)
-        .reply_markup(keyboard)
-        .await?;
-    dialogue.update(State::SettingsMenu).await?;
-    Ok(())
-}
-
 /* Allows user to view and edit chat settings.
  * Bot presents a button menu of setting options.
  */
@@ -90,51 +94,51 @@ pub async fn action_settings_menu(
     if let Some(button) = &query.data {
         bot.answer_callback_query(query.id.to_string()).await?;
         if let Some(msg) = query.message {
+            let chat_id = msg.chat.id.to_string();
             match button.as_str() {
                 "Time Zone" => {
-                    let setting =
-                        get_chat_setting(&msg.chat.id.to_string(), ChatSetting::TimeZone(None))?;
-                    if let ChatSetting::TimeZone(Some(time_zone)) = setting {
-                        bot.edit_message_text(
-                            msg.chat.id,
-                            msg.id,
-                            format!(
-                                "Current Time Zone: {}\n\nIf you wish to change the time zone, reply with the new time zone code. Otherwise, if you are happy with this, you can /cancel this operation.",
-                                time_zone
-                                ),
-                                )
-                            .await?;
-                        dialogue.update(State::SettingsTimeZone).await?;
-                    }
+                    let time_zone = retrieve_time_zone(&chat_id);
+                    let buttons = vec!["Back", "Edit"];
+                    let keyboard = make_keyboard(buttons, Some(2));
+                    bot.edit_message_text(
+                        chat_id,
+                        msg.id,
+                        format!(
+                            "Time Zone: {}\n\nWould you like to edit the time zone for this chat?",
+                            time_zone
+                        ),
+                    )
+                    .reply_markup(keyboard)
+                    .await?;
+                    dialogue.update(State::SettingsTimeZoneMenu).await?;
                 }
                 "Default Currency" => {
-                    let setting = get_chat_setting(
-                        &msg.chat.id.to_string(),
-                        ChatSetting::DefaultCurrency(None),
-                    )?;
+                    let setting = get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None))?;
                     if let ChatSetting::DefaultCurrency(Some(currency)) = setting {
                         let currency_info: String;
+                        let buttons: Vec<&str>;
                         if currency == CURRENCY_DEFAULT.0 {
                             currency_info = format!("Default Currency is NOT set.");
+                            buttons = vec!["Disable", "Edit", "Back"];
                         } else {
                             currency_info = format!("Default Currency: {}", currency);
+                            buttons = vec!["Back", "Edit"];
                         }
+                        let keyboard = make_keyboard(buttons, Some(2));
+
                         bot.edit_message_text(
-                            msg.chat.id,
+                            chat_id,
                             msg.id,
                             format!(
-                                "{currency_info}\n\nIf you wish to change the default currency, reply with the new currency code (check out the documentation in {COMMAND_HELP} if unsure!).\n\nYou can also disable Default Currency by replying with \"NIL\". Or, to keep it as it is, {COMMAND_CANCEL} this operation.",
-                                ),
-                                )
+                                "{currency_info}\n\nWould you like to edit the default currency for this chat?",
+                                )).reply_markup(keyboard)
                             .await?;
-                        dialogue.update(State::SettingsDefaultCurrency).await?;
+                        dialogue.update(State::SettingsDefaultCurrencyMenu).await?;
                     }
                 }
                 "Currency Conversion" => {
-                    let setting = get_chat_setting(
-                        &msg.chat.id.to_string(),
-                        ChatSetting::CurrencyConversion(None),
-                    )?;
+                    let setting =
+                        get_chat_setting(&chat_id, ChatSetting::CurrencyConversion(None))?;
                     if let ChatSetting::CurrencyConversion(Some(convert)) = setting {
                         let status: &str;
                         let action: &str;
@@ -153,7 +157,7 @@ pub async fn action_settings_menu(
                         let keyboard = make_keyboard(buttons, Some(2));
 
                         bot.edit_message_text(
-                            msg.chat.id,
+                            chat_id,
                             msg.id,
                             format!(
                                 "Currency Conversion is currently {}.\n\nDo you wish to {} currency conversion for this chat?",
@@ -174,7 +178,52 @@ pub async fn action_settings_menu(
                         log::error!(
                             "Settings Menu - Invalid button for user {} in chat {}: {}",
                             user.id,
+                            chat_id,
+                            button
+                        );
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/* Presents the time zone for the chat.
+ * Receives a callback query on whether the user wants to edit the time zone.
+ */
+pub async fn action_time_zone_menu(
+    bot: Bot,
+    dialogue: UserDialogue,
+    query: CallbackQuery,
+) -> HandlerResult {
+    if let Some(button) = &query.data {
+        bot.answer_callback_query(query.id.to_string()).await?;
+        if let Some(msg) = query.message {
+            let chat_id = msg.chat.id;
+            match button.as_str() {
+                "Back" => {
+                    display_settings_menu(bot, dialogue, chat_id.to_string()).await?;
+                }
+                "Edit" => {
+                    let time_zone = retrieve_time_zone(&chat_id.to_string());
+                    bot.edit_message_text(
                             msg.chat.id,
+                            msg.id,
+                            format!(
+                                "Time Zone: {}\n\nWhat time zone would you like to set for this chat? If you are unsure on which time zones are supported, check out the user guide with {COMMAND_HELP}!",
+                                time_zone
+                                ),
+                                )
+                            .await?;
+                    dialogue.update(State::SettingsTimeZone).await?;
+                }
+                _ => {
+                    if let Some(user) = msg.from() {
+                        log::error!(
+                            "Settings Time Zone Menu - Invalid button for user {} in chat {}: {}",
+                            user.id,
+                            chat_id,
                             button
                         );
                     }
@@ -221,6 +270,67 @@ pub async fn action_settings_time_zone(
     Ok(())
 }
 
+/* Presents the default currency for the chat.
+ * Receives a callback query on whether the user wants to edit the default currency.
+ */
+pub async fn action_default_currency_menu(
+    bot: Bot,
+    dialogue: UserDialogue,
+    query: CallbackQuery,
+) -> HandlerResult {
+    if let Some(button) = &query.data {
+        bot.answer_callback_query(query.id.to_string()).await?;
+        if let Some(msg) = query.message {
+            let chat_id = msg.chat.id.to_string();
+            match button.as_str() {
+                "Disable" => {
+                    update_chat_default_currency(&chat_id, CURRENCY_DEFAULT.0)?;
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("Default Currency has been disabled for future payments! 👍"),
+                    )
+                    .await?;
+                    dialogue.exit().await?;
+                }
+                "Edit" => {
+                    let setting = get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None))?;
+                    if let ChatSetting::DefaultCurrency(Some(currency)) = setting {
+                        let currency_info: String;
+                        if currency == CURRENCY_DEFAULT.0 {
+                            currency_info = format!("Default Currency is NOT set.");
+                        } else {
+                            currency_info = format!("Default Currency: {}", currency);
+                        }
+
+                        bot.edit_message_text(
+                            chat_id,
+                            msg.id,
+                            format!(
+                                "{currency_info}\n\nWhat would you like to set as the default currency? If you are unsure on which currencies are supported, check out the user guide with {COMMAND_HELP}!",
+                                ))
+                            .await?;
+                        dialogue.update(State::SettingsDefaultCurrency).await?;
+                    }
+                }
+                "Back" => {
+                    display_settings_menu(bot, dialogue, chat_id).await?;
+                }
+                _ => {
+                    if let Some(user) = msg.from() {
+                        log::error!(
+                            "Settings Time Zone Menu - Invalid button for user {} in chat {}: {}",
+                            user.id,
+                            chat_id,
+                            button
+                        );
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /* Sets the default currency for the chat.
  * Bot receives a string representing the currency code, and calls processor.
  */
@@ -229,37 +339,36 @@ pub async fn action_settings_default_currency(
     dialogue: UserDialogue,
     msg: Message,
 ) -> HandlerResult {
+    let chat_id = msg.chat.id.to_string();
     match msg.text() {
         Some(text) => {
             let currency = get_currency(text);
             match currency {
                 Ok(currency) => {
-                    let response: String;
-                    if currency.0 == CURRENCY_DEFAULT.0 {
-                        response = format!("The Default Currency has now been disabled! 👍");
-                    } else {
-                        response =
-                            format!("The Default Currency has been set to {}! 👍", currency.0);
-                    }
-                    let setting = ChatSetting::DefaultCurrency(Some(currency.0.clone()));
-                    set_chat_setting(&msg.chat.id.to_string(), setting)?;
-                    bot.send_message(msg.chat.id, response).await?;
+                    update_chat_default_currency(&chat_id, &currency.0)?;
+                    bot.send_message(
+                        msg.chat.id,
+                        format!(
+                            "Default Currency has been set to {} for future payments! 👍",
+                            currency.0
+                        ),
+                    )
+                    .await?;
                     dialogue.exit().await?;
                 }
                 Err(err) => {
                     bot.send_message(
-                        msg.chat.id,
+                        chat_id,
                         format!(
-                            "{} You can check out the supported currencies in the documentation with {COMMAND_HELP}.",
+                            "{} You can check out the supported currencies in the user guide with {COMMAND_HELP}.",
                             err
-                        ),
-                    )
-                    .await?;
+                            ))
+                        .await?;
                 }
             }
         }
         None => {
-            bot.send_message(msg.chat.id, format!("{NO_TEXT_MESSAGE}"))
+            bot.send_message(chat_id, format!("{NO_TEXT_MESSAGE}"))
                 .await?;
         }
     }
