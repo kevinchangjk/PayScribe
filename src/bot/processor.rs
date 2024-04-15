@@ -369,12 +369,6 @@ pub fn set_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<(), Proce
  */
 pub fn update_chat_default_currency(chat_id: &str, currency: &str) -> Result<(), ProcessError> {
     let old_currency = get_default_currency(chat_id)?;
-    log::info!(
-        "Changing default currency of chat {} from {} to {}",
-        chat_id,
-        old_currency,
-        currency
-    );
 
     // Update all payments to old currency
     let payments = get_chat_payments_details(chat_id)?;
@@ -388,12 +382,6 @@ pub fn update_chat_default_currency(chat_id: &str, currency: &str) -> Result<(),
                 None,
                 None,
             )?;
-            log::info!(
-                "Updating payment {} from {} to {}",
-                payment.payment_id,
-                CURRENCY_CODE_DEFAULT,
-                old_currency
-            );
         }
     }
 
@@ -413,12 +401,6 @@ pub fn update_chat_default_currency(chat_id: &str, currency: &str) -> Result<(),
                 balance: balance.balance,
             };
             changes.extend(vec![change_sub, change_add]);
-            log::info!(
-                "Updating balance of {} from {} to {}",
-                balance.username,
-                CURRENCY_CODE_DEFAULT,
-                old_currency
-            );
         }
     }
 
