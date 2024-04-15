@@ -277,7 +277,7 @@ pub async fn action_settings_time_zone(
             match time_zone {
                 Ok(time_zone) => {
                     let setting = ChatSetting::TimeZone(Some(text.to_string()));
-                    set_chat_setting(&chat_id, setting)?;
+                    set_chat_setting(&chat_id, setting).await?;
                     bot.send_message(
                         msg.chat.id,
                         format!("The Time Zone has been set to {}! 👍", time_zone),
@@ -419,7 +419,7 @@ pub async fn action_settings_currency_conversion(
                 }
                 "Turn On" => {
                     let setting = ChatSetting::CurrencyConversion(Some(true));
-                    set_chat_setting(&chat_id, setting)?;
+                    set_chat_setting(&chat_id, setting).await?;
                     bot.edit_message_text(
                         msg.chat.id,
                         msg.id,
@@ -430,7 +430,7 @@ pub async fn action_settings_currency_conversion(
                 }
                 "Turn Off" => {
                     let setting = ChatSetting::CurrencyConversion(Some(false));
-                    set_chat_setting(&chat_id, setting)?;
+                    set_chat_setting(&chat_id, setting).await?;
                     bot.edit_message_text(
                         msg.chat.id,
                         msg.id,

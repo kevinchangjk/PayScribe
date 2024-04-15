@@ -389,7 +389,7 @@ pub fn get_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<ChatSetti
 
 /* Sets a group chat setting.
  */
-pub fn set_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<(), ProcessError> {
+pub async fn set_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<(), ProcessError> {
     match setting {
         ChatSetting::TimeZone(time_zone) => {
             if let Some(time_zone) = time_zone {
@@ -404,6 +404,9 @@ pub fn set_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<(), Proce
         ChatSetting::CurrencyConversion(convert) => {
             if let Some(convert) = convert {
                 set_currency_conversion(chat_id, convert)?;
+
+                // If currency conversion is updated, need to update balances
+                update_balances_debts(chat_id, Vec::new()).await?;
             }
         }
     }
