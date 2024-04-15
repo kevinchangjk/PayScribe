@@ -1,7 +1,10 @@
 use teloxide::{prelude::*, types::Message};
 
 use crate::bot::{
-    handler::utils::{display_balances, HandlerResult, UNKNOWN_ERROR_MESSAGE},
+    handler::{
+        constants::UNKNOWN_ERROR_MESSAGE,
+        utils::{display_balances, HandlerResult},
+    },
     processor::view_debts,
 };
 
@@ -29,13 +32,13 @@ pub async fn action_view_balances(bot: Bot, msg: Message) -> HandlerResult {
                         "View Balances - User {} viewed balances for group {}, found: {}",
                         sender_id,
                         chat_id,
-                        display_balances(&debts)
+                        display_balances(&debts, &chat_id)
                     );
                     bot.send_message(
                         msg.chat.id,
                         format!(
                             "Here you go! The current balances are:\n\n{}",
-                            display_balances(&debts)
+                            display_balances(&debts, &chat_id)
                         ),
                     )
                     .await?;

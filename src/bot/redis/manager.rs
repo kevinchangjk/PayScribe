@@ -4,8 +4,10 @@ use super::{
     balance::{get_balance, get_balance_exists, set_balance},
     chat::{
         add_chat, add_chat_currency, add_chat_payment, add_chat_user_multiple, delete_chat_payment,
-        get_chat_currencies, get_chat_debt, get_chat_exists, get_chat_payment_exists,
-        get_chat_payments, get_chat_users, set_chat_debt, Debt,
+        get_chat_currencies, get_chat_currency_conversion, get_chat_debt,
+        get_chat_default_currency, get_chat_exists, get_chat_payment_exists, get_chat_payments,
+        get_chat_time_zone, get_chat_users, set_chat_currency_conversion, set_chat_debt,
+        set_chat_default_currency, set_chat_time_zone, Debt,
     },
     connect::{connect, DBError},
     payment::{add_payment, delete_payment, get_payment, update_payment, Payment},
@@ -13,6 +15,7 @@ use super::{
         add_user, get_preferred_username, get_user_chats, get_user_exists, set_preferred_username,
         update_user_chats,
     },
+    CURRENCY_CODE_DEFAULT,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -96,6 +99,7 @@ pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> Result<(), CrudErro
     // Adds chat if not exists
     if !get_chat_exists(&mut con, chat_id)? {
         add_chat(&mut con, chat_id, &usernames[0].to_lowercase())?;
+        init_chat_settings(chat_id)?;
     }
 
     // Adds all users, automatically checked if added
@@ -108,14 +112,121 @@ pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> Result<(), CrudErro
     Ok(())
 }
 
+/* Initialises chat settings to default.
+ */
+fn init_chat_settings(chat_id: &str) -> Result<(), CrudError> {
+    let mut con = connect()?;
+
+    // Set default time zone
+    let default_time_zone = "UTC";
+    set_chat_time_zone(&mut con, chat_id, default_time_zone)?;
+
+    // Set default currency
+    set_chat_default_currency(&mut con, chat_id, CURRENCY_CODE_DEFAULT)?;
+
+    // Set default currency conversion
+    set_chat_currency_conversion(&mut con, chat_id, false)?;
+
+    Ok(())
+}
+
+/* Sets time zone for a chat.
+ */
+pub fn set_time_zone(chat_id: &str, time_zone: &str) -> Result<(), CrudError> {
+    let mut con = connect()?;
+
+    set_chat_time_zone(&mut con, chat_id, time_zone)?;
+    Ok(())
+}
+
+/* Gets time zone for a chat.
+ */
+pub fn get_time_zone(chat_id: &str) -> Result<String, CrudError> {
+    let mut con = connect()?;
+
+    let time_zone = get_chat_time_zone(&mut con, chat_id)?;
+    match time_zone {
+        Some(time_zone) => Ok(time_zone),
+        None => Ok("UTC".to_string()),
+    }
+}
+
+/* Sets default currency for a chat.
+ */
+pub fn set_default_currency(chat_id: &str, currency: &str) -> Result<(), CrudError> {
+    let mut con = connect()?;
+
+    set_chat_default_currency(&mut con, chat_id, currency)?;
+    Ok(())
+}
+
+/* Gets default currency for a chat.
+ */
+pub fn get_default_currency(chat_id: &str) -> Result<String, CrudError> {
+    let mut con = connect()?;
+
+    let currency = get_chat_default_currency(&mut con, chat_id)?;
+    match currency {
+        Some(currency) => Ok(currency.to_string()),
+        None => Ok(CURRENCY_CODE_DEFAULT.to_string()),
+    }
+}
+
+/* Sets currency conversion for a chat.
+ */
+pub fn set_currency_conversion(chat_id: &str, conversion: bool) -> Result<(), CrudError> {
+    let mut con = connect()?;
+
+    set_chat_currency_conversion(&mut con, chat_id, conversion)?;
+    Ok(())
+}
+
+/* Gets currency conversion for a chat.
+ */
+pub fn get_currency_conversion(chat_id: &str) -> Result<bool, CrudError> {
+    let mut con = connect()?;
+
+    let conversion = get_chat_currency_conversion(&mut con, chat_id)?;
+    match conversion {
+        Some(conversion) => Ok(conversion),
+        None => Ok(false),
+    }
+}
+
+/* Gets all balances for a chat.
+ * Used when updating default currencies for a chat.
+ */
+pub fn get_chat_balances(chat_id: &str) -> Result<Vec<UserBalance>, CrudError> {
+    let mut con = connect()?;
+
+    // Retrieve all balances
+    let mut balances: Vec<UserBalance> = Vec::new();
+    let users = get_chat_users(&mut con, chat_id)?;
+    let currencies = get_chat_currencies(&mut con, chat_id)?;
+    for currency in &currencies {
+        for user in &users {
+            if get_balance_exists(&mut con, chat_id, user, &currency)? {
+                let balance = get_balance(&mut con, chat_id, user, &currency)?;
+                if balance != 0 {
+                    let username = get_preferred_username(&mut con, user)?;
+                    balances.push(UserBalance {
+                        username,
+                        currency: currency.to_string(),
+                        balance,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(balances)
+}
+
 /* Updates balances for a chat based on given change amounts.
  * If balance does not exist, creates it.
  * Returns the updated balances.
  */
-pub fn update_chat_balances(
-    chat_id: &str,
-    changes: Vec<UserBalance>,
-) -> Result<Vec<UserBalance>, CrudError> {
+pub fn update_chat_balances(chat_id: &str, changes: Vec<UserBalance>) -> Result<(), CrudError> {
     let mut con = connect()?;
 
     // Update balances through changes
@@ -140,25 +251,7 @@ pub fn update_chat_balances(
         }
     }
 
-    // Retrieve all balances
-    let mut updated_balances: Vec<UserBalance> = Vec::new();
-    let users = get_chat_users(&mut con, chat_id)?;
-    let currencies = get_chat_currencies(&mut con, chat_id)?;
-    for user in users {
-        for currency in &currencies {
-            if get_balance_exists(&mut con, chat_id, &user, &currency)? {
-                let balance = get_balance(&mut con, chat_id, &user, &currency)?;
-                let username = get_preferred_username(&mut con, &user)?;
-                updated_balances.push(UserBalance {
-                    username,
-                    currency: currency.to_string(),
-                    balance,
-                });
-            }
-        }
-    }
-
-    Ok(updated_balances)
+    Ok(())
 }
 
 /* Sets the latest state of simplified debts for a chat.
@@ -299,7 +392,10 @@ pub fn delete_payment_entry(chat_id: &str, payment_id: &str) -> Result<(), CrudE
 mod tests {
     use crate::bot::redis::{
         balance::delete_balance,
-        chat::{delete_chat, delete_chat_currencies, delete_chat_debt, get_chat_users},
+        chat::{
+            delete_chat, delete_chat_currencies, delete_chat_debt, delete_chat_settings,
+            get_chat_users,
+        },
         user::{delete_preferred_username, delete_user, get_preferred_username, get_user_chats},
     };
 
@@ -458,6 +554,12 @@ mod tests {
                 "manager_test_user_6".to_string(),
             ]
         );
+        assert_eq!(get_time_zone(chat_id).unwrap(), "UTC".to_string());
+        assert_eq!(
+            get_default_currency(chat_id).unwrap(),
+            CURRENCY_CODE_DEFAULT.to_string()
+        );
+        assert_eq!(get_currency_conversion(chat_id).unwrap(), false);
 
         // Call again, add both groups of usernames
         usernames.extend(more_usernames.clone());
@@ -492,6 +594,7 @@ mod tests {
 
         // Deletes chat
         delete_chat(&mut con, chat_id).unwrap();
+        delete_chat_settings(&mut con, chat_id).unwrap();
     }
 
     #[test]
@@ -682,7 +785,8 @@ mod tests {
         ];
 
         // Adds initial balances
-        let initial_balances = update_chat_balances(chat_id, changes.clone()).unwrap();
+        assert!(update_chat_balances(chat_id, changes.clone()).is_ok());
+        let initial_balances = get_chat_balances(chat_id).unwrap();
 
         // Checks that balances are correct
         assert_eq!(
@@ -725,7 +829,8 @@ mod tests {
             },
         ];
 
-        let new_balances = update_chat_balances(chat_id, new_changes.clone()).unwrap();
+        assert!(update_chat_balances(chat_id, new_changes.clone()).is_ok());
+        let new_balances = get_chat_balances(chat_id).unwrap();
 
         // Checks that balances are correct
         assert_eq!(
@@ -739,11 +844,6 @@ mod tests {
                 UserBalance {
                     username: "manager_test_user_21".to_string(),
                     balance: -10000,
-                    currency: "USD".to_string(),
-                },
-                UserBalance {
-                    username: "manager_test_user_22".to_string(),
-                    balance: 0,
                     currency: "USD".to_string(),
                 },
             ]
@@ -763,6 +863,7 @@ mod tests {
         // Deletes chat
         delete_chat(&mut con, chat_id).unwrap();
         delete_chat_currencies(&mut con, chat_id).unwrap();
+        delete_chat_settings(&mut con, chat_id).unwrap();
     }
 
     #[test]
@@ -823,7 +924,8 @@ mod tests {
             },
         ];
 
-        let new_balances = update_chat_balances(chat_id, new_changes.clone()).unwrap();
+        assert!(update_chat_balances(chat_id, new_changes.clone()).is_ok());
+        let new_balances = get_chat_balances(chat_id).unwrap();
 
         // Check balances
         let balances = vec![
@@ -833,6 +935,16 @@ mod tests {
                 currency: "USD".to_string(),
             },
             UserBalance {
+                username: "manager_test_user_27".to_string(),
+                balance: -5000,
+                currency: "USD".to_string(),
+            },
+            UserBalance {
+                username: "manager_test_user_28".to_string(),
+                balance: -5000,
+                currency: "USD".to_string(),
+            },
+            UserBalance {
                 username: "manager_test_user_26".to_string(),
                 balance: -5000,
                 currency: "JPY".to_string(),
@@ -840,17 +952,7 @@ mod tests {
             UserBalance {
                 username: "manager_test_user_27".to_string(),
                 balance: -5000,
-                currency: "USD".to_string(),
-            },
-            UserBalance {
-                username: "manager_test_user_27".to_string(),
-                balance: -5000,
                 currency: "JPY".to_string(),
-            },
-            UserBalance {
-                username: "manager_test_user_28".to_string(),
-                balance: -5000,
-                currency: "USD".to_string(),
             },
             UserBalance {
                 username: "manager_test_user_28".to_string(),
@@ -875,6 +977,7 @@ mod tests {
         // Deletes chat
         delete_chat(&mut con, chat_id).unwrap();
         delete_chat_currencies(&mut con, chat_id).unwrap();
+        delete_chat_settings(&mut con, chat_id).unwrap();
     }
 
     #[test]
@@ -925,5 +1028,50 @@ mod tests {
 
         // Deletes debts
         delete_chat_debt(&mut con, chat_id).unwrap();
+    }
+
+    #[test]
+    fn test_get_set_chat_settings() {
+        let mut con = connect().unwrap();
+
+        let chat_id = "manager_12345678991";
+        let usernames = vec![
+            "manager_test_user_29".to_string(),
+            "manager_test_user_30".to_string(),
+            "manager_test_user_31".to_string(),
+        ];
+
+        // Checks "default" chat settings
+        assert_eq!(get_time_zone(chat_id).unwrap(), "UTC".to_string());
+        assert_eq!(
+            get_default_currency(chat_id).unwrap(),
+            CURRENCY_CODE_DEFAULT.to_string()
+        );
+        assert_eq!(get_currency_conversion(chat_id).unwrap(), false);
+
+        // Adds chat
+        assert!(update_chat(chat_id, usernames.clone()).is_ok());
+        assert_eq!(get_time_zone(chat_id).unwrap(), "UTC".to_string());
+        assert_eq!(
+            get_default_currency(chat_id).unwrap(),
+            CURRENCY_CODE_DEFAULT.to_string()
+        );
+        assert_eq!(get_currency_conversion(chat_id).unwrap(), false);
+
+        // Sets various chat settings
+        let time_zone = "GMT";
+        let currency = "USD";
+        let conversion = true;
+
+        assert!(set_time_zone(chat_id, time_zone).is_ok());
+        assert_eq!(get_time_zone(chat_id).unwrap(), time_zone);
+        assert!(set_default_currency(chat_id, currency).is_ok());
+        assert_eq!(get_default_currency(chat_id).unwrap(), currency);
+        assert!(set_currency_conversion(chat_id, conversion).is_ok());
+        assert_eq!(get_currency_conversion(chat_id).unwrap(), conversion);
+
+        // Deletes chat
+        delete_chat(&mut con, chat_id).unwrap();
+        delete_chat_settings(&mut con, chat_id).unwrap();
     }
 }

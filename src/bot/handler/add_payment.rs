@@ -2,13 +2,18 @@ use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
 
 use crate::bot::{
     dispatcher::State,
-    handler::utils::{
-        display_balances, display_currency_amount, display_debts, display_username, make_keyboard,
-        parse_username, process_debts, HandlerResult, UserDialogue, COMMAND_CURRENCIES,
-        DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
-        DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
-        DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
-        TOTAL_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
+    handler::{
+        constants::{
+            COMMAND_HELP, DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
+            DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
+            DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            TOTAL_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
+        },
+        utils::{
+            display_balances, display_currency_amount, display_debts, display_username,
+            make_keyboard, parse_username, process_debts, use_currency, HandlerResult,
+            UserDialogue,
+        },
     },
     processor::add_payment,
 };
@@ -67,7 +72,7 @@ fn display_add_payment(payment: &AddPaymentParams) -> String {
         Some(total) => match &payment.currency {
             Some(currency) => format!(
                 "Total: {}\n",
-                display_currency_amount(*total, currency.clone())
+                display_currency_amount(*total, use_currency(currency.clone(), &payment.chat_id))
             ),
             None => "".to_string(),
         },
@@ -299,7 +304,7 @@ async fn call_processor_add_payment(
                     format!(
                         "🎉 I've added the payment! 🎉\n\n{}Here are the updated balances:\n{}",
                         payment_overview,
-                        display_balances(&balances)
+                        display_balances(&balances, &payment_clone.chat_id)
                     ),
                 )
                 .await?;
@@ -507,7 +512,7 @@ pub async fn action_add_total(
                 Err(err) => {
                     bot.send_message(
                         msg.chat.id,
-                        format!("{} Check out the supported currencies with {COMMAND_CURRENCIES}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string()),
+                        format!("{} You can check out the supported currencies in the documentation with {COMMAND_HELP}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string()),
                         )
                         .await?;
                     return Ok(());
@@ -703,7 +708,7 @@ pub async fn action_add_edit_menu(
                         id,
                         format!(
                             "Current total: {}\n\nWhat should the total be?\n\nOptional: You may also enter the currency of the amount. {TOTAL_INSTRUCTIONS_MESSAGE}",
-                            display_currency_amount(payment_clone.total.unwrap(), payment_clone.currency.unwrap())
+                            display_currency_amount(payment_clone.total.unwrap(), use_currency(payment_clone.currency.unwrap(), &payment_clone.chat_id))
                             ),
                             )
                         .await?;
@@ -815,7 +820,7 @@ pub async fn action_add_edit(
                     }
                     Err(err) => {
                         bot.send_message(msg.chat.id,
-                                         format!("{} Check out the supported currencies with {COMMAND_CURRENCIES}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string())
+                                         format!("{} You can check out the supported currencies in the documentation with {COMMAND_HELP}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string())
                                         ).await?;
                         return Ok(());
                     }

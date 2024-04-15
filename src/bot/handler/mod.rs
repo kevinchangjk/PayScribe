@@ -15,8 +15,7 @@ pub use self::edit_payment::{
     handle_repeated_edit_payment, no_edit_payment, EditPaymentParams,
 };
 pub use self::general::{
-    action_cancel, action_currencies, action_help, action_start, callback_invalid_message,
-    invalid_state,
+    action_cancel, action_help, action_start, callback_invalid_message, invalid_state,
 };
 pub use self::pay_back::{
     action_pay_back, action_pay_back_confirm, action_pay_back_currency,
@@ -31,12 +30,20 @@ pub use self::view_payments::{
     handle_repeated_select_payment, Payment,
 };
 
+pub use self::settings::{
+    action_default_currency_menu, action_settings, action_settings_currency_conversion,
+    action_settings_default_currency, action_settings_menu, action_settings_time_zone,
+    action_time_zone_menu, block_settings, cancel_settings, handle_repeated_settings,
+};
+
 // Submodules
 mod add_payment;
+mod constants;
 mod delete_payment;
 mod edit_payment;
 mod general;
 mod pay_back;
+mod settings;
 mod utils;
 mod view_balances;
 mod view_payments;

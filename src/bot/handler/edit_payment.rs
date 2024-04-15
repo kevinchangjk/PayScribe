@@ -7,14 +7,16 @@ use teloxide::{
 use crate::bot::{
     dispatcher::State,
     handler::{
+        constants::{
+            COMMAND_HELP, COMMAND_VIEW_PAYMENTS, DEBT_EQUAL_DESCRIPTION_MESSAGE,
+            DEBT_EQUAL_INSTRUCTIONS_MESSAGE, DEBT_EXACT_DESCRIPTION_MESSAGE,
+            DEBT_EXACT_INSTRUCTIONS_MESSAGE, DEBT_RATIO_DESCRIPTION_MESSAGE,
+            DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, TOTAL_INSTRUCTIONS_MESSAGE,
+        },
         utils::{
             display_balances, display_debts, display_payment, display_username, make_keyboard,
             make_keyboard_debt_selection, parse_currency_amount, parse_username, process_debts,
-            Currency, HandlerResult, UserDialogue, COMMAND_CURRENCIES, COMMAND_VIEW_PAYMENTS,
-            DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
-            DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
-            DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
-            TOTAL_INSTRUCTIONS_MESSAGE,
+            retrieve_time_zone, use_currency, Currency, HandlerResult, UserDialogue,
         },
         AddDebtsFormat, AddPaymentEdit, Payment,
     },
@@ -46,7 +48,7 @@ fn display_edit_payment(payment: Payment, edited_payment: EditPaymentParams) -> 
         display_username(&edited_payment.creditor.unwrap_or(payment.creditor)),
         display_currency_amount(
             edited_payment.total.unwrap_or(payment.total),
-            currency.clone()
+            use_currency(currency.clone(), &payment.chat_id),
         ),
         display_debts(
             &edited_payment.debts.unwrap_or(payment.debts.clone()),
@@ -126,9 +128,10 @@ async fn call_processor_edit_payment(
     query: CallbackQuery,
 ) -> HandlerResult {
     if let Some(Message { id, chat, .. }) = query.message {
+        let chat_id = chat.id.to_string();
         let edited_clone = edited_payment.clone();
         let edited = edit_payment(
-            &chat.id.to_string(),
+            &chat_id,
             &payment.payment_id,
             edited_payment.description.as_deref(),
             edited_payment.creditor.as_deref(),
@@ -142,26 +145,26 @@ async fn call_processor_edit_payment(
                 let edit_overview = display_edit_payment(payment, edited_clone);
                 log::info!(
                     "Edit Payment Submission - payment edited for chat {} with payment {}",
-                    chat.id,
+                    chat_id,
                     edit_overview
                 );
 
                 match balances {
                     Some(balances) => {
                         bot.edit_message_text(
-                            chat.id,
+                            chat_id.clone(),
                             id,
                             format!(
                                 "🎉 I've edited the payment! 🎉\n\n{}\nHere are the updated balances:\n{}",
                                 edit_overview,
-                                display_balances(&balances)
+                                display_balances(&balances, &chat_id)
                                 ),
                                 )
                             .await?;
                     }
                     None => {
                         bot.edit_message_text(
-                            chat.id,
+                            chat_id,
                             id,
                             format!(
                                 "🎉 I've edited the payment! 🎉\n\n{}\nThere are no changes to the balances.",
@@ -176,10 +179,11 @@ async fn call_processor_edit_payment(
                     .await?;
             }
             Err(err) => {
+                let time_zone = retrieve_time_zone(&chat_id);
                 log::error!(
                     "Edit Payment Submission - Processor failed to edit payment for chat {} with payment {}: {}",
-                    chat.id,
-                    display_payment(&payment, 1),
+                    chat_id,
+                    display_payment(&payment, 1, time_zone),
                     err.to_string()
                     );
                 bot.edit_message_text(
@@ -357,11 +361,16 @@ pub async fn action_edit_payment_confirm(
                         .await?;
                 }
                 "Total" => {
+                    let currency = edited_payment
+                        .currency
+                        .clone()
+                        .unwrap_or(payment.currency.clone());
+                    let actual_currency = use_currency(currency, &payment.chat_id);
                     bot.send_message(
                         chat.id,
                         format!(
                             "Current total: {}\n\nWhat should the total be?\n\nOptional: You may also enter the currency of the amount. {TOTAL_INSTRUCTIONS_MESSAGE}",
-                            display_currency_amount(edited_payment.total.unwrap_or(payment.total), edited_payment.currency.clone().unwrap_or(payment.currency.clone()))
+                            display_currency_amount(edited_payment.total.unwrap_or(payment.total), actual_currency)
                             ),
                             )
                         .await?;
@@ -379,7 +388,7 @@ pub async fn action_edit_payment_confirm(
                     bot.send_message(
                         chat.id,
                         format!(
-                            "Current splits:\n{}\n\nHow are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
+                            "Current splits:\n{}\nHow are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
                             display_debts(&edited_payment.debts.clone().unwrap_or(payment.debts.clone()), edited_payment.currency.clone().unwrap_or(payment.currency.clone()).1)
                             ),
                             ).reply_markup(make_keyboard_debt_selection())
@@ -602,7 +611,7 @@ pub async fn action_edit_payment_edit(
                     Err(err) => {
                         bot.send_message(
                             msg.chat.id,
-                            format!("{} Check out the supported currencies with {COMMAND_CURRENCIES}.\n\nWhat should the total be?", err.to_string()),
+                            format!("{} You can check out the supported currencies in the documentation with {COMMAND_HELP}.\n\nWhat should the total be?", err.to_string()),
                             )
                             .await?;
                         return Ok(());

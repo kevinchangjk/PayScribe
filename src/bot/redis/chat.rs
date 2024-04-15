@@ -14,6 +14,15 @@ const CHAT_KEY: &str = "chat";
 const CHAT_PAYMENT_KEY: &str = "chat_payment";
 const CHAT_DEBT_KEY: &str = "chat_debt";
 const CHAT_CURRENCY_KEY: &str = "chat_currency";
+const CHAT_SETTING_KEY: &str = "chat_setting";
+
+// Chat Settings
+const SETTING_TIME_ZONE: &str = "time_zone";
+const SETTING_DEFAULT_CURRENCY: &str = "default_currency";
+const SETTING_CURRENCY_CONVERSION: &str = "currency_conversion";
+
+// Constants
+pub const CURRENCY_CODE_DEFAULT: &str = "NIL";
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Debt {
@@ -153,6 +162,77 @@ pub fn get_chat_currencies(con: &mut Connection, chat_id: &str) -> RedisResult<V
 #[allow(dead_code)]
 pub fn delete_chat_currencies(con: &mut Connection, chat_id: &str) -> RedisResult<()> {
     con.del(format!("{CHAT_CURRENCY_KEY}:{chat_id}"))
+}
+
+/* Chat Setting CRUD Operations */
+// Sets time zone for a chat
+pub fn set_chat_time_zone(con: &mut Connection, chat_id: &str, time_zone: &str) -> RedisResult<()> {
+    con.hset(
+        format!("{CHAT_SETTING_KEY}:{chat_id}"),
+        SETTING_TIME_ZONE,
+        time_zone,
+    )
+}
+
+// Sets default currency for a chat
+pub fn set_chat_default_currency(
+    con: &mut Connection,
+    chat_id: &str,
+    currency: &str,
+) -> RedisResult<()> {
+    con.hset(
+        format!("{CHAT_SETTING_KEY}:{chat_id}"),
+        SETTING_DEFAULT_CURRENCY,
+        currency,
+    )
+}
+
+// Sets currency conversion for a chat
+pub fn set_chat_currency_conversion(
+    con: &mut Connection,
+    chat_id: &str,
+    currency_conversion: bool,
+) -> RedisResult<()> {
+    con.hset(
+        format!("{CHAT_SETTING_KEY}:{chat_id}"),
+        SETTING_CURRENCY_CONVERSION,
+        currency_conversion,
+    )
+}
+
+// Gets time zone for a chat
+pub fn get_chat_time_zone(con: &mut Connection, chat_id: &str) -> RedisResult<Option<String>> {
+    con.hget(format!("{CHAT_SETTING_KEY}:{chat_id}"), SETTING_TIME_ZONE)
+}
+
+// Gets default currency for a chat
+pub fn get_chat_default_currency(
+    con: &mut Connection,
+    chat_id: &str,
+) -> RedisResult<Option<String>> {
+    con.hget(
+        format!("{CHAT_SETTING_KEY}:{chat_id}"),
+        SETTING_DEFAULT_CURRENCY,
+    )
+}
+
+// Gets currency conversion for a chat
+pub fn get_chat_currency_conversion(
+    con: &mut Connection,
+    chat_id: &str,
+) -> RedisResult<Option<bool>> {
+    con.hget(
+        format!("{CHAT_SETTING_KEY}:{chat_id}"),
+        SETTING_CURRENCY_CONVERSION,
+    )
+}
+
+// Deletes chat settings
+// Mainly for testing purposes
+// In application, no real need to delete keys
+#[allow(dead_code)]
+pub fn delete_chat_settings(con: &mut Connection, chat_id: &str) -> RedisResult<()> {
+    con.del(format!("{CHAT_SETTING_KEY}:{chat_id}"))
 }
 
 #[cfg(test)]
@@ -326,7 +406,7 @@ mod tests {
     fn test_add_get_chat_currency() {
         let mut con = connect().unwrap();
 
-        let chat_id = "123456789";
+        let chat_id = "1234567899";
         let currency = "USD";
         assert!(add_chat_currency(&mut con, chat_id, currency).is_ok());
         assert_eq!(
@@ -341,5 +421,76 @@ mod tests {
             vec![currency, second_currency]
         );
         assert!(delete_chat_currencies(&mut con, chat_id).is_ok());
+    }
+
+    #[test]
+    fn test_set_get_chat_time_zone() {
+        let mut con = connect().unwrap();
+
+        let chat_id = "12345678900";
+        let time_zone = "SST";
+
+        assert!(set_chat_time_zone(&mut con, chat_id, time_zone).is_ok());
+        assert_eq!(
+            get_chat_time_zone(&mut con, chat_id).unwrap(),
+            Some(time_zone.to_string())
+        );
+
+        let second_time_zone = "PST";
+        assert!(set_chat_time_zone(&mut con, chat_id, second_time_zone).is_ok());
+        assert_eq!(
+            get_chat_time_zone(&mut con, chat_id).unwrap(),
+            Some(second_time_zone.to_string())
+        );
+
+        assert!(delete_chat_settings(&mut con, chat_id).is_ok());
+    }
+
+    #[test]
+    fn test_set_get_chat_default_currency() {
+        let mut con = connect().unwrap();
+
+        let chat_id = "12345678901";
+        let currency = "USD";
+
+        assert!(set_chat_default_currency(&mut con, chat_id, currency).is_ok());
+        assert_eq!(
+            get_chat_default_currency(&mut con, chat_id).unwrap(),
+            Some(currency.to_string())
+        );
+
+        let second_currency = "EUR";
+        assert!(set_chat_default_currency(&mut con, chat_id, second_currency).is_ok());
+        assert_eq!(
+            get_chat_default_currency(&mut con, chat_id).unwrap(),
+            Some(second_currency.to_string())
+        );
+
+        assert!(delete_chat_settings(&mut con, chat_id).is_ok());
+    }
+
+    #[test]
+    fn test_set_get_chat_currency_conversion() {
+        let mut con = connect().unwrap();
+
+        let chat_id = "12345678902";
+        let currency_conversion = true;
+
+        assert!(set_chat_currency_conversion(&mut con, chat_id, currency_conversion).is_ok());
+        assert_eq!(
+            get_chat_currency_conversion(&mut con, chat_id).unwrap(),
+            Some(currency_conversion)
+        );
+
+        let second_currency_conversion = false;
+        assert!(
+            set_chat_currency_conversion(&mut con, chat_id, second_currency_conversion).is_ok()
+        );
+        assert_eq!(
+            get_chat_currency_conversion(&mut con, chat_id).unwrap(),
+            Some(second_currency_conversion)
+        );
+
+        assert!(delete_chat_settings(&mut con, chat_id).is_ok());
     }
 }
