@@ -91,6 +91,7 @@ pub enum State {
     SettingsMenu,
     SettingsTimeZone,
     SettingsDefaultCurrency,
+    SettingsDefaultCurrencyMenu,
     SettingsCurrencyConversion,
 }
 

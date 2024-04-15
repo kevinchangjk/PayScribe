@@ -7,13 +7,13 @@ use teloxide::{
 use crate::bot::{
     dispatcher::State,
     handler::{
-        constants::{COMMAND_HELP, NO_TEXT_MESSAGE},
+        constants::{COMMAND_CANCEL, COMMAND_HELP, NO_TEXT_MESSAGE},
         utils::{get_currency, make_keyboard, HandlerResult, UserDialogue},
     },
     processor::{get_chat_setting, set_chat_setting, ChatSetting},
 };
 
-use super::utils::parse_time_zone;
+use super::{constants::CURRENCY_DEFAULT, utils::parse_time_zone};
 
 /* Utilities */
 const CANCEL_MESSAGE: &str = "Sure, no changes to the settings have been made! 👌";
@@ -113,12 +113,17 @@ pub async fn action_settings_menu(
                         ChatSetting::DefaultCurrency(None),
                     )?;
                     if let ChatSetting::DefaultCurrency(Some(currency)) = setting {
+                        let currency_info: String;
+                        if currency == CURRENCY_DEFAULT.0 {
+                            currency_info = format!("Default Currency is NOT set.");
+                        } else {
+                            currency_info = format!("Default Currency: {}", currency);
+                        }
                         bot.edit_message_text(
                             msg.chat.id,
                             msg.id,
                             format!(
-                                "Current Default Currency: {}\n\nIf you wish to change the default currency, reply with the new currency code (check out /currencies if unsure!). Otherwise, if you are happy with this, you can /cancel this operation.",
-                                currency
+                                "{currency_info}\n\nIf you wish to change the default currency, reply with the new currency code (check out the documentation in {COMMAND_HELP} if unsure!).\n\nYou can also disable Default Currency by replying with \"NIL\". Or, to keep it as it is, {COMMAND_CANCEL} this operation.",
                                 ),
                                 )
                             .await?;
@@ -229,13 +234,16 @@ pub async fn action_settings_default_currency(
             let currency = get_currency(text);
             match currency {
                 Ok(currency) => {
+                    let response: String;
+                    if currency.0 == CURRENCY_DEFAULT.0 {
+                        response = format!("The Default Currency has now been disabled! 👍");
+                    } else {
+                        response =
+                            format!("The Default Currency has been set to {}! 👍", currency.0);
+                    }
                     let setting = ChatSetting::DefaultCurrency(Some(currency.0.clone()));
                     set_chat_setting(&msg.chat.id.to_string(), setting)?;
-                    bot.send_message(
-                        msg.chat.id,
-                        format!("The Default Currency has been set to {}! 👍", currency.0),
-                    )
-                    .await?;
+                    bot.send_message(msg.chat.id, response).await?;
                     dialogue.exit().await?;
                 }
                 Err(err) => {
