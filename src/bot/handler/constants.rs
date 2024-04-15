@@ -9,7 +9,7 @@ pub const NO_TEXT_MESSAGE: &str =
 pub const TOTAL_INSTRUCTIONS_MESSAGE: &str =
 "Enter the amount followed by the 3 letter abbreviation for the currency.\nE.g. 7.50 USD, 28 EUR, 320 JPY, etc.";
 pub const CURRENCY_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the 3 letter shorthand for the currency. E.g. USD, EUR, JPY, etc.";
+    "Enter the 3 letter code for the currency. E.g. USD, EUR, JPY, etc.";
 pub const DEBT_EQUAL_DESCRIPTION_MESSAGE: &str =
     "Equal — Divide the total amount equally among users\n";
 pub const DEBT_EXACT_DESCRIPTION_MESSAGE: &str =

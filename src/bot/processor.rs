@@ -421,10 +421,12 @@ pub fn update_chat_default_currency(chat_id: &str, currency: &str) -> Result<(),
             );
         }
     }
-    update_chat_balances(chat_id, changes)?;
 
     // Update default currency in settings
     set_default_currency(chat_id, &currency)?;
+
+    // Finally, update balances and debts
+    update_balances_debts(chat_id, changes)?;
 
     Ok(())
 }

@@ -1,7 +1,7 @@
 use teloxide::{
-    payloads::SendMessageSetters,
+    payloads::{EditMessageTextSetters, SendMessageSetters},
     prelude::*,
-    types::{Message, ParseMode},
+    types::{Message, MessageId, ParseMode},
 };
 
 use crate::bot::{
@@ -27,7 +27,12 @@ const CURRENCY_CONVERSION_DESCRIPTION: &str =
     "*Currency Conversion* — Convert currencies when simplifying balances";
 
 // Displays the first settings menu.
-async fn display_settings_menu(bot: Bot, dialogue: UserDialogue, chat_id: String) -> HandlerResult {
+async fn display_settings_menu(
+    bot: Bot,
+    dialogue: UserDialogue,
+    chat_id: String,
+    msg_id: Option<MessageId>,
+) -> HandlerResult {
     let buttons = vec![
         "Time Zone",
         "Default Currency",
@@ -35,10 +40,23 @@ async fn display_settings_menu(bot: Bot, dialogue: UserDialogue, chat_id: String
         "Cancel",
     ];
     let keyboard = make_keyboard(buttons, Some(2));
-    bot.send_message(chat_id, format!("Of course\\! Here are the settings you can configure\\. What would you like to view or edit?\n\n{TIME_ZONE_DESCRIPTION}\n{DEFAULT_CURRENCY_DESCRIPTION}\n{CURRENCY_CONVERSION_DESCRIPTION}"))
-        .parse_mode(ParseMode::MarkdownV2)
-        .reply_markup(keyboard)
-        .await?;
+    let message = format!(
+        "Of course\\! Here are the settings you can configure\\. What would you like to view or edit?\n\n{TIME_ZONE_DESCRIPTION}\n{DEFAULT_CURRENCY_DESCRIPTION}\n{CURRENCY_CONVERSION_DESCRIPTION}",
+    );
+    match msg_id {
+        Some(id) => {
+            bot.edit_message_text(chat_id, id, message)
+                .parse_mode(ParseMode::MarkdownV2)
+                .reply_markup(keyboard)
+                .await?;
+        }
+        None => {
+            bot.send_message(chat_id, message)
+                .parse_mode(ParseMode::MarkdownV2)
+                .reply_markup(keyboard)
+                .await?;
+        }
+    }
     dialogue.update(State::SettingsMenu).await?;
     Ok(())
 }
@@ -79,7 +97,7 @@ pub async fn block_settings(bot: Bot, msg: Message) -> HandlerResult {
  */
 pub async fn action_settings(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
     let chat_id = msg.chat.id.to_string();
-    display_settings_menu(bot, dialogue, chat_id).await?;
+    display_settings_menu(bot, dialogue, chat_id, None).await?;
     Ok(())
 }
 
@@ -119,10 +137,10 @@ pub async fn action_settings_menu(
                         let buttons: Vec<&str>;
                         if currency == CURRENCY_DEFAULT.0 {
                             currency_info = format!("Default Currency is NOT set.");
-                            buttons = vec!["Disable", "Edit", "Back"];
+                            buttons = vec!["Back", "Edit"];
                         } else {
                             currency_info = format!("Default Currency: {}", currency);
-                            buttons = vec!["Back", "Edit"];
+                            buttons = vec!["Disable", "Edit", "Back"];
                         }
                         let keyboard = make_keyboard(buttons, Some(2));
 
@@ -203,7 +221,7 @@ pub async fn action_time_zone_menu(
             let chat_id = msg.chat.id;
             match button.as_str() {
                 "Back" => {
-                    display_settings_menu(bot, dialogue, chat_id.to_string()).await?;
+                    display_settings_menu(bot, dialogue, chat_id.to_string(), Some(msg.id)).await?;
                 }
                 "Edit" => {
                     let time_zone = retrieve_time_zone(&chat_id.to_string());
@@ -313,7 +331,7 @@ pub async fn action_default_currency_menu(
                     }
                 }
                 "Back" => {
-                    display_settings_menu(bot, dialogue, chat_id).await?;
+                    display_settings_menu(bot, dialogue, chat_id, Some(msg.id)).await?;
                 }
                 _ => {
                     if let Some(user) = msg.from() {
@@ -389,7 +407,7 @@ pub async fn action_settings_currency_conversion(
             let chat_id = msg.chat.id.to_string();
             match button.as_str() {
                 "Back" => {
-                    display_settings_menu(bot, dialogue, chat_id).await?;
+                    display_settings_menu(bot, dialogue, chat_id, Some(msg.id)).await?;
                 }
                 "Turn On" => {
                     let setting = ChatSetting::CurrencyConversion(Some(true));
