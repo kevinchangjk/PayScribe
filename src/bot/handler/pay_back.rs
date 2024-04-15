@@ -1,16 +1,17 @@
 use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
 
 use crate::bot::{
+    currency::{get_default_currency, CURRENCY_DEFAULT},
     dispatcher::State,
     handler::{
         constants::{
-            COMMAND_HELP, CURRENCY_DEFAULT, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            COMMAND_HELP, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
             PAY_BACK_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
         },
         utils::{
             display_balances, display_debts, display_username, get_chat_default_currency,
-            get_currency, get_default_currency, make_keyboard, parse_debts_payback, parse_username,
-            use_currency, Currency, HandlerResult, UserDialogue,
+            get_currency, make_keyboard, parse_debts_payback, parse_username, use_currency,
+            Currency, HandlerResult, UserDialogue,
         },
     },
     processor::add_payment,
@@ -85,7 +86,8 @@ async fn call_processor_pay_back(
             &payment.currency.0,
             payment.total,
             payment.debts,
-        );
+        )
+        .await;
 
         match updated_balances {
             Err(err) => {

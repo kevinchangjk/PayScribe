@@ -272,7 +272,8 @@ async fn call_processor_add_payment(
             &currency.0,
             total,
             debts,
-        );
+        )
+        .await;
         match updated_balances {
             Err(err) => {
                 log::error!(

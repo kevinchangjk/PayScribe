@@ -138,7 +138,8 @@ async fn call_processor_edit_payment(
             edited_payment.currency.unzip().0.as_deref(),
             edited_payment.total.as_ref(),
             edited_payment.debts,
-        );
+        )
+        .await;
 
         match edited {
             Ok(balances) => {

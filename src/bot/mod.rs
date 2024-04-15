@@ -7,7 +7,7 @@ pub use self::dispatcher::run_dispatcher;
 pub use self::dispatcher::{Command, State};
 
 // Declare submodules
-mod api;
+mod currency;
 mod dispatcher;
 mod handler;
 mod optimizer;

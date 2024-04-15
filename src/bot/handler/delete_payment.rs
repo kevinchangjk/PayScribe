@@ -130,7 +130,7 @@ pub async fn action_delete_payment_confirm(
                 }
                 "Confirm" => {
                     let payment_id = &payment.payment_id;
-                    let deletion = delete_payment(&chat_id, payment_id);
+                    let deletion = delete_payment(&chat_id, payment_id).await;
 
                     match deletion {
                         Ok(balances) => {

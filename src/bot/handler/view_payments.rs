@@ -5,12 +5,13 @@ use teloxide::{
 };
 
 use crate::bot::{
+    currency::get_default_currency,
     dispatcher::State,
     handler::{
         constants::{COMMAND_ADD_PAYMENT, UNKNOWN_ERROR_MESSAGE},
         utils::{
-            display_payment, get_currency, get_default_currency, make_keyboard, retrieve_time_zone,
-            Currency, HandlerResult, UserDialogue,
+            display_payment, get_currency, make_keyboard, retrieve_time_zone, Currency,
+            HandlerResult, UserDialogue,
         },
     },
     processor::{view_payments, ProcessError},

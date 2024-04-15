@@ -5,17 +5,16 @@ use teloxide::{
 };
 
 use crate::bot::{
+    currency::CURRENCY_DEFAULT,
     dispatcher::State,
     handler::{
         constants::{COMMAND_HELP, NO_TEXT_MESSAGE},
-        utils::{get_currency, make_keyboard, HandlerResult, UserDialogue},
+        utils::{
+            get_currency, make_keyboard, parse_time_zone, retrieve_time_zone, HandlerResult,
+            UserDialogue,
+        },
     },
     processor::{get_chat_setting, set_chat_setting, update_chat_default_currency, ChatSetting},
-};
-
-use super::{
-    constants::CURRENCY_DEFAULT,
-    utils::{parse_time_zone, retrieve_time_zone},
 };
 
 /* Utilities */
@@ -311,7 +310,7 @@ pub async fn action_default_currency_menu(
             let chat_id = msg.chat.id.to_string();
             match button.as_str() {
                 "Disable" => {
-                    update_chat_default_currency(&chat_id, CURRENCY_DEFAULT.0)?;
+                    update_chat_default_currency(&chat_id, CURRENCY_DEFAULT.0).await?;
                     bot.send_message(
                         msg.chat.id,
                         format!("Default Currency has been disabled for future payments! 👍"),
@@ -372,7 +371,7 @@ pub async fn action_settings_default_currency(
             let currency = get_currency(text);
             match currency {
                 Ok(currency) => {
-                    update_chat_default_currency(&chat_id, &currency.0)?;
+                    update_chat_default_currency(&chat_id, &currency.0).await?;
                     bot.send_message(
                         msg.chat.id,
                         format!(
