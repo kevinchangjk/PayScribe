@@ -7,9 +7,11 @@ pub const UNKNOWN_ERROR_MESSAGE: &str =
 pub const NO_TEXT_MESSAGE: &str =
     "❓ Sorry, I can't understand that! Please reply to me in text.\n\n";
 pub const TOTAL_INSTRUCTIONS_MESSAGE: &str =
-"Enter the amount followed by the 3 letter abbreviation for the currency.\nE.g. 7.50 USD, 28 EUR, 320 JPY, etc.";
+"Enter the amount followed by the 3 letter abbreviation for the currency (Check out the User Guide with /help if unsure, or you can also leave out the currency entirely).\n\nE.g. 7.50 USD, 320 JPY, 28.75, etc.";
 pub const CURRENCY_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the 3 letter code for the currency. E.g. USD, EUR, JPY, etc.";
+    "Enter the 3 letter code for the currency (Check out the User Guide with /help if unsure).\nE.g. USD, EUR, JPY, etc.";
+pub const TIME_ZONE_INSTRUCTIONS_MESSAGE: &str =
+    "Check out the User Guide with /help for all supported time zones.";
 pub const DEBT_EQUAL_DESCRIPTION_MESSAGE: &str =
     "Equal — Divide the total amount equally among users\n";
 pub const DEBT_EXACT_DESCRIPTION_MESSAGE: &str =

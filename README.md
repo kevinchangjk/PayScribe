@@ -55,7 +55,7 @@ To get started with using the bot, add the bot into any group chat of your choic
 
 ### User Guide
 
-For more details on how to use the bot, the various commands and configurations, do check out the [User Guide]()!
+For more details on how to use the bot, the various commands and configurations, do check out the [User Guide](https://github.com/kevinchangjk/PayScribe/wiki/User-Guide)!
 
 The guide also contains more examples, tips, and advice on maximizing your use of **PayScribe**.
 

@@ -4,7 +4,7 @@ use crate::bot::{
     dispatcher::State,
     handler::{
         constants::{
-            COMMAND_HELP, DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
+            DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
             DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
             DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
             TOTAL_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
@@ -451,11 +451,11 @@ pub async fn action_add_creditor(
             bot.send_message(
                 msg.chat.id,
                 format!(
-                    "{}Nice! How much was the total amount?\n\nOptional: You may also enter the currency of the amount. {TOTAL_INSTRUCTIONS_MESSAGE}",
+                    "{}Nice! How much was the total amount?\n\n{TOTAL_INSTRUCTIONS_MESSAGE}",
                     display_add_payment(&new_payment)
-                    ),
-                    )
-                .await?;
+                ),
+            )
+            .await?;
             dialogue
                 .update(State::AddTotal {
                     payment: new_payment,
@@ -513,9 +513,9 @@ pub async fn action_add_total(
                 Err(err) => {
                     bot.send_message(
                         msg.chat.id,
-                        format!("{} You can check out the supported currencies in the documentation with {COMMAND_HELP}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string()),
-                        )
-                        .await?;
+                        format!("{}\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string()),
+                    )
+                    .await?;
                     return Ok(());
                 }
             }
@@ -708,7 +708,7 @@ pub async fn action_add_edit_menu(
                         chat.id,
                         id,
                         format!(
-                            "Current total: {}\n\nWhat should the total be?\n\nOptional: You may also enter the currency of the amount. {TOTAL_INSTRUCTIONS_MESSAGE}",
+                            "Current total: {}\n\nWhat should the total be?\n\n{TOTAL_INSTRUCTIONS_MESSAGE}",
                             display_currency_amount(payment_clone.total.unwrap(), use_currency(payment_clone.currency.unwrap(), &payment_clone.chat_id))
                             ),
                             )
@@ -820,9 +820,11 @@ pub async fn action_add_edit(
                             .await?;
                     }
                     Err(err) => {
-                        bot.send_message(msg.chat.id,
-                                         format!("{} You can check out the supported currencies in the documentation with {COMMAND_HELP}.\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string())
-                                        ).await?;
+                        bot.send_message(
+                            msg.chat.id,
+                            format!("{}\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string()),
+                        )
+                        .await?;
                         return Ok(());
                     }
                 }

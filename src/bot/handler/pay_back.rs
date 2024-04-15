@@ -272,7 +272,7 @@ pub async fn action_pay_back_currency(
                     bot.send_message(
                         msg.chat.id,
                         format!(
-                            "{} You can check out the supported currencies in the documentation with {COMMAND_HELP}.",
+                            "{} You can check out the supported currencies in the User Guide with {COMMAND_HELP}.",
                             err.to_string()
                         ),
                     )
@@ -322,7 +322,11 @@ pub async fn action_pay_back_debts(
                     }
                     let debts = parse_debts_payback(text, actual_currency.clone(), &username);
                     if let Err(err) = debts {
-                        bot.send_message(chat_id, err.to_string()).await?;
+                        bot.send_message(
+                            chat_id,
+                            format!("{}\n\n{PAY_BACK_INSTRUCTIONS_MESSAGE}", err.to_string()),
+                        )
+                        .await?;
                         return Ok(());
                     }
 

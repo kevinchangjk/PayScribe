@@ -8,10 +8,10 @@ use crate::bot::{
     dispatcher::State,
     handler::{
         constants::{
-            COMMAND_HELP, COMMAND_VIEW_PAYMENTS, DEBT_EQUAL_DESCRIPTION_MESSAGE,
-            DEBT_EQUAL_INSTRUCTIONS_MESSAGE, DEBT_EXACT_DESCRIPTION_MESSAGE,
-            DEBT_EXACT_INSTRUCTIONS_MESSAGE, DEBT_RATIO_DESCRIPTION_MESSAGE,
-            DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, TOTAL_INSTRUCTIONS_MESSAGE,
+            COMMAND_VIEW_PAYMENTS, DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
+            DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
+            DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            TOTAL_INSTRUCTIONS_MESSAGE,
         },
         utils::{
             display_balances, display_debts, display_payment, display_username, make_keyboard,
@@ -370,7 +370,7 @@ pub async fn action_edit_payment_confirm(
                     bot.send_message(
                         chat.id,
                         format!(
-                            "Current total: {}\n\nWhat should the total be?\n\nOptional: You may also enter the currency of the amount. {TOTAL_INSTRUCTIONS_MESSAGE}",
+                            "Current total: {}\n\nWhat should the total be?\n\n{TOTAL_INSTRUCTIONS_MESSAGE}",
                             display_currency_amount(edited_payment.total.unwrap_or(payment.total), actual_currency)
                             ),
                             )
@@ -612,9 +612,12 @@ pub async fn action_edit_payment_edit(
                     Err(err) => {
                         bot.send_message(
                             msg.chat.id,
-                            format!("{} You can check out the supported currencies in the documentation with {COMMAND_HELP}.\n\nWhat should the total be?", err.to_string()),
-                            )
-                            .await?;
+                            format!(
+                                "{}\n\n{TOTAL_INSTRUCTIONS_MESSAGE}\n\nWhat should the total be?",
+                                err.to_string()
+                            ),
+                        )
+                        .await?;
                         return Ok(());
                     }
                 }

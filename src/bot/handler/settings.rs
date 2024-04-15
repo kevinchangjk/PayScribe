@@ -8,7 +8,9 @@ use crate::bot::{
     currency::CURRENCY_DEFAULT,
     dispatcher::State,
     handler::{
-        constants::{COMMAND_HELP, NO_TEXT_MESSAGE},
+        constants::{
+            CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, TIME_ZONE_INSTRUCTIONS_MESSAGE,
+        },
         utils::{
             get_currency, make_keyboard, parse_time_zone, retrieve_time_zone, HandlerResult,
             UserDialogue,
@@ -237,7 +239,7 @@ pub async fn action_time_zone_menu(
                             msg.chat.id,
                             msg.id,
                             format!(
-                                "Time Zone: {}\n\nWhat time zone would you like to set for this chat? If you are unsure on which time zones are supported, check out the user guide with {COMMAND_HELP}!",
+                                "Time Zone: {}\n\nWhat time zone would you like to set for this chat? {TIME_ZONE_INSTRUCTIONS_MESSAGE}",
                                 time_zone
                                 ),
                                 )
@@ -332,7 +334,7 @@ pub async fn action_default_currency_menu(
                             chat_id,
                             msg.id,
                             format!(
-                                "{currency_info}\n\nWhat would you like to set as the default currency? If you are unsure on which currencies are supported, check out the user guide with {COMMAND_HELP}!",
+                                "{currency_info}\n\nWhat would you like to set as the default currency? {CURRENCY_INSTRUCTIONS_MESSAGE}",
                                 ))
                             .await?;
                         dialogue.update(State::SettingsDefaultCurrency).await?;
@@ -385,11 +387,9 @@ pub async fn action_settings_default_currency(
                 Err(err) => {
                     bot.send_message(
                         chat_id,
-                        format!(
-                            "{} You can check out the supported currencies in the user guide with {COMMAND_HELP}.",
-                            err
-                            ))
-                        .await?;
+                        format!("{}\n\n{CURRENCY_INSTRUCTIONS_MESSAGE}", err),
+                    )
+                    .await?;
                 }
             }
         }
