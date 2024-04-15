@@ -1,16 +1,17 @@
 use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
 
 use crate::bot::{
+    currency::{get_default_currency, CURRENCY_DEFAULT},
     dispatcher::State,
     handler::{
         constants::{
-            COMMAND_HELP, CURRENCY_DEFAULT, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            COMMAND_HELP, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
             PAY_BACK_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
         },
         utils::{
             display_balances, display_debts, display_username, get_chat_default_currency,
-            get_currency, get_default_currency, make_keyboard, parse_debts_payback, parse_username,
-            use_currency, Currency, HandlerResult, UserDialogue,
+            get_currency, make_keyboard, parse_debts_payback, parse_username, use_currency,
+            Currency, HandlerResult, UserDialogue,
         },
     },
     processor::add_payment,
@@ -85,7 +86,8 @@ async fn call_processor_pay_back(
             &payment.currency.0,
             payment.total,
             payment.debts,
-        );
+        )
+        .await;
 
         match updated_balances {
             Err(err) => {
@@ -270,7 +272,7 @@ pub async fn action_pay_back_currency(
                     bot.send_message(
                         msg.chat.id,
                         format!(
-                            "{} You can check out the supported currencies in the documentation with {COMMAND_HELP}.",
+                            "{} You can check out the supported currencies in the User Guide with {COMMAND_HELP}.",
                             err.to_string()
                         ),
                     )
@@ -320,7 +322,11 @@ pub async fn action_pay_back_debts(
                     }
                     let debts = parse_debts_payback(text, actual_currency.clone(), &username);
                     if let Err(err) = debts {
-                        bot.send_message(chat_id, err.to_string()).await?;
+                        bot.send_message(
+                            chat_id,
+                            format!("{}\n\n{PAY_BACK_INSTRUCTIONS_MESSAGE}", err.to_string()),
+                        )
+                        .await?;
                         return Ok(());
                     }
 

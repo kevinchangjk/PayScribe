@@ -8,13 +8,14 @@ use teloxide::{
 };
 
 use crate::bot::{
+    currency::{get_currency_from_code, get_default_currency, CURRENCY_DEFAULT},
     processor::{get_chat_setting, ChatSetting, ProcessError},
     redis::Debt,
     State,
 };
 
 use super::{
-    constants::{all_time_zones, CURRENCIES, CURRENCY_DEFAULT, MAX_VALUE},
+    constants::{all_time_zones, MAX_VALUE},
     AddDebtsFormat, Payment,
 };
 
@@ -60,27 +61,15 @@ impl From<ProcessError> for BotError {
     }
 }
 
-// Converts a (&str, i32) to a Currency.
-fn to_currency(currency: (&str, i32)) -> Currency {
-    (currency.0.to_string(), currency.1)
-}
-
 // Retrieves the currency given a currency code.
 pub fn get_currency(code: &str) -> Result<Currency, BotError> {
-    let code = code.to_uppercase();
-    for currency in &CURRENCIES {
-        if currency.0 == code {
-            return Ok(to_currency(*currency));
-        }
+    let currency = get_currency_from_code(code);
+    match currency {
+        Some(currency) => Ok(currency),
+        None => Err(BotError::UserError(
+            "❌ Sorry, I don't have that currency!".to_string(),
+        )),
     }
-
-    Err(BotError::UserError(
-        "❌ Sorry, I don't have that currency!".to_string(),
-    ))
-}
-
-pub fn get_default_currency() -> Currency {
-    to_currency(CURRENCY_DEFAULT)
 }
 
 // Retrieves the default currency of a chat. Does not return an error, assumes default.
@@ -571,7 +560,7 @@ fn parse_datetime(text: &str, time_zone: Tz) -> DateTime<Tz> {
 
 // Formats a Datetime object into an easy to read string
 fn format_datetime(datetime: &DateTime<Tz>) -> String {
-    datetime.format("%e %b %Y %T").to_string()
+    datetime.format("%e %b %Y %R").to_string()
 }
 
 // Combines both datetime functions to essentially reformat a string into an easier format

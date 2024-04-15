@@ -5,17 +5,18 @@ use teloxide::{
 };
 
 use crate::bot::{
+    currency::CURRENCY_DEFAULT,
     dispatcher::State,
     handler::{
-        constants::{COMMAND_HELP, NO_TEXT_MESSAGE},
-        utils::{get_currency, make_keyboard, HandlerResult, UserDialogue},
+        constants::{
+            CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, TIME_ZONE_INSTRUCTIONS_MESSAGE,
+        },
+        utils::{
+            get_currency, make_keyboard, parse_time_zone, retrieve_time_zone, HandlerResult,
+            UserDialogue,
+        },
     },
     processor::{get_chat_setting, set_chat_setting, update_chat_default_currency, ChatSetting},
-};
-
-use super::{
-    constants::CURRENCY_DEFAULT,
-    utils::{parse_time_zone, retrieve_time_zone},
 };
 
 /* Utilities */
@@ -159,32 +160,41 @@ pub async fn action_settings_menu(
                         get_chat_setting(&chat_id, ChatSetting::CurrencyConversion(None))?;
                     if let ChatSetting::CurrencyConversion(Some(convert)) = setting {
                         let status: &str;
-                        let action: &str;
-                        let button: &str;
+                        let prompt: &str;
+                        let buttons: Vec<&str>;
                         if convert {
                             status = "ENABLED";
-                            action = "turn off";
-                            button = "Turn Off";
+                            buttons = vec!["Back", "Turn Off"];
+                            prompt = "Do you wish to turn off currency conversion for this chat?";
                         } else {
+                            let currency =
+                                get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None))?;
+                            if let ChatSetting::DefaultCurrency(Some(currency)) = currency {
+                                if currency == CURRENCY_DEFAULT.0 {
+                                    buttons = vec!["Back"];
+                                    prompt = "To turn on currency conversion, you must first set a default currency for the chat!";
+                                } else {
+                                    buttons = vec!["Back", "Turn On"];
+                                    prompt =
+                                        "Do you wish to turn on currency conversion for this chat?";
+                                }
+                            } else {
+                                // Should not occur, these are placeholder values
+                                buttons = vec!["Back"];
+                                prompt = "To turn on currency conversion, you must first set a default currency for the chat!";
+                            }
                             status = "DISABLED";
-                            action = "turn on";
-                            button = "Turn On";
                         }
 
-                        let buttons = vec!["Back", button];
-                        let keyboard = make_keyboard(buttons, Some(2));
+                        let keyboard = make_keyboard(buttons.clone(), Some(buttons.len()));
 
                         bot.edit_message_text(
                             chat_id,
                             msg.id,
-                            format!(
-                                "Currency Conversion is currently {}.\n\nDo you wish to {} currency conversion for this chat?",
-                                status,
-                                action
-                                ),
-                                )
-                            .reply_markup(keyboard)
-                            .await?;
+                            format!("Currency Conversion is currently {status}.\n\n{prompt}",),
+                        )
+                        .reply_markup(keyboard)
+                        .await?;
                         dialogue.update(State::SettingsCurrencyConversion).await?;
                     }
                 }
@@ -229,7 +239,7 @@ pub async fn action_time_zone_menu(
                             msg.chat.id,
                             msg.id,
                             format!(
-                                "Time Zone: {}\n\nWhat time zone would you like to set for this chat? If you are unsure on which time zones are supported, check out the user guide with {COMMAND_HELP}!",
+                                "Time Zone: {}\n\nWhat time zone would you like to set for this chat? {TIME_ZONE_INSTRUCTIONS_MESSAGE}",
                                 time_zone
                                 ),
                                 )
@@ -267,7 +277,7 @@ pub async fn action_settings_time_zone(
             match time_zone {
                 Ok(time_zone) => {
                     let setting = ChatSetting::TimeZone(Some(text.to_string()));
-                    set_chat_setting(&chat_id, setting)?;
+                    set_chat_setting(&chat_id, setting).await?;
                     bot.send_message(
                         msg.chat.id,
                         format!("The Time Zone has been set to {}! 👍", time_zone),
@@ -302,7 +312,7 @@ pub async fn action_default_currency_menu(
             let chat_id = msg.chat.id.to_string();
             match button.as_str() {
                 "Disable" => {
-                    update_chat_default_currency(&chat_id, CURRENCY_DEFAULT.0)?;
+                    update_chat_default_currency(&chat_id, CURRENCY_DEFAULT.0).await?;
                     bot.send_message(
                         msg.chat.id,
                         format!("Default Currency has been disabled for future payments! 👍"),
@@ -324,7 +334,7 @@ pub async fn action_default_currency_menu(
                             chat_id,
                             msg.id,
                             format!(
-                                "{currency_info}\n\nWhat would you like to set as the default currency? If you are unsure on which currencies are supported, check out the user guide with {COMMAND_HELP}!",
+                                "{currency_info}\n\nWhat would you like to set as the default currency? {CURRENCY_INSTRUCTIONS_MESSAGE}",
                                 ))
                             .await?;
                         dialogue.update(State::SettingsDefaultCurrency).await?;
@@ -363,7 +373,7 @@ pub async fn action_settings_default_currency(
             let currency = get_currency(text);
             match currency {
                 Ok(currency) => {
-                    update_chat_default_currency(&chat_id, &currency.0)?;
+                    update_chat_default_currency(&chat_id, &currency.0).await?;
                     bot.send_message(
                         msg.chat.id,
                         format!(
@@ -377,11 +387,9 @@ pub async fn action_settings_default_currency(
                 Err(err) => {
                     bot.send_message(
                         chat_id,
-                        format!(
-                            "{} You can check out the supported currencies in the user guide with {COMMAND_HELP}.",
-                            err
-                            ))
-                        .await?;
+                        format!("{}\n\n{CURRENCY_INSTRUCTIONS_MESSAGE}", err),
+                    )
+                    .await?;
                 }
             }
         }
@@ -411,9 +419,10 @@ pub async fn action_settings_currency_conversion(
                 }
                 "Turn On" => {
                     let setting = ChatSetting::CurrencyConversion(Some(true));
-                    set_chat_setting(&chat_id, setting)?;
-                    bot.send_message(
+                    set_chat_setting(&chat_id, setting).await?;
+                    bot.edit_message_text(
                         msg.chat.id,
+                        msg.id,
                         "Currency Conversion has been turned on for this chat! 👍",
                     )
                     .await?;
@@ -421,9 +430,10 @@ pub async fn action_settings_currency_conversion(
                 }
                 "Turn Off" => {
                     let setting = ChatSetting::CurrencyConversion(Some(false));
-                    set_chat_setting(&chat_id, setting)?;
-                    bot.send_message(
+                    set_chat_setting(&chat_id, setting).await?;
+                    bot.edit_message_text(
                         msg.chat.id,
+                        msg.id,
                         "Currency Conversion has been turned off for this chat! 👍",
                     )
                     .await?;

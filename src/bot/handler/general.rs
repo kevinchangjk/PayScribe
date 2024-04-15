@@ -54,12 +54,11 @@ pub async fn action_help(bot: Bot, msg: Message) -> HandlerResult {
     let add_info = &format!("To begin, you can add new payment records with {COMMAND_ADD_PAYMENT}\\. When splitting the total amount, you can:\n\\- Divide the total cost equally \\(e\\.g\\. sharing ticket prices equally among friends\\)\n\\- Specify the exact amount for each person\n\\- Provide a proportion of how much each person owes \\(e\\.g\\. splitting the electricity bill 40\\-60\\)");
     let view_info = &format!("Use {COMMAND_VIEW_BALANCES} see how much everyone owes one another\\. To edit or delete payments, use {COMMAND_VIEW_PAYMENTS}, then {COMMAND_EDIT_PAYMENT} or {COMMAND_DELETE_PAYMENT}\\.");
     let payback_info = &format!("After paying back your friends, be sure to record those down with the {COMMAND_PAY_BACK} command\\!");
-    let access_info = "You will have to directly reply to my messages for me to read your texts\\. If I'm being too nosy and responding to every message, you might have accidentally given me admin rights\\!";
-    let settings_info = &format!("With {COMMAND_SETTINGS}, you can configure settings for the chat\\. For reference, all supported time zones and currencies can be found [here](https://github.com/kevinchangjk/PayScribe/tree/feat/group-settings/src/docs)\\.");
+    let settings_info = &format!("With {COMMAND_SETTINGS}, you can configure settings for the chat\\. You can find all supported time zones, currencies, along with other useful details in my [User Guide](https://github.com/kevinchangjk/PayScribe/wiki/User-Guide)\\!");
 
     bot.send_message(
         msg.chat.id,
-        format!("{introduction}\n\n{add_info}\n\n{view_info}\n\n{payback_info}\n\n{access_info}\n\n{settings_info}\n\n*Check out all my commands here*:\n\n{}", commands),
+        format!("{introduction}\n\n{add_info}\n\n{view_info}\n\n{payback_info}\n\n{settings_info}\n\n*All commands*:\n\n{}", commands),
         )
         .parse_mode(ParseMode::MarkdownV2)
         .await?;
