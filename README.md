@@ -11,6 +11,7 @@ _Track your Telegram group payments right in the chat._
 1. [Features](#features)
 2. [Getting Started as a User](#getting-started-as-a-user)\
    a. [Bot Commands](#bot-commands)
+   b. [User Guide](#user-guide)
 3. [For Developers](#for-developers)\
    a. [Setup](#setup)\
    b. [Codebase](#codebase)
@@ -32,10 +33,6 @@ _Track your Telegram group payments right in the chat._
 
 To get started with using the bot, add the bot into any group chat of your choice! You can then check out the available bot commands with `/help`, or as listed below.
 
-Do note that by default, Telegram bots will have <a href="https://core.telegram.org/bots/features#:~:text=Privacy%20mode%20is%20enabled%20by,this%20change%20to%20take%20effect" target="_blank">Group Privacy</a> enabled, which means that they can only access messages that are directed towards them in some way. To interact with the **PayScribe**, users will have to call the bot's commands, or directly reply to the bot's messages.
-
-If you notice that **PayScribe** is responding to every message sent in the group, that means that the bot has been given admin rights, and can thus access every message in the group. Revoke the bot's admin rights for normal usage.
-
 ### Bot Commands
 
 `/start` — "Start" the bot.
@@ -55,6 +52,12 @@ If you notice that **PayScribe** is responding to every message sent in the grou
 `/viewbalances` — View the current balances for the group.
 
 `/cancel` — Cancels an ongoing action.
+
+### User Guide
+
+For more details on how to use the bot, the various commands and configurations, do check out the [User Guide]()!
+
+The guide also contains more examples, tips, and advice on maximizing your use of **PayScribe**.
 
 ## For Developers
 
@@ -90,6 +93,7 @@ The codebase consists of mainly the **Bot** module, which has the following subm
 
 Apart from these, the other main components of the bot are:
 
-- **Dispatcher**: Manages the conversation branches of the Telegram bot, and runs the server.
+- **Dispatcher**: Manages the conversation branches of the Telegram bot.
 - **Processor**: Deals with the main backend facing logic for the bot, serves as intermediary between front-facing Handler and Redis.
 - **Optimizer**: Separate crate for handling debt simplification logic, invoked by the Processor.
+- **Currency**: Separate crate for handling currency-related logic, used by the Processor and Handler.
