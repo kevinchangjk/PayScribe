@@ -159,32 +159,41 @@ pub async fn action_settings_menu(
                         get_chat_setting(&chat_id, ChatSetting::CurrencyConversion(None))?;
                     if let ChatSetting::CurrencyConversion(Some(convert)) = setting {
                         let status: &str;
-                        let action: &str;
-                        let button: &str;
+                        let prompt: &str;
+                        let buttons: Vec<&str>;
                         if convert {
                             status = "ENABLED";
-                            action = "turn off";
-                            button = "Turn Off";
+                            buttons = vec!["Back", "Turn Off"];
+                            prompt = "Do you wish to turn off currency conversion for this chat?";
                         } else {
+                            let currency =
+                                get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None))?;
+                            if let ChatSetting::DefaultCurrency(Some(currency)) = currency {
+                                if currency == CURRENCY_DEFAULT.0 {
+                                    buttons = vec!["Back"];
+                                    prompt = "To turn on currency conversion, you must first set a default currency for the chat!";
+                                } else {
+                                    buttons = vec!["Back", "Turn On"];
+                                    prompt =
+                                        "Do you wish to turn on currency conversion for this chat?";
+                                }
+                            } else {
+                                // Should not occur, these are placeholder values
+                                buttons = vec!["Back"];
+                                prompt = "To turn on currency conversion, you must first set a default currency for the chat!";
+                            }
                             status = "DISABLED";
-                            action = "turn on";
-                            button = "Turn On";
                         }
 
-                        let buttons = vec!["Back", button];
-                        let keyboard = make_keyboard(buttons, Some(2));
+                        let keyboard = make_keyboard(buttons.clone(), Some(buttons.len()));
 
                         bot.edit_message_text(
                             chat_id,
                             msg.id,
-                            format!(
-                                "Currency Conversion is currently {}.\n\nDo you wish to {} currency conversion for this chat?",
-                                status,
-                                action
-                                ),
-                                )
-                            .reply_markup(keyboard)
-                            .await?;
+                            format!("Currency Conversion is currently {status}.\n\n{prompt}",),
+                        )
+                        .reply_markup(keyboard)
+                        .await?;
                         dialogue.update(State::SettingsCurrencyConversion).await?;
                     }
                 }
@@ -412,8 +421,9 @@ pub async fn action_settings_currency_conversion(
                 "Turn On" => {
                     let setting = ChatSetting::CurrencyConversion(Some(true));
                     set_chat_setting(&chat_id, setting)?;
-                    bot.send_message(
+                    bot.edit_message_text(
                         msg.chat.id,
+                        msg.id,
                         "Currency Conversion has been turned on for this chat! 👍",
                     )
                     .await?;
@@ -422,8 +432,9 @@ pub async fn action_settings_currency_conversion(
                 "Turn Off" => {
                     let setting = ChatSetting::CurrencyConversion(Some(false));
                     set_chat_setting(&chat_id, setting)?;
-                    bot.send_message(
+                    bot.edit_message_text(
                         msg.chat.id,
+                        msg.id,
                         "Currency Conversion has been turned off for this chat! 👍",
                     )
                     .await?;
