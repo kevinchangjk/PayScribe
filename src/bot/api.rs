@@ -49,4 +49,10 @@ mod tests {
         assert!(fetch.is_ok());
         assert!(fetch.unwrap() > 0.0);
     }
+
+    #[tokio::test]
+    async fn test_fetch_non_existent_currencies() {
+        let fetch = fetch_currencies("usd", "non_existent_currency").await;
+        assert!(fetch.is_err());
+    }
 }
