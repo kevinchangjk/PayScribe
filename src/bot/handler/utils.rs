@@ -560,7 +560,7 @@ fn parse_datetime(text: &str, time_zone: Tz) -> DateTime<Tz> {
 
 // Formats a Datetime object into an easy to read string
 fn format_datetime(datetime: &DateTime<Tz>) -> String {
-    datetime.format("%e %b %Y %T").to_string()
+    datetime.format("%e %b %Y %R").to_string()
 }
 
 // Combines both datetime functions to essentially reformat a string into an easier format
