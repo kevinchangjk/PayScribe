@@ -97,6 +97,45 @@ fn split_balances_currencies(
     splits
 }
 
+// Converts an amount from one currency to another.
+fn convert_currency(amount: i64, currency_from: &str, currency_to: &str) -> i64 {
+    3
+}
+
+// Converts all balances to default currency. Cannot be called when default is NIL.
+fn convert_balances_currencies(mut balances: Vec<UserBalance>, chat_id: &str) -> Vec<UserBalance> {
+    let default_currency = get_default_currency(chat_id);
+    let default_currency = match default_currency {
+        Ok(currency) => currency,
+        Err(_) => CURRENCY_CODE_DEFAULT.to_string(),
+    };
+    let mut result: Vec<UserBalance> = Vec::new();
+
+    for balance in &mut balances {
+        let currency = balance.currency.as_str();
+        if currency == CURRENCY_CODE_DEFAULT {
+            balance.currency = default_currency.clone();
+        } else if currency != default_currency {
+            balance.balance =
+                convert_currency(balance.balance, &balance.currency, &default_currency);
+            balance.currency = default_currency.clone();
+        }
+        let index = result
+            .iter()
+            .position(|bal| bal.username == balance.username);
+        match index {
+            Some(index) => {
+                result[index].balance += balance.balance;
+            }
+            None => {
+                result.push(balance.clone());
+            }
+        }
+    }
+
+    result
+}
+
 fn update_balances_debts(
     chat_id: &str,
     changes: Vec<UserBalance>,
@@ -106,12 +145,20 @@ fn update_balances_debts(
     let balances = get_chat_balances(chat_id)?;
 
     // Update group debts
-    let split_balances = split_balances_currencies(balances, chat_id);
     let mut all_debts = Vec::new();
-    for split in split_balances {
-        let debts = optimize_debts(split);
+    let conversion = get_currency_conversion(chat_id)?;
+    if conversion {
+        let balances = convert_balances_currencies(balances, chat_id);
+        let debts = optimize_debts(balances);
         all_debts.extend(debts);
+    } else {
+        let split_balances = split_balances_currencies(balances, chat_id);
+        for split in split_balances {
+            let debts = optimize_debts(split);
+            all_debts.extend(debts);
+        }
     }
+
     update_chat_debts(&chat_id, &all_debts)?;
 
     Ok(all_debts)
@@ -404,8 +451,11 @@ pub fn update_chat_default_currency(chat_id: &str, currency: &str) -> Result<(),
         }
     }
 
-    // Update default currency in settings
+    // Update default currency in settings. If now NIL, disable currency conversion.
     set_default_currency(chat_id, &currency)?;
+    if currency == CURRENCY_CODE_DEFAULT {
+        set_currency_conversion(chat_id, false)?;
+    }
 
     // Finally, update balances and debts
     update_balances_debts(chat_id, changes)?;
