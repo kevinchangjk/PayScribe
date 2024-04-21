@@ -17,4 +17,5 @@ mod chat;
 mod connect;
 mod manager;
 mod payment;
+mod spending;
 mod user;
