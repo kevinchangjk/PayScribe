@@ -4,9 +4,8 @@ use crate::bot::dispatcher::Command;
 
 use super::{
     constants::{
-        COMMAND_ADD_PAYMENT, COMMAND_DELETE_PAYMENT, COMMAND_EDIT_PAYMENT, COMMAND_HELP,
-        COMMAND_PAY_BACK, COMMAND_SETTINGS, COMMAND_VIEW_BALANCES, COMMAND_VIEW_PAYMENTS,
-        USER_GUIDE_URL,
+        COMMAND_ADD_PAYMENT, COMMAND_BALANCES, COMMAND_DELETE_PAYMENT, COMMAND_EDIT_PAYMENT,
+        COMMAND_HELP, COMMAND_PAY_BACK, COMMAND_SETTINGS, COMMAND_VIEW_PAYMENTS, USER_GUIDE_URL,
     },
     utils::HandlerResult,
 };
@@ -56,7 +55,7 @@ pub async fn action_help(bot: Bot, msg: Message) -> HandlerResult {
 
     let introduction = "👋 Hey there\\! Need some help?\n\n_PayScribe_ is a handy assistant for keeping track of group payments, and simplifying your debts to keep you updated with how much everyone owes one another\\.";
     let add_info = &format!("To begin, you can add new payment records with {COMMAND_ADD_PAYMENT}\\. When splitting the total amount, you can:\n\\- Divide the total cost equally \\(e\\.g\\. sharing ticket prices equally among friends\\)\n\\- Specify the exact amount for each person\n\\- Provide a proportion of how much each person owes \\(e\\.g\\. splitting the electricity bill 40\\-60\\)");
-    let view_info = &format!("Use {COMMAND_VIEW_BALANCES} see how much everyone owes one another\\. To edit or delete payments, use {COMMAND_VIEW_PAYMENTS}, then {COMMAND_EDIT_PAYMENT} or {COMMAND_DELETE_PAYMENT}\\.");
+    let view_info = &format!("Use {COMMAND_BALANCES} see how much everyone owes one another\\. To edit or delete payments, use {COMMAND_VIEW_PAYMENTS}, then {COMMAND_EDIT_PAYMENT} or {COMMAND_DELETE_PAYMENT}\\.");
     let payback_info = &format!("After paying back your friends, be sure to record those down with the {COMMAND_PAY_BACK} command\\!");
     let settings_info = &format!("With {COMMAND_SETTINGS}, you can configure settings for the chat\\. You can find all supported time zones, currencies, along with other useful details in my [User Guide]({USER_GUIDE_URL})\\!");
 
