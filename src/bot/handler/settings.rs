@@ -20,6 +20,8 @@ use crate::bot::{
     processor::{get_chat_setting, set_chat_setting, update_chat_default_currency, ChatSetting},
 };
 
+use super::constants::UNKNOWN_ERROR_MESSAGE;
+
 /* Utilities */
 const CANCEL_MESSAGE: &str = "Sure, no changes to the settings have been made! 👌";
 const TIME_ZONE_DESCRIPTION: &str = "*Time Zone* — Time zone to display date and time";
@@ -44,7 +46,7 @@ async fn display_settings_menu(
     let keyboard = make_keyboard(buttons, Some(2));
     let message = format!(
         "Of course\\! Here are the settings you can configure\\. What would you like to view or edit?\n\n{TIME_ZONE_DESCRIPTION}\n{DEFAULT_CURRENCY_DESCRIPTION}\n{CURRENCY_CONVERSION_DESCRIPTION}",
-    );
+        );
     match msg_id {
         Some(id) => {
             bot.edit_message_text(chat_id, id, message)
@@ -237,14 +239,14 @@ pub async fn action_time_zone_menu(
                 "Edit" => {
                     let time_zone = retrieve_time_zone(&chat_id.to_string());
                     bot.edit_message_text(
-                            msg.chat.id,
-                            msg.id,
-                            format!(
-                                "Time Zone: {}\n\nWhat time zone would you like to set for this chat? {TIME_ZONE_INSTRUCTIONS_MESSAGE}",
-                                time_zone
-                                ),
-                                )
-                            .await?;
+                        msg.chat.id,
+                        msg.id,
+                        format!(
+                            "Time Zone: {}\n\nWhat time zone would you like to set for this chat? {TIME_ZONE_INSTRUCTIONS_MESSAGE}",
+                            time_zone
+                            ),
+                            )
+                        .await?;
                     dialogue.update(State::SettingsTimeZone).await?;
                 }
                 _ => {
@@ -278,12 +280,34 @@ pub async fn action_settings_time_zone(
             match time_zone {
                 Ok(time_zone) => {
                     let setting = ChatSetting::TimeZone(Some(text.to_string()));
-                    set_chat_setting(&chat_id, setting).await?;
-                    bot.send_message(
-                        msg.chat.id,
-                        format!("The Time Zone has been set to {}! 👍", time_zone),
-                    )
-                    .await?;
+                    let process = set_chat_setting(&chat_id, setting).await;
+                    match process {
+                        Ok(_) => {
+                            bot.send_message(
+                                chat_id.clone(),
+                                format!("The Time Zone has been set to {}! 👍", time_zone),
+                            )
+                            .await?;
+
+                            // Logging
+                            log::info!(
+                                "Settings Time Zone - Time zone set for chat {}: {}",
+                                chat_id,
+                                time_zone
+                            );
+                        }
+                        Err(err) => {
+                            bot.send_message(chat_id.clone(), UNKNOWN_ERROR_MESSAGE)
+                                .await?;
+
+                            // Logging
+                            log::error!(
+                                "Settings Time Zone - Error setting time zone for chat {}: {}",
+                                chat_id,
+                                err.to_string()
+                            );
+                        }
+                    }
                     dialogue.exit().await?;
                 }
                 Err(err) => {
@@ -313,13 +337,42 @@ pub async fn action_default_currency_menu(
             let chat_id = msg.chat.id.to_string();
             match button.as_str() {
                 "Disable" => {
-                    update_chat_default_currency(&chat_id, CURRENCY_DEFAULT.0).await?;
-                    bot.send_message(
-                        msg.chat.id,
-                        format!("Default Currency has been disabled for future payments! 👍"),
-                    )
-                    .await?;
+                    let process = update_chat_default_currency(&chat_id, CURRENCY_DEFAULT.0).await;
+                    match process {
+                        Ok(_) => {
+                            bot.send_message(
+                                chat_id.clone(),
+                                format!(
+                                    "Default Currency has been disabled for future payments! 👍"
+                                ),
+                            )
+                            .await?;
+
+                            // Logging
+                            log::info!(
+                                "Settings Default Currency - Default currency disabled for chat {}",
+                                chat_id
+                            );
+                        }
+                        Err(err) => {
+                            bot.send_message(chat_id.clone(), UNKNOWN_ERROR_MESSAGE)
+                                .await?;
+
+                            // Logging
+                            log::error!(
+                                "Settings Default Currency - Error setting default currency for chat {}: {}",
+                                chat_id,
+                                err.to_string()
+                                );
+                        }
+                    }
                     dialogue.exit().await?;
+
+                    // Logging
+                    log::info!(
+                        "Settings Default Currency - Default currency disabled for chat {}",
+                        chat_id
+                    );
                 }
                 "Edit" => {
                     let setting = get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None))?;
@@ -374,15 +427,37 @@ pub async fn action_settings_default_currency(
             let currency = get_currency(text);
             match currency {
                 Ok(currency) => {
-                    update_chat_default_currency(&chat_id, &currency.0).await?;
-                    bot.send_message(
-                        msg.chat.id,
-                        format!(
-                            "Default Currency has been set to {} for future payments! 👍",
-                            currency.0
-                        ),
-                    )
-                    .await?;
+                    let process = update_chat_default_currency(&chat_id, &currency.0).await;
+                    match process {
+                        Ok(_) => {
+                            bot.send_message(
+                                chat_id.clone(),
+                                format!(
+                                    "Default Currency has been set to {} for future payments! 👍",
+                                    currency.0
+                                ),
+                            )
+                            .await?;
+
+                            // Logging
+                            log::info!(
+                                "Settings Default Currency - Default currency set for chat {}: {}",
+                                chat_id,
+                                currency.0
+                            );
+                        }
+                        Err(err) => {
+                            bot.send_message(chat_id.clone(), UNKNOWN_ERROR_MESSAGE)
+                                .await?;
+
+                            // Logging
+                            log::error!(
+                                "Settings Default Currency - Error setting default currency for chat {}: {}",
+                                chat_id,
+                                err.to_string()
+                                );
+                        }
+                    }
                     dialogue.exit().await?;
                 }
                 Err(err) => {
@@ -420,24 +495,67 @@ pub async fn action_settings_currency_conversion(
                 }
                 "Turn On" => {
                     let setting = ChatSetting::CurrencyConversion(Some(true));
-                    set_chat_setting(&chat_id, setting).await?;
-                    bot.edit_message_text(
-                        msg.chat.id,
-                        msg.id,
-                        "Currency Conversion has been turned on for this chat! 👍",
-                    )
-                    .await?;
+                    let process = set_chat_setting(&chat_id, setting).await;
+                    match process {
+                        Ok(_) => {
+                            bot.edit_message_text(
+                                chat_id.clone(),
+                                msg.id,
+                                "Currency Conversion has been turned on for this chat! 👍",
+                            )
+                            .await?;
+                            dialogue.exit().await?;
+
+                            // Logging
+                            log::info!(
+                                "Settings Currency Conversion - Currency conversion enabled for chat {}",
+                                chat_id
+                                );
+                        }
+                        Err(err) => {
+                            bot.send_message(chat_id.clone(), UNKNOWN_ERROR_MESSAGE)
+                                .await?;
+
+                            // Logging
+                            log::error!(
+                                "Settings Currency Conversion - Error setting currency conversion for chat {}: {}",
+                                chat_id,
+                                err.to_string()
+                                );
+                        }
+                    }
                     dialogue.exit().await?;
                 }
                 "Turn Off" => {
                     let setting = ChatSetting::CurrencyConversion(Some(false));
-                    set_chat_setting(&chat_id, setting).await?;
-                    bot.edit_message_text(
-                        msg.chat.id,
-                        msg.id,
-                        "Currency Conversion has been turned off for this chat! 👍",
-                    )
-                    .await?;
+                    let process = set_chat_setting(&chat_id, setting).await;
+                    match process {
+                        Ok(_) => {
+                            bot.edit_message_text(
+                                chat_id.clone(),
+                                msg.id,
+                                "Currency Conversion has been turned off for this chat! 👍",
+                            )
+                            .await?;
+
+                            // Logging
+                            log::info!(
+                                "Settings Currency Conversion - Currency conversion disabled for chat {}",
+                                chat_id
+                                );
+                        }
+                        Err(err) => {
+                            bot.send_message(chat_id.clone(), UNKNOWN_ERROR_MESSAGE)
+                                .await?;
+
+                            // Logging
+                            log::error!(
+                                "Settings Currency Conversion - Error setting currency conversion for chat {}: {}",
+                                chat_id,
+                                err.to_string()
+                                );
+                        }
+                    }
                     dialogue.exit().await?;
                 }
                 _ => {

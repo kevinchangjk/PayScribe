@@ -21,19 +21,15 @@ pub async fn action_view_balances(bot: Bot, msg: Message) -> HandlerResult {
         match debts {
             Ok(debts) => {
                 if debts.is_empty() {
-                    log::info!("View Balances - User {} viewed balances for group {}, but no balances found.", sender_id, chat_id);
                     bot.send_message(
                         msg.chat.id,
                         format!("There are no outstanding balances at the moment."),
                     )
                     .await?;
+
+                    // Logging
+                    log::info!("View Balances - User {} viewed balances for group {}, but no balances were recorded.", sender_id, chat_id);
                 } else {
-                    log::info!(
-                        "View Balances - User {} viewed balances for group {}, found: {}",
-                        sender_id,
-                        chat_id,
-                        display_balances(&debts, &chat_id)
-                    );
                     bot.send_message(
                         msg.chat.id,
                         format!(
@@ -42,24 +38,30 @@ pub async fn action_view_balances(bot: Bot, msg: Message) -> HandlerResult {
                         ),
                     )
                     .await?;
+
+                    // Logging
+                    log::info!(
+                        "View Balances - User {} viewed balances for group {}, found: {}",
+                        sender_id,
+                        chat_id,
+                        display_balances(&debts, &chat_id)
+                    );
                 }
             }
             Err(err) => {
+                bot.send_message(msg.chat.id, format!("{UNKNOWN_ERROR_MESSAGE}"))
+                    .await?;
+
+                // Logging
                 log::error!(
                     "View Balances - User {} failed to view balances for group {}: {}",
                     sender_id,
                     chat_id,
                     err.to_string()
                 );
-                bot.send_message(msg.chat.id, format!("{UNKNOWN_ERROR_MESSAGE}"))
-                    .await?;
             }
         }
-        return Ok(());
     }
-    log::error!(
-        "View Balances - User not found in message: {}",
-        msg.id.to_string()
-    );
+
     Ok(())
 }

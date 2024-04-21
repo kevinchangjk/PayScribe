@@ -91,13 +91,6 @@ async fn call_processor_pay_back(
 
         match updated_balances {
             Err(err) => {
-                log::error!(
-                    "Pay Back Submission - Processor failed to update balances for user {} in chat {} with payment {:?}: {}",
-                    payment_clone.sender_id,
-                    payment_clone.chat_id,
-                    payment_clone,
-                    err.to_string()
-                    );
                 bot.edit_message_text(
                     chat.id,
                     id,
@@ -106,14 +99,17 @@ async fn call_processor_pay_back(
                     ),
                 )
                 .await?;
-            }
-            Ok(balances) => {
-                log::info!(
-                    "Pay Back Submission - Processor updated balances successfully for user {} in chat {}: {:?}",
+
+                // Logging
+                log::error!(
+                    "Pay Back Submission - Processor failed to update balances for user {} in chat {} with payment {:?}: {}",
                     payment_clone.sender_id,
                     payment_clone.chat_id,
-                    payment_clone
+                    payment_clone,
+                    err.to_string()
                     );
+            }
+            Ok(balances) => {
                 bot.edit_message_text(
                     chat.id,
                     id,
@@ -124,6 +120,14 @@ async fn call_processor_pay_back(
                     ),
                 )
                 .await?;
+
+                // Logging
+                log::info!(
+                    "Pay Back Submission - Processor updated balances successfully for user {} in chat {}: {:?}",
+                    payment_clone.sender_id,
+                    payment_clone.chat_id,
+                    payment_clone
+                    );
             }
         }
         dialogue.exit().await?;
@@ -303,23 +307,25 @@ pub async fn action_pay_back_debts(
             if let Some(user) = msg.from() {
                 if let Some(username) = &user.username {
                     let username = parse_username(username);
-                    if let Err(err) = username {
+                    if let Err(err) = &username {
+                        bot.send_message(msg.chat.id, UNKNOWN_ERROR_MESSAGE).await?;
+
+                        // Logging
                         log::error!(
-                            "Pay Back - User {} in chat {} failed to parse username: {}",
+                            "Pay Back Debts - Failed to parse username for sender {}: {}",
                             user.id,
-                            chat_id,
-                            err
+                            err.to_string()
                         );
-                        bot.send_message(chat_id, UNKNOWN_ERROR_MESSAGE).await?;
-                        return Ok(());
                     }
                     let username = username?;
+
                     let actual_currency: Currency;
                     if currency.0 == CURRENCY_DEFAULT.0 {
                         actual_currency = get_chat_default_currency(&chat_id);
                     } else {
                         actual_currency = currency.clone();
                     }
+
                     let debts = parse_debts_payback(text, actual_currency.clone(), &username);
                     if let Err(err) = debts {
                         bot.send_message(

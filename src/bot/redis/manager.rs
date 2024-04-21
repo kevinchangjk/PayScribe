@@ -304,7 +304,6 @@ pub fn get_chat_payments_details(chat_id: &str) -> Result<Vec<UserPayment>, Crud
     let mut payments: Vec<UserPayment> = Vec::new();
 
     if payment_ids.is_empty() {
-        log::info!("No payments found for chat {}", chat_id);
         return Err(CrudError::NoPaymentsError());
     }
 
@@ -330,10 +329,7 @@ pub fn get_payment_entry(payment_id: &str) -> Result<Payment, CrudError> {
     let payment = get_payment(&mut con, payment_id);
 
     match payment {
-        Err(_) => {
-            log::info!("No such payment found for payment_id {}", payment_id);
-            Err(CrudError::NoSuchPaymentError())
-        }
+        Err(_) => Err(CrudError::NoSuchPaymentError()),
         Ok(payment) => Ok(payment),
     }
 }
@@ -352,7 +348,6 @@ pub fn update_payment_entry(
     let mut con = connect()?;
 
     if let Err(_) = get_payment(&mut con, payment_id) {
-        log::info!("No such payment found for payment_id {}", payment_id);
         return Err(CrudError::NoSuchPaymentError());
     }
 
@@ -378,7 +373,6 @@ pub fn delete_payment_entry(chat_id: &str, payment_id: &str) -> Result<(), CrudE
     let mut con = connect()?;
 
     if let Err(_) = get_payment(&mut con, payment_id) {
-        log::info!("No such payment found for payment_id {}", payment_id);
         return Err(CrudError::NoSuchPaymentError());
     }
 

@@ -275,30 +275,7 @@ async fn call_processor_add_payment(
         )
         .await;
         match updated_balances {
-            Err(err) => {
-                log::error!(
-                    "Add Payment Submission - Processor failed to update balances for user {} in chat {} with payment {:?}: {}",
-                    payment_clone.sender_id,
-                    payment_clone.chat_id,
-                    payment_clone,
-                    err.to_string()
-                    );
-                bot.edit_message_text(
-                    chat.id,
-                    id,
-                    format!(
-                        "❓ Hmm, something went wrong! Sorry, I can't add the payment right now."
-                    ),
-                )
-                .await?;
-            }
             Ok(balances) => {
-                log::info!(
-                    "Add Payment Submission - Processor updated balances successfully for user {} in chat {}: {:?}",
-                    payment_clone.sender_id,
-                    payment_clone.chat_id,
-                    payment_clone
-                    );
                 bot.edit_message_text(
                     chat.id,
                     id,
@@ -309,6 +286,33 @@ async fn call_processor_add_payment(
                     ),
                 )
                 .await?;
+
+                // Logging
+                log::info!(
+                    "Add Payment Submission - Processor updated balances successfully for user {} in chat {}: {:?}",
+                    payment_clone.sender_id,
+                    payment_clone.chat_id,
+                    payment_clone
+                    );
+            }
+            Err(err) => {
+                bot.edit_message_text(
+                    chat.id,
+                    id,
+                    format!(
+                        "❓ Hmm, something went wrong! Sorry, I can't add the payment right now."
+                    ),
+                )
+                .await?;
+
+                // Logging
+                log::error!(
+                    "Add Payment Submission - Processor failed to update balances for user {} in chat {} with payment {:?}: {}",
+                    payment_clone.sender_id,
+                    payment_clone.chat_id,
+                    payment_clone,
+                    err.to_string()
+                    );
             }
         }
         dialogue.exit().await?;
@@ -378,13 +382,15 @@ pub async fn action_add_description(
                 if let Some(username) = &user.username {
                     let username = parse_username(username);
 
-                    if let Err(err) = username {
+                    if let Err(err) = &username {
+                        bot.send_message(msg.chat.id, UNKNOWN_ERROR_MESSAGE).await?;
+
+                        // Logging
                         log::error!(
                             "Add Payment Description - Failed to parse username for user {}: {}",
                             user.id,
                             err.to_string()
                         );
-                        return Ok(());
                     }
 
                     let payment = AddPaymentParams {

@@ -144,12 +144,6 @@ async fn call_processor_edit_payment(
         match edited {
             Ok(balances) => {
                 let edit_overview = display_edit_payment(payment, edited_clone);
-                log::info!(
-                    "Edit Payment Submission - payment edited for chat {} with payment {}",
-                    chat_id,
-                    edit_overview
-                );
-
                 match balances {
                     Some(balances) => {
                         bot.edit_message_text(
@@ -165,7 +159,7 @@ async fn call_processor_edit_payment(
                     }
                     None => {
                         bot.edit_message_text(
-                            chat_id,
+                            chat_id.clone(),
                             id,
                             format!(
                                 "🎉 I've edited the payment! 🎉\n\n{}\nThere are no changes to the balances.",
@@ -175,18 +169,20 @@ async fn call_processor_edit_payment(
                             .await?;
                     }
                 }
+
+                // Logging
+                log::info!(
+                    "Edit Payment Submission - payment edited for chat {} with payment {}",
+                    chat_id,
+                    edit_overview
+                );
+
                 dialogue
                     .update(State::ViewPayments { payments, page })
                     .await?;
             }
             Err(err) => {
                 let time_zone = retrieve_time_zone(&chat_id);
-                log::error!(
-                    "Edit Payment Submission - Processor failed to edit payment for chat {} with payment {}: {}",
-                    chat_id,
-                    display_payment(&payment, 1, time_zone),
-                    err.to_string()
-                    );
                 bot.edit_message_text(
                     chat.id,
                     id,
@@ -195,6 +191,15 @@ async fn call_processor_edit_payment(
                     ),
                 )
                 .await?;
+
+                // Logging
+                log::error!(
+                    "Edit Payment Submission - Processor failed to edit payment for chat {} with payment {}: {}",
+                    chat_id,
+                    display_payment(&payment, 1, time_zone),
+                    err.to_string()
+                    );
+
                 dialogue
                     .update(State::ViewPayments { payments, page })
                     .await?;
@@ -526,12 +531,6 @@ pub async fn action_edit_payment_edit(
                     total: edited_payment.total,
                     debts: edited_payment.debts,
                 };
-                log::info!(
-                    "Edit Payment - Description updated successfully for user {} in chat {}: {:?}",
-                    msg.from().unwrap().id,
-                    msg.chat.id,
-                    display_edit_payment(payment.clone(), new_edited_payment.clone())
-                );
                 display_edit_overview(
                     bot,
                     dialogue,
@@ -557,12 +556,6 @@ pub async fn action_edit_payment_edit(
                     total: edited_payment.total,
                     debts: edited_payment.debts,
                 };
-                log::info!(
-                    "Edit Payment - Creditor updated successfully for user {} in chat {}: {:?}",
-                    msg.from().unwrap().id,
-                    msg.chat.id,
-                    display_edit_payment(payment.clone(), new_edited_payment.clone())
-                );
                 display_edit_overview(
                     bot,
                     dialogue,
@@ -586,13 +579,6 @@ pub async fn action_edit_payment_edit(
                             total: Some(total),
                             debts: None,
                         };
-
-                        log::info!(
-                            "Edit Payment - Total updated successfully for user {} in chat {}: {:?}",
-                            msg.from().unwrap().id,
-                            msg.chat.id,
-                            display_edit_payment(payment.clone(), new_edited_payment.clone())
-                            );
 
                         bot.send_message(
                             msg.chat.id,
@@ -668,12 +654,6 @@ pub async fn action_edit_payment_edit(
                             debts: Some(debts.unwrap()),
                         };
 
-                        log::info!(
-                                "Edit Payment - Creditor updated successfully for user {} in chat {}: {:?}",
-                                msg.from().unwrap().id,
-                                msg.chat.id,
-                                display_edit_payment(payment.clone(), new_edited_payment.clone())
-                                );
                         display_edit_overview(
                             bot,
                             dialogue,

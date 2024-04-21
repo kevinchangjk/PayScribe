@@ -184,12 +184,6 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
                     .into_iter()
                     .map(|payment| unfold_payment(payment))
                     .collect();
-                log::info!(
-                    "View Payments - User {} viewed payments for group {}, found: {}",
-                    sender_id,
-                    chat_id,
-                    display_payments_paged(&payments, 0, &chat_id)
-                );
                 bot.send_message(
                     msg.chat.id,
                     format!(
@@ -200,33 +194,48 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
                 )
                 .reply_markup(get_navigation_menu())
                 .await?;
+
+                // Logging
+                log::info!(
+                    "View Payments - User {} viewed payments for group {}, found: {}",
+                    sender_id,
+                    chat_id,
+                    display_payments_paged(&payments, 0, &chat_id)
+                );
+
                 dialogue
                     .update(State::ViewPayments { payments, page: 0 })
                     .await?;
-                return Ok(());
             }
             Err(ProcessError::CrudError(CrudError::NoPaymentsError())) => {
                 bot.send_message(msg.chat.id, format!("I have not recorded any payment entry for this group. Use {COMMAND_ADD_PAYMENT} to let me know when you need my help with that!"))
                     .await?;
+
+                // Logging
+                log::info!(
+                    "View Payments - User {} viewed payments for group {}, but there were no payments recorded.",
+                    sender_id,
+                    chat_id,
+                );
+
                 dialogue.exit().await?;
             }
             Err(err) => {
+                bot.send_message(msg.chat.id, format!("{UNKNOWN_ERROR_MESSAGE}"))
+                    .await?;
+
+                // Logging
                 log::error!(
                     "View Payments - User {} failed to view payments for group {}: {}",
                     sender_id,
                     chat_id,
                     err.to_string()
                 );
-                bot.send_message(msg.chat.id, format!("{UNKNOWN_ERROR_MESSAGE}"))
-                    .await?;
+
+                dialogue.exit().await?;
             }
         }
     }
-    dialogue.exit().await?;
-    log::error!(
-        "View Payments - User not found in msg {}.",
-        msg.id.to_string()
-    );
     Ok(())
 }
 
@@ -414,24 +423,28 @@ pub async fn action_select_payment_number(
                                 }
                             }
                         } else {
+                            dialogue
+                                .update(State::ViewPayments { payments, page })
+                                .await?;
+
+                            // Logging
                             log::error!(
                                 "Select Payment Number - Invalid serial number {} in chat {}",
                                 serial_num,
                                 chat.id
                             );
-                            dialogue
-                                .update(State::ViewPayments { payments, page })
-                                .await?;
                         }
                     } else {
+                        dialogue
+                            .update(State::ViewPayments { payments, page })
+                            .await?;
+
+                        // Logging
                         log::error!(
                             "Select Payment Number - Invalid serial number {} in chat {}",
                             num,
                             chat.id
                         );
-                        dialogue
-                            .update(State::ViewPayments { payments, page })
-                            .await?;
                     }
                 }
             }
