@@ -9,7 +9,8 @@ use crate::bot::{
     dispatcher::State,
     handler::{
         constants::{
-            CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, TIME_ZONE_INSTRUCTIONS_MESSAGE,
+            COMMAND_CANCEL, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            TIME_ZONE_INSTRUCTIONS_MESSAGE,
         },
         utils::{
             get_currency, make_keyboard, parse_time_zone, retrieve_time_zone, HandlerResult,
@@ -68,7 +69,7 @@ async fn display_settings_menu(
 pub async fn handle_repeated_settings(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "🚫 You are already checking out the settings! Please complete or cancel the current operation before starting a new one.",
+        format!("🚫 You are already checking out the settings! Please complete or {COMMAND_CANCEL} the current operation before starting a new one."),
         ).await?;
     Ok(())
 }
@@ -88,7 +89,7 @@ pub async fn cancel_settings(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
 pub async fn block_settings(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "🚫 You are currently checking out the settings! Please complete or cancel the current payment entry before starting another command.",
+        format!("🚫 You are currently checking out the settings! Please complete or {COMMAND_CANCEL} the current payment entry before starting another command."),
         ).await?;
     Ok(())
 }

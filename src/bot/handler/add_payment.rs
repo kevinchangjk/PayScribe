@@ -4,7 +4,7 @@ use crate::bot::{
     dispatcher::State,
     handler::{
         constants::{
-            DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
+            COMMAND_CANCEL, DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
             DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
             DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
             TOTAL_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
@@ -324,7 +324,7 @@ async fn call_processor_add_payment(
 pub async fn handle_repeated_add_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "🚫 You are already adding a payment entry! Please complete or cancel the current operation before starting a new one.",
+        format!("🚫 You are already adding a payment entry! Please complete or {COMMAND_CANCEL} the current operation before starting a new one."),
         ).await?;
     Ok(())
 }
@@ -344,7 +344,7 @@ pub async fn cancel_add_payment(bot: Bot, dialogue: UserDialogue, msg: Message) 
 pub async fn block_add_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "🚫 You are currently adding a payment entry! Please complete or cancel the current payment entry before starting another command.",
+        format!("🚫 You are currently adding a payment entry! Please complete or {COMMAND_CANCEL} the current payment entry before starting another command."),
         ).await?;
     Ok(())
 }

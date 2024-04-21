@@ -5,7 +5,7 @@ use crate::bot::{
     dispatcher::State,
     handler::{
         constants::{
-            COMMAND_HELP, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            COMMAND_CANCEL, COMMAND_HELP, CURRENCY_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
             PAY_BACK_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
         },
         utils::{
@@ -139,7 +139,7 @@ async fn call_processor_pay_back(
 pub async fn handle_repeated_pay_back(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "🚫 You are already paying back! Please complete or cancel the current operation before starting a new one.",
+        format!("🚫 You are already paying back! Please complete or {COMMAND_CANCEL} the current operation before starting a new one."),
         ).await?;
     Ok(())
 }
@@ -159,7 +159,7 @@ pub async fn cancel_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
 pub async fn block_pay_back(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "🚫 You are currently paying back! Please complete or cancel the current payment before starting another command.",
+        format!("🚫 You are currently paying back! Please complete or {COMMAND_CANCEL} the current payment before starting another command."),
         ).await?;
     Ok(())
 }

@@ -8,10 +8,10 @@ use crate::bot::{
     dispatcher::State,
     handler::{
         constants::{
-            COMMAND_VIEW_PAYMENTS, DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
-            DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
-            DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
-            TOTAL_INSTRUCTIONS_MESSAGE,
+            COMMAND_CANCEL, COMMAND_VIEW_PAYMENTS, DEBT_EQUAL_DESCRIPTION_MESSAGE,
+            DEBT_EQUAL_INSTRUCTIONS_MESSAGE, DEBT_EXACT_DESCRIPTION_MESSAGE,
+            DEBT_EXACT_INSTRUCTIONS_MESSAGE, DEBT_RATIO_DESCRIPTION_MESSAGE,
+            DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, TOTAL_INSTRUCTIONS_MESSAGE,
         },
         utils::{
             display_balances, display_debts, display_payment, display_username, make_keyboard,
@@ -213,7 +213,7 @@ async fn call_processor_edit_payment(
 pub async fn handle_repeated_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "🚫 You are already editing a payment entry! Please complete or cancel the current operation before starting a new one.",
+        format!("🚫 You are already editing a payment entry! Please complete or {COMMAND_CANCEL} the current operation before starting a new one."),
         ).await?;
     Ok(())
 }
@@ -233,7 +233,7 @@ pub async fn cancel_edit_payment(bot: Bot, dialogue: UserDialogue, msg: Message)
 pub async fn block_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "🚫 You are currently editing a payment entry! Please complete or cancel the current payment entry before starting another command.",
+        format!("🚫 You are currently editing a payment entry! Please complete or {COMMAND_CANCEL} the current payment entry before starting another command."),
         ).await?;
     Ok(())
 }

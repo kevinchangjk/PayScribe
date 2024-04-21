@@ -6,7 +6,7 @@ use teloxide::{
 use crate::bot::{
     dispatcher::State,
     handler::{
-        constants::COMMAND_VIEW_PAYMENTS,
+        constants::{COMMAND_CANCEL, COMMAND_VIEW_PAYMENTS},
         utils::{display_balances, display_payment, make_keyboard, HandlerResult, UserDialogue},
         Payment,
     },
@@ -28,7 +28,7 @@ const CANCEL_MESSAGE: &str =
 pub async fn handle_repeated_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "🚫 You are already deleting a payment entry! Please complete or cancel the current operation before starting a new one.",
+        format!("🚫 You are already deleting a payment entry! Please complete or {COMMAND_CANCEL} the current operation before starting a new one."),
         ).await?;
     Ok(())
 }
@@ -52,7 +52,7 @@ pub async fn cancel_delete_payment(
 pub async fn block_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "🚫 You are currently deleting a payment entry! Please complete or cancel the current payment entry before starting another command.",
+        format!("🚫 You are currently deleting a payment entry! Please complete or {COMMAND_CANCEL} the current payment entry before starting another command."),
         ).await?;
     Ok(())
 }
