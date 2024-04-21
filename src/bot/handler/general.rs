@@ -12,21 +12,24 @@ use super::{
 };
 
 /* Invalid state.
-*/
-pub async fn invalid_state(bot: Bot, msg: Message) -> HandlerResult {
+ * This action is invoked when the bot is in start state, and there is a non-command message
+ * addressed to it.
+ * Currently, simply does not respond to anything. Reduces spam.
+ */
+pub async fn invalid_state(_bot: Bot, msg: Message) -> HandlerResult {
     // Checks if msg is a service message, ignores it if so
     let is_service_msg = msg.from().is_none();
 
     if is_service_msg {
         Ok(())
     } else {
-        bot.send_message(msg.chat.id, format!("Sorry, I'm not intelligent enough to process that! 🤖\nPlease refer to {COMMAND_HELP} on how to use me!")).await?;
+        // bot.send_message(msg.chat.id, format!("Sorry, I'm not intelligent enough to process that! 🤖\nPlease refer to {COMMAND_HELP} on how to use me!")).await?;
         Ok(())
     }
 }
 
 /* Invalid message during callback expected.
-*/
+ */
 pub async fn callback_invalid_message(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
