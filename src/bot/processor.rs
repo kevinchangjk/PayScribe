@@ -51,9 +51,9 @@ fn auto_update_user(
     Ok(())
 }
 
-// Splits balances by currencies. Sets "NIL" to default currency (which can be "NIL").
-fn split_balances_currencies(
-    mut balances: Vec<UserBalance>,
+// Sets "NIL" to default currency (which can be "NIL").
+fn process_balances_currencies(
+    mut balances: Vec<Vec<UserBalance>>,
     chat_id: &str,
 ) -> Vec<Vec<UserBalance>> {
     let default_currency = get_default_currency(chat_id);
@@ -62,36 +62,38 @@ fn split_balances_currencies(
         Err(_) => CURRENCY_CODE_DEFAULT.to_string(),
     };
 
-    let mut currencies: Vec<&str> = Vec::new();
-    let mut splits: Vec<Vec<UserBalance>> = Vec::new();
-    for balance in &mut balances {
-        // Replace NIL with default currency
-        if balance.currency.as_str() == CURRENCY_CODE_DEFAULT {
-            balance.currency = default_currency.clone();
-        }
+    let mut splits: Vec<Vec<UserBalance>> = vec![Vec::new()];
+    let default_currency_index = 0;
+    let mut curr_index = 0;
+    for currency_balances in &mut balances {
+        let target_index: usize;
 
-        let currency = balance.currency.as_str();
-        if currencies.contains(&currency) {
-            // Add to existing split
-            let index = currencies
-                .iter()
-                .position(|&curr| curr == currency)
-                .unwrap();
-            let user_index = splits[index]
-                .iter()
-                .position(|bal| bal.username == balance.username);
-            match user_index {
-                Some(user_index) => {
-                    splits[index][user_index].balance += balance.balance;
-                }
-                None => {
-                    splits[index].push(balance.clone());
+        if currency_balances.len() > 0 {
+            let currency = currency_balances[0].currency.as_str();
+            if currency == CURRENCY_CODE_DEFAULT {
+                currency_balances[0].currency = default_currency.clone();
+                target_index = default_currency_index;
+            } else if currency == default_currency {
+                target_index = default_currency_index;
+            } else {
+                splits.push(Vec::new());
+                curr_index += 1;
+                target_index = curr_index;
+            }
+
+            for balance in &mut *currency_balances {
+                let user_index = splits[target_index]
+                    .iter()
+                    .position(|bal| bal.username == balance.username);
+                match user_index {
+                    Some(user_index) => {
+                        splits[target_index][user_index].balance += balance.balance;
+                    }
+                    None => {
+                        splits[target_index].push(balance.clone());
+                    }
                 }
             }
-        } else {
-            // Create a new split
-            currencies.push(currency);
-            splits.push(vec![balance.clone()]);
         }
     }
 
@@ -100,7 +102,7 @@ fn split_balances_currencies(
 
 // Converts all balances to default currency. Cannot be called when default is NIL.
 async fn convert_balances_currencies(
-    mut balances: Vec<UserBalance>,
+    mut balances: Vec<Vec<UserBalance>>,
     chat_id: &str,
 ) -> Vec<UserBalance> {
     let default_currency = get_default_currency(chat_id);
@@ -110,24 +112,26 @@ async fn convert_balances_currencies(
     };
     let mut result: Vec<UserBalance> = Vec::new();
 
-    for balance in &mut balances {
-        let currency = balance.currency.as_str();
-        if currency == CURRENCY_CODE_DEFAULT {
-            balance.currency = default_currency.clone();
-        } else if currency != default_currency {
-            balance.balance =
-                convert_currency(balance.balance, &balance.currency, &default_currency).await;
-            balance.currency = default_currency.clone();
-        }
-        let index = result
-            .iter()
-            .position(|bal| bal.username == balance.username);
-        match index {
-            Some(index) => {
-                result[index].balance += balance.balance;
+    for currency_balances in &mut balances {
+        for balance in currency_balances {
+            let currency = balance.currency.as_str();
+            if currency == CURRENCY_CODE_DEFAULT {
+                balance.currency = default_currency.clone();
+            } else if currency != default_currency {
+                balance.balance =
+                    convert_currency(balance.balance, &balance.currency, &default_currency).await;
+                balance.currency = default_currency.clone();
             }
-            None => {
-                result.push(balance.clone());
+            let index = result
+                .iter()
+                .position(|bal| bal.username == balance.username);
+            match index {
+                Some(index) => {
+                    result[index].balance += balance.balance;
+                }
+                None => {
+                    result.push(balance.clone());
+                }
             }
         }
     }
@@ -155,8 +159,8 @@ async fn update_balances_debts(
         let debts = optimize_debts(balances);
         all_debts.extend(debts);
     } else {
-        let split_balances = split_balances_currencies(balances, chat_id);
-        for split in split_balances {
+        let processed_balances = process_balances_currencies(balances, chat_id);
+        for split in processed_balances {
             let debts = optimize_debts(split);
             all_debts.extend(debts);
         }
@@ -447,19 +451,23 @@ pub async fn update_chat_default_currency(
 
             // Update all balances to old currency
             let balances = get_chat_balances(chat_id)?;
-            for balance in balances {
-                if balance.currency == CURRENCY_CODE_DEFAULT {
-                    let change_sub = UserBalance {
-                        username: balance.username.clone(),
-                        currency: balance.currency,
-                        balance: balance.balance.neg(),
-                    };
-                    let change_add = UserBalance {
-                        username: balance.username.clone(),
-                        currency: old_currency.clone(),
-                        balance: balance.balance,
-                    };
-                    changes.extend(vec![change_sub, change_add]);
+            for currency_balances in balances {
+                if currency_balances.len() > 0
+                    && currency_balances[0].currency == CURRENCY_CODE_DEFAULT
+                {
+                    for balance in currency_balances {
+                        let change_sub = UserBalance {
+                            username: balance.username.clone(),
+                            currency: balance.currency,
+                            balance: balance.balance.neg(),
+                        };
+                        let change_add = UserBalance {
+                            username: balance.username.clone(),
+                            currency: old_currency.clone(),
+                            balance: balance.balance,
+                        };
+                        changes.extend(vec![change_sub, change_add]);
+                    }
                 }
             }
         }

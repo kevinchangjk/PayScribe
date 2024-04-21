@@ -199,20 +199,24 @@ pub fn get_currency_conversion(chat_id: &str) -> Result<bool, CrudError> {
 /* Gets all balances for a chat.
  * Used when updating default currencies for a chat.
  */
-pub fn get_chat_balances(chat_id: &str) -> Result<Vec<UserBalance>, CrudError> {
+pub fn get_chat_balances(chat_id: &str) -> Result<Vec<Vec<UserBalance>>, CrudError> {
     let mut con = connect()?;
 
     // Retrieve all balances
-    let mut balances: Vec<UserBalance> = Vec::new();
+    let mut balances: Vec<Vec<UserBalance>> = Vec::new();
     let users = get_chat_users(&mut con, chat_id)?;
     let currencies = get_chat_currencies(&mut con, chat_id)?;
+
+    let mut curr_index = 0;
     for currency in &currencies {
+        balances.push(Vec::new());
+
         for user in &users {
             if get_balance_exists(&mut con, chat_id, user, &currency)? {
                 let balance = get_balance(&mut con, chat_id, user, &currency)?;
                 if balance != 0 {
                     let username = get_preferred_username(&mut con, user)?;
-                    balances.push(UserBalance {
+                    balances[curr_index].push(UserBalance {
                         username,
                         currency: currency.to_string(),
                         balance,
@@ -220,6 +224,8 @@ pub fn get_chat_balances(chat_id: &str) -> Result<Vec<UserBalance>, CrudError> {
                 }
             }
         }
+
+        curr_index += 1;
     }
 
     Ok(balances)
@@ -858,7 +864,7 @@ mod tests {
         // Checks that balances are correct
         assert_eq!(
             initial_balances,
-            vec![
+            vec![vec![
                 UserBalance {
                     username: "manager_test_user_20".to_string(),
                     balance: 10000,
@@ -874,7 +880,7 @@ mod tests {
                     balance: -5000,
                     currency: "USD".to_string(),
                 },
-            ]
+            ]]
         );
 
         // Updates balances
@@ -902,7 +908,7 @@ mod tests {
         // Checks that balances are correct
         assert_eq!(
             new_balances,
-            vec![
+            vec![vec![
                 UserBalance {
                     username: "manager_test_user_20".to_string(),
                     balance: 5000,
@@ -913,11 +919,11 @@ mod tests {
                     balance: -10000,
                     currency: "USD".to_string(),
                 },
-            ]
+            ]]
         );
 
         // Deletes balances
-        for balance in initial_balances {
+        for balance in &initial_balances[0] {
             delete_balance(&mut con, chat_id, &balance.username, "USD").unwrap();
         }
 
@@ -996,43 +1002,49 @@ mod tests {
 
         // Check balances
         let balances = vec![
-            UserBalance {
-                username: "manager_test_user_26".to_string(),
-                balance: 10000,
-                currency: "USD".to_string(),
-            },
-            UserBalance {
-                username: "manager_test_user_27".to_string(),
-                balance: -5000,
-                currency: "USD".to_string(),
-            },
-            UserBalance {
-                username: "manager_test_user_28".to_string(),
-                balance: -5000,
-                currency: "USD".to_string(),
-            },
-            UserBalance {
-                username: "manager_test_user_26".to_string(),
-                balance: -5000,
-                currency: "JPY".to_string(),
-            },
-            UserBalance {
-                username: "manager_test_user_27".to_string(),
-                balance: -5000,
-                currency: "JPY".to_string(),
-            },
-            UserBalance {
-                username: "manager_test_user_28".to_string(),
-                balance: 10000,
-                currency: "JPY".to_string(),
-            },
+            vec![
+                UserBalance {
+                    username: "manager_test_user_26".to_string(),
+                    balance: 10000,
+                    currency: "USD".to_string(),
+                },
+                UserBalance {
+                    username: "manager_test_user_27".to_string(),
+                    balance: -5000,
+                    currency: "USD".to_string(),
+                },
+                UserBalance {
+                    username: "manager_test_user_28".to_string(),
+                    balance: -5000,
+                    currency: "USD".to_string(),
+                },
+            ],
+            vec![
+                UserBalance {
+                    username: "manager_test_user_26".to_string(),
+                    balance: -5000,
+                    currency: "JPY".to_string(),
+                },
+                UserBalance {
+                    username: "manager_test_user_27".to_string(),
+                    balance: -5000,
+                    currency: "JPY".to_string(),
+                },
+                UserBalance {
+                    username: "manager_test_user_28".to_string(),
+                    balance: 10000,
+                    currency: "JPY".to_string(),
+                },
+            ],
         ];
 
         assert_eq!(new_balances, balances);
 
         // Deletes balances
-        for balance in balances {
-            delete_balance(&mut con, chat_id, &balance.username, &balance.currency).unwrap();
+        for current in balances {
+            for balance in current {
+                delete_balance(&mut con, chat_id, &balance.username, &balance.currency).unwrap();
+            }
         }
 
         // Deletes usernames
