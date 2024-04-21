@@ -13,11 +13,11 @@ pub fn set_spending(
     chat_id: &str,
     user_id: &str,
     currency: &str,
-    balance: i64,
+    spending: u64,
 ) -> RedisResult<()> {
     con.set(
         format!("{SPENDING_KEY}:{chat_id}:{user_id}:{currency}"),
-        balance,
+        spending,
     )
 }
 
@@ -37,7 +37,7 @@ pub fn get_spending(
     chat_id: &str,
     user_id: &str,
     currency: &str,
-) -> RedisResult<i64> {
+) -> RedisResult<u64> {
     con.get(format!("{SPENDING_KEY}:{chat_id}:{user_id}:{currency}"))
 }
 
