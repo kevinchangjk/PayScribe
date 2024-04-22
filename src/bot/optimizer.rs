@@ -29,6 +29,10 @@ fn sort_balances(balances: &mut Vec<UserBalance>) -> () {
 * Important: implicitly assumed that all balances sum up to 0.
 */
 pub fn optimize_debts(balances: Vec<UserBalance>) -> Vec<Debt> {
+    if balances.len() == 0 {
+        return Vec::new();
+    }
+
     let mut sorted_balances = balances.clone();
     sort_balances(&mut sorted_balances);
 
@@ -417,7 +421,7 @@ mod tests {
             UserBalance {
                 username: "user20".to_string(),
                 currency: "USD".to_string(),
-                balance: 0,
+                balance: 000,
             },
         ];
 

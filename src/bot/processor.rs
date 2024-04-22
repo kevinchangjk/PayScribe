@@ -202,6 +202,9 @@ async fn update_balances_debts(
     } else {
         let processed_balances = process_balances_currencies(balances, chat_id);
         for split in processed_balances {
+            if split.len() == 0 {
+                continue;
+            }
             let debts = optimize_debts(split);
             all_debts.extend(debts);
         }
