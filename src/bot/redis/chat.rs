@@ -201,15 +201,12 @@ pub fn set_chat_currency_conversion(
 }
 
 // Gets time zone for a chat
-pub fn get_chat_time_zone(con: &mut Connection, chat_id: &str) -> RedisResult<Option<String>> {
+pub fn get_chat_time_zone(con: &mut Connection, chat_id: &str) -> RedisResult<String> {
     con.hget(format!("{CHAT_SETTING_KEY}:{chat_id}"), SETTING_TIME_ZONE)
 }
 
 // Gets default currency for a chat
-pub fn get_chat_default_currency(
-    con: &mut Connection,
-    chat_id: &str,
-) -> RedisResult<Option<String>> {
+pub fn get_chat_default_currency(con: &mut Connection, chat_id: &str) -> RedisResult<String> {
     con.hget(
         format!("{CHAT_SETTING_KEY}:{chat_id}"),
         SETTING_DEFAULT_CURRENCY,
@@ -217,10 +214,7 @@ pub fn get_chat_default_currency(
 }
 
 // Gets currency conversion for a chat
-pub fn get_chat_currency_conversion(
-    con: &mut Connection,
-    chat_id: &str,
-) -> RedisResult<Option<bool>> {
+pub fn get_chat_currency_conversion(con: &mut Connection, chat_id: &str) -> RedisResult<bool> {
     con.hget(
         format!("{CHAT_SETTING_KEY}:{chat_id}"),
         SETTING_CURRENCY_CONVERSION,
@@ -433,14 +427,14 @@ mod tests {
         assert!(set_chat_time_zone(&mut con, chat_id, time_zone).is_ok());
         assert_eq!(
             get_chat_time_zone(&mut con, chat_id).unwrap(),
-            Some(time_zone.to_string())
+            time_zone.to_string()
         );
 
         let second_time_zone = "PST";
         assert!(set_chat_time_zone(&mut con, chat_id, second_time_zone).is_ok());
         assert_eq!(
             get_chat_time_zone(&mut con, chat_id).unwrap(),
-            Some(second_time_zone.to_string())
+            second_time_zone.to_string()
         );
 
         assert!(delete_chat_settings(&mut con, chat_id).is_ok());
@@ -456,14 +450,14 @@ mod tests {
         assert!(set_chat_default_currency(&mut con, chat_id, currency).is_ok());
         assert_eq!(
             get_chat_default_currency(&mut con, chat_id).unwrap(),
-            Some(currency.to_string())
+            currency.to_string()
         );
 
         let second_currency = "EUR";
         assert!(set_chat_default_currency(&mut con, chat_id, second_currency).is_ok());
         assert_eq!(
             get_chat_default_currency(&mut con, chat_id).unwrap(),
-            Some(second_currency.to_string())
+            second_currency.to_string()
         );
 
         assert!(delete_chat_settings(&mut con, chat_id).is_ok());
@@ -479,7 +473,7 @@ mod tests {
         assert!(set_chat_currency_conversion(&mut con, chat_id, currency_conversion).is_ok());
         assert_eq!(
             get_chat_currency_conversion(&mut con, chat_id).unwrap(),
-            Some(currency_conversion)
+            currency_conversion
         );
 
         let second_currency_conversion = false;
@@ -488,7 +482,7 @@ mod tests {
         );
         assert_eq!(
             get_chat_currency_conversion(&mut con, chat_id).unwrap(),
-            Some(second_currency_conversion)
+            second_currency_conversion
         );
 
         assert!(delete_chat_settings(&mut con, chat_id).is_ok());

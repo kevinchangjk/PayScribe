@@ -53,6 +53,8 @@ pub async fn fetch_currency_conversion(
     base_currency: &str,
     target_currency: &str,
 ) -> Result<f64, Box<dyn Error>> {
+    let base_currency = base_currency.to_lowercase();
+    let target_currency = target_currency.to_lowercase();
     let url = format!("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/{base_currency}.json");
 
     let mut h = header::HeaderMap::new();
@@ -64,7 +66,6 @@ pub async fn fetch_currency_conversion(
     let client = reqwest::Client::builder().default_headers(h).build()?;
 
     let response: Value = client.get(url).send().await?.json().await?;
-    log::info!("Response: {:?}", response);
     if let Some(conversions) = response.get(base_currency) {
         if let Some(value) = conversions.get(target_currency) {
             let res = value.as_f64();

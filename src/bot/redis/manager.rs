@@ -147,10 +147,10 @@ pub fn set_time_zone(chat_id: &str, time_zone: &str) -> Result<(), CrudError> {
 pub fn get_time_zone(chat_id: &str) -> Result<String, CrudError> {
     let mut con = connect()?;
 
-    let time_zone = get_chat_time_zone(&mut con, chat_id)?;
+    let time_zone = get_chat_time_zone(&mut con, chat_id);
     match time_zone {
-        Some(time_zone) => Ok(time_zone),
-        None => Ok("UTC".to_string()),
+        Ok(time_zone) => Ok(time_zone),
+        Err(_) => Ok("UTC".to_string()),
     }
 }
 
@@ -168,10 +168,10 @@ pub fn set_default_currency(chat_id: &str, currency: &str) -> Result<(), CrudErr
 pub fn get_default_currency(chat_id: &str) -> Result<String, CrudError> {
     let mut con = connect()?;
 
-    let currency = get_chat_default_currency(&mut con, chat_id)?;
+    let currency = get_chat_default_currency(&mut con, chat_id);
     match currency {
-        Some(currency) => Ok(currency.to_string()),
-        None => Ok(CURRENCY_CODE_DEFAULT.to_string()),
+        Ok(currency) => Ok(currency),
+        Err(_) => Ok(CURRENCY_CODE_DEFAULT.to_string()),
     }
 }
 
@@ -189,10 +189,10 @@ pub fn set_currency_conversion(chat_id: &str, conversion: bool) -> Result<(), Cr
 pub fn get_currency_conversion(chat_id: &str) -> Result<bool, CrudError> {
     let mut con = connect()?;
 
-    let conversion = get_chat_currency_conversion(&mut con, chat_id)?;
+    let conversion = get_chat_currency_conversion(&mut con, chat_id);
     match conversion {
-        Some(conversion) => Ok(conversion),
-        None => Ok(false),
+        Ok(conversion) => Ok(conversion),
+        Err(_) => Ok(false),
     }
 }
 
