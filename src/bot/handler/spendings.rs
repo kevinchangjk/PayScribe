@@ -88,7 +88,6 @@ async fn handle_spendings_with_option(
                 valid_currencies.retain(|&x| x != CURRENCY_DEFAULT.0);
             }
 
-            let is_convert = option != SpendingsOption::ConvertCurrency;
             let default_currency =
                 match get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None)) {
                     Ok(ChatSetting::DefaultCurrency(Some(currency))) => currency,
@@ -96,7 +95,10 @@ async fn handle_spendings_with_option(
                 };
 
             let conversion_button = format!("Convert to {default_currency}");
-            if !is_convert && default_currency != CURRENCY_DEFAULT.0 {
+            if option != SpendingsOption::ConvertCurrency
+                && default_currency != CURRENCY_DEFAULT.0
+                && valid_currencies.len() > 0
+            {
                 valid_currencies.push(&conversion_button);
             } else if default_currency == CURRENCY_DEFAULT.0 {
                 if let SpendingsOption::Currency(ref curr) = option {

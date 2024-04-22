@@ -64,6 +64,7 @@ pub async fn fetch_currency_conversion(
     let client = reqwest::Client::builder().default_headers(h).build()?;
 
     let response: Value = client.get(url).send().await?.json().await?;
+    log::info!("Response: {:?}", response);
     if let Some(conversions) = response.get(base_currency) {
         if let Some(value) = conversions.get(target_currency) {
             let res = value.as_f64();
