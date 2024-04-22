@@ -1,7 +1,7 @@
 use std::ops::Neg;
 
 use super::{
-    currency::convert_currency,
+    currency::{convert_currency_with_rate, fetch_currency_conversion},
     optimizer::optimize_debts,
     redis::{
         add_payment_entry, delete_payment_entry, get_chat_balances, get_chat_balances_currency,
@@ -135,15 +135,39 @@ async fn convert_balances_currencies(
     let mut result: Vec<UserBalance> = Vec::new();
 
     for currency_balances in &mut balances {
+        if currency_balances.len() == 0 {
+            continue;
+        }
+
+        let currency = currency_balances[0].currency.as_str();
+        let should_update = currency != default_currency;
+        let should_convert = should_update && currency != CURRENCY_CODE_DEFAULT;
+        let conversion_rate = if should_convert {
+            match fetch_currency_conversion(currency, &default_currency).await {
+                Ok(rate) => rate,
+                Err(err) => {
+                    log::error!("Error fetching currency conversion from {currency} to {default_currency}: {}", err);
+                    1.0
+                }
+            }
+        } else {
+            1.0
+        };
+
         for balance in currency_balances {
-            let currency = balance.currency.as_str();
-            if currency == CURRENCY_CODE_DEFAULT {
-                balance.currency = default_currency.clone();
-            } else if currency != default_currency {
-                balance.balance =
-                    convert_currency(balance.balance, &balance.currency, &default_currency).await;
+            if should_convert {
+                balance.balance = convert_currency_with_rate(
+                    balance.balance,
+                    &balance.currency,
+                    &default_currency,
+                    conversion_rate,
+                );
+            }
+
+            if should_update {
                 balance.currency = default_currency.clone();
             }
+
             let index = result
                 .iter()
                 .position(|bal| bal.username == balance.username);
@@ -500,6 +524,20 @@ async fn retrieve_spending_data_converted(chat_id: &str) -> Result<SpendingData,
         }
 
         let currency = spending_currency[0].currency.clone();
+        let should_convert = currency != default_currency && currency != CURRENCY_CODE_DEFAULT;
+
+        let conversion_rate = if should_convert {
+            match fetch_currency_conversion(&currency, &default_currency).await {
+                Ok(rate) => rate,
+                Err(err) => {
+                    log::error!("Error fetching currency conversion from {currency} to {default_currency}: {}", err);
+                    1.0
+                }
+            }
+        } else {
+            1.0
+        };
+
         let balances_currency = balances
             .iter()
             .find(|bal| bal.len() > 0 && bal[0].currency == *currency);
@@ -511,12 +549,26 @@ async fn retrieve_spending_data_converted(chat_id: &str) -> Result<SpendingData,
                 .find(|bal| bal.username == spending.username)
                 .map(|bal| bal.balance)
                 .unwrap_or(0);
-            let paid = spending.balance + balance;
-            let paid_converted = convert_currency(paid, &currency, &default_currency).await;
-            let spending_converted =
-                convert_currency(spending.balance, &currency, &default_currency).await;
 
-            group_spending += spending_converted;
+            let mut paid_amount = spending.balance + balance;
+            let mut spending_amount = spending.balance.clone();
+
+            if should_convert {
+                spending_amount = convert_currency_with_rate(
+                    spending_amount,
+                    &currency,
+                    &default_currency,
+                    conversion_rate,
+                );
+                paid_amount = convert_currency_with_rate(
+                    paid_amount,
+                    &currency,
+                    &default_currency,
+                    conversion_rate,
+                );
+            }
+
+            group_spending += spending_amount;
 
             let user = user_spendings
                 .iter()
@@ -524,14 +576,14 @@ async fn retrieve_spending_data_converted(chat_id: &str) -> Result<SpendingData,
 
             match user {
                 Some(index) => {
-                    user_spendings[index].spending += spending_converted;
-                    user_spendings[index].paid += paid_converted;
+                    user_spendings[index].spending += spending_amount;
+                    user_spendings[index].paid += paid_amount;
                 }
                 None => {
                     user_spendings.push(UserSpending {
                         username: spending.username.clone(),
-                        spending: spending_converted,
-                        paid: paid_converted,
+                        spending: spending_amount,
+                        paid: paid_amount,
                     });
                 }
             }

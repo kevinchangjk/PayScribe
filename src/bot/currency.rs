@@ -26,15 +26,13 @@ pub fn get_default_currency() -> Currency {
     to_currency(CURRENCY_DEFAULT)
 }
 
-// Converts an amount from one currency to another.
-pub async fn convert_currency(amount: i64, currency_from: &str, currency_to: &str) -> i64 {
-    let conversion_rate =
-        match fetch_currency_conversion(&currency_from.to_lowercase(), &currency_to.to_lowercase())
-            .await
-        {
-            Ok(rate) => rate,
-            Err(_) => return amount,
-        };
+// Converts an amount from one currency to another, given the conversion rate.
+pub fn convert_currency_with_rate(
+    amount: i64,
+    currency_from: &str,
+    currency_to: &str,
+    conversion_rate: f64,
+) -> i64 {
     let currency_from = match get_currency_from_code(currency_from) {
         Some(currency) => currency,
         None => return amount,
