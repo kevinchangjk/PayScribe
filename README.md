@@ -1,3 +1,5 @@
+![PayScribe Logo](./assets/logo-color.png)
+
 # PayScribe
 
 _Track your Telegram group payments right in the chat._
@@ -10,7 +12,7 @@ _Track your Telegram group payments right in the chat._
 
 1. [Features](#features)
 2. [Getting Started as a User](#getting-started-as-a-user)\
-   a. [Bot Commands](#bot-commands)
+   a. [Bot Commands](#bot-commands)\
    b. [User Guide](#user-guide)
 3. [For Developers](#for-developers)\
    a. [Setup](#setup)\
@@ -49,7 +51,9 @@ To get started with using the bot, add the bot into any group chat of your choic
 
 `/deletepayment` — Delete a payment record that was previously added.
 
-`/viewbalances` — View the current balances for the group.
+`/balances` — View the current balances for the group.
+
+`/totalspendings` — View the total spendings for the group.
 
 `/cancel` — Cancels an ongoing action.
 
@@ -64,6 +68,8 @@ The guide also contains more examples, tips, and advice on maximizing your use o
 If you are interested, you are welcome to fork this repo and deploy your own bot.
 
 This bot was written in Rust using [Teloxide](https://github.com/teloxide/teloxide), and uses a Redis database.
+
+The API used for currency conversion rates is from [fawazahmed0](https://github.com/fawazahmed0/exchange-api).
 
 Below, I will go through the steps for setting up the environment, and an overview of the codebase.
 
