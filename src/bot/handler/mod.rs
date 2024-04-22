@@ -22,18 +22,18 @@ pub use self::pay_back::{
     action_pay_back_currency_menu, action_pay_back_debts, block_pay_back, cancel_pay_back,
     handle_repeated_pay_back, PayBackParams,
 };
-pub use self::utils::{Currency, SelectPaymentType};
+pub use self::settings::{
+    action_default_currency_menu, action_settings, action_settings_currency_conversion,
+    action_settings_default_currency, action_settings_menu, action_settings_time_zone,
+    action_time_zone_menu, block_settings, cancel_settings, handle_repeated_settings,
+};
+pub use self::spendings::{action_spendings_menu, action_view_spendings, SpendingsOption};
+pub use self::utils::SelectPaymentType;
 pub use self::view_balances::action_view_balances;
 pub use self::view_payments::{
     action_select_payment_delete, action_select_payment_edit, action_select_payment_number,
     action_view_more, action_view_payments, block_select_payment, cancel_select_payment,
     handle_repeated_select_payment, Payment,
-};
-
-pub use self::settings::{
-    action_default_currency_menu, action_settings, action_settings_currency_conversion,
-    action_settings_default_currency, action_settings_menu, action_settings_time_zone,
-    action_time_zone_menu, block_settings, cancel_settings, handle_repeated_settings,
 };
 
 // Submodules
@@ -44,6 +44,7 @@ mod edit_payment;
 mod general;
 mod pay_back;
 mod settings;
+mod spendings;
 mod utils;
 mod view_balances;
 mod view_payments;

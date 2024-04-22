@@ -3,7 +3,8 @@ use reqwest::header;
 use serde_json::Value;
 use std::error::Error;
 
-use super::handler::Currency;
+// Represents a currency with a code and decimal places.
+pub type Currency = (String, i32);
 
 // Converts a (&str, i32) to a Currency.
 fn to_currency(currency: (&str, i32)) -> Currency {

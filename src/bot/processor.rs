@@ -2,6 +2,7 @@ use std::ops::Neg;
 
 use super::{
     currency::{convert_currency_with_rate, fetch_currency_conversion},
+    handler::SpendingsOption,
     optimizer::optimize_debts,
     redis::{
         add_payment_entry, delete_payment_entry, get_chat_balances, get_chat_balances_currency,
@@ -29,23 +30,17 @@ pub enum ChatSetting {
 }
 
 #[derive(Debug, Clone)]
-pub enum SpendingsOption {
-    Currency(String),
-    ConvertCurrency,
-}
-
-#[derive(Debug, Clone)]
 pub struct UserSpending {
-    username: String,
-    spending: i64,
-    paid: i64,
+    pub username: String,
+    pub spending: i64,
+    pub paid: i64,
 }
 
 #[derive(Debug, Clone)]
 pub struct SpendingData {
-    currency: String,
-    group_spending: i64,
-    user_spendings: Vec<UserSpending>,
+    pub currency: String,
+    pub group_spending: i64,
+    pub user_spendings: Vec<UserSpending>,
 }
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -604,7 +599,11 @@ async fn retrieve_spending_data_converted(chat_id: &str) -> Result<SpendingData,
 pub async fn retrieve_spending_data(
     chat_id: &str,
     option: SpendingsOption,
+    sender_id: &str,
+    sender_username: Option<&str>,
 ) -> Result<SpendingData, ProcessError> {
+    auto_update_user(chat_id, sender_id, sender_username)?;
+
     match option {
         SpendingsOption::Currency(currency) => {
             retrieve_spending_data_by_currency(chat_id, &currency)

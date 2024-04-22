@@ -26,6 +26,8 @@ pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
 "Enter the usernames and exact amounts (without currency) as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n";
 pub const DEBT_RATIO_INSTRUCTIONS_MESSAGE: &str =
 "Enter the usernames and proportions as follows: \n\n@username__1 portion1\n@username__2 portion2\n@username__3 portion3\n...\n\nThe portions can be any whole or decimal number.";
+pub const SPENDINGS_INSTRUCTIONS_MESSAGE: &str =
+    "Feel free to check out the total spendings in other currencies with the buttons below!";
 pub const COMMAND_HELP: &str = "/help";
 pub const COMMAND_CANCEL: &str = "/cancel";
 pub const COMMAND_SETTINGS: &str = "/settings";

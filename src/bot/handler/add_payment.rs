@@ -1,6 +1,7 @@
 use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
 
 use crate::bot::{
+    currency::Currency,
     dispatcher::State,
     handler::{
         constants::{
@@ -11,16 +12,11 @@ use crate::bot::{
         },
         utils::{
             display_balances, display_currency_amount, display_debts, display_username,
-            make_keyboard, parse_username, process_debts, use_currency, HandlerResult,
-            UserDialogue,
+            make_keyboard, make_keyboard_debt_selection, parse_currency_amount, parse_username,
+            process_debts, use_currency, HandlerResult, UserDialogue,
         },
     },
     processor::add_payment,
-};
-
-use super::{
-    utils::{make_keyboard_debt_selection, parse_currency_amount},
-    Currency,
 };
 
 /* Utilities */

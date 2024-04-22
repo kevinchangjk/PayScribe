@@ -8,7 +8,7 @@ use teloxide::{
 };
 
 use crate::bot::{
-    currency::{get_currency_from_code, get_default_currency, CURRENCY_DEFAULT},
+    currency::{get_currency_from_code, get_default_currency, Currency, CURRENCY_DEFAULT},
     processor::{get_chat_setting, ChatSetting, ProcessError},
     redis::Debt,
     State,
@@ -24,8 +24,6 @@ use super::{
 /* Types */
 pub type UserDialogue = Dialogue<State, InMemStorage<State>>;
 pub type HandlerResult = Result<(), BotError>;
-// Represents a currency with a code and decimal places.
-pub type Currency = (String, i32);
 
 #[derive(Debug, Clone)]
 pub enum SelectPaymentType {

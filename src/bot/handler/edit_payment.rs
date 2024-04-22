@@ -5,6 +5,7 @@ use teloxide::{
 };
 
 use crate::bot::{
+    currency::Currency,
     dispatcher::State,
     handler::{
         constants::{
@@ -14,16 +15,15 @@ use crate::bot::{
             DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, TOTAL_INSTRUCTIONS_MESSAGE,
         },
         utils::{
-            display_balances, display_debts, display_payment, display_username, make_keyboard,
-            make_keyboard_debt_selection, parse_currency_amount, parse_username, process_debts,
-            retrieve_time_zone, use_currency, Currency, HandlerResult, UserDialogue,
+            display_balances, display_currency_amount, display_debts, display_payment,
+            display_username, make_keyboard, make_keyboard_debt_selection, parse_currency_amount,
+            parse_username, process_debts, retrieve_time_zone, use_currency, HandlerResult,
+            UserDialogue,
         },
         AddDebtsFormat, AddPaymentEdit, Payment,
     },
     processor::edit_payment,
 };
-
-use super::utils::display_currency_amount;
 
 /* Utilities */
 #[derive(Clone, Debug)]
