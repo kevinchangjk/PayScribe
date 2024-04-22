@@ -7,12 +7,13 @@ use crate::bot::{
         utils::{display_amount, display_username, get_currency, HandlerResult},
     },
     processor::{
-        get_chat_setting, retrieve_spending_data, ChatSetting, SpendingData, UserSpending,
+        get_chat_setting, retrieve_spending_data, retrieve_valid_currencies, ChatSetting,
+        SpendingData, UserSpending,
     },
     State,
 };
 
-use super::utils::UserDialogue;
+use super::utils::{make_keyboard, UserDialogue};
 
 /* Utilities */
 fn display_individual_spending(spending: UserSpending, currency: Currency) -> String {
@@ -24,7 +25,7 @@ fn display_individual_spending(spending: UserSpending, currency: Currency) -> St
     )
 }
 
-fn display_spendings(spending_data: SpendingData, option: SpendingsOption) -> String {
+fn display_spendings(spending_data: SpendingData) -> String {
     let currency = match get_currency(&spending_data.currency) {
         Ok(currency) => currency,
         // Should not occur. Currency string is from database, so should exist.
@@ -89,6 +90,27 @@ pub async fn action_view_spendings(
 
         match spending_data {
             Ok(spending_data) => {
+                let valid_currencies = match retrieve_valid_currencies(&chat_id) {
+                    Ok(currencies) => currencies,
+                    Err(_) => {
+                        log::error!(
+                            "View Spendings - User {} failed to retrieve valid currencies for group {}",
+                            sender_id,
+                            chat_id
+                        );
+                        vec![]
+                    }
+                };
+                let mut valid_currencies: Vec<&str> =
+                    valid_currencies.iter().map(|s| s.as_ref()).collect();
+                valid_currencies.retain(|&x| x != &default_currency && x != CURRENCY_DEFAULT.0);
+                let conversion_button = format!("Convert to {default_currency}");
+                if !is_convert && default_currency != CURRENCY_DEFAULT.0 {
+                    valid_currencies.push(&conversion_button);
+                }
+
+                let keyboard = make_keyboard(valid_currencies, Some(2));
+
                 let header = if is_convert {
                     format!("Here are the total spendings, converted to {default_currency}!")
                 } else if default_currency == CURRENCY_DEFAULT.0 {
@@ -102,9 +124,10 @@ pub async fn action_view_spendings(
                     format!(
                         "{}\n\n{}\n\n{SPENDINGS_INSTRUCTIONS_MESSAGE}",
                         header,
-                        display_spendings(spending_data, option)
+                        display_spendings(spending_data)
                     ),
                 )
+                .reply_markup(keyboard)
                 .await?;
                 dialogue.update(State::SpendingsMenu).await?;
             }

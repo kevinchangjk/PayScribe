@@ -7,11 +7,11 @@ use super::{
     redis::{
         add_payment_entry, delete_payment_entry, get_chat_balances, get_chat_balances_currency,
         get_chat_payments_details, get_currency_conversion, get_default_currency,
-        get_payment_entry, get_time_zone, retrieve_chat_debts, retrieve_chat_spendings,
-        retrieve_chat_spendings_currency, set_currency_conversion, set_default_currency,
-        set_time_zone, update_chat, update_chat_balances, update_chat_debts, update_chat_spendings,
-        update_payment_entry, update_user, CrudError, Debt, Payment, UserBalance, UserPayment,
-        CURRENCY_CODE_DEFAULT,
+        get_payment_entry, get_time_zone, get_valid_chat_currencies, retrieve_chat_debts,
+        retrieve_chat_spendings, retrieve_chat_spendings_currency, set_currency_conversion,
+        set_default_currency, set_time_zone, update_chat, update_chat_balances, update_chat_debts,
+        update_chat_spendings, update_payment_entry, update_user, CrudError, Debt, Payment,
+        UserBalance, UserPayment, CURRENCY_CODE_DEFAULT,
     },
 };
 
@@ -722,4 +722,12 @@ pub async fn update_chat_default_currency(
     update_balances_debts(chat_id, changes).await?;
 
     Ok(())
+}
+
+/* Retrieves all valid currencies for a chat.
+ * Valid currencies are currencies with some payments.
+ */
+pub fn retrieve_valid_currencies(chat_id: &str) -> Result<Vec<String>, ProcessError> {
+    let currencies = get_valid_chat_currencies(chat_id)?;
+    Ok(currencies)
 }

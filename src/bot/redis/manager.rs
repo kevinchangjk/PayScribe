@@ -196,6 +196,32 @@ pub fn get_currency_conversion(chat_id: &str) -> Result<bool, CrudError> {
     }
 }
 
+/* Gets all valid currencies for a chat.
+ * Valid currencies are currencies with some payments.
+ */
+pub fn get_valid_chat_currencies(chat_id: &str) -> Result<Vec<String>, CrudError> {
+    let mut con = connect()?;
+
+    // Retrieve all currencies
+    let currencies = get_chat_currencies(&mut con, chat_id)?;
+
+    // Retrieve all users
+    let users = get_chat_users(&mut con, chat_id)?;
+
+    // For each currency, check that there is at least one spending amongst all users
+    let mut valid_currencies: Vec<String> = Vec::new();
+    for currency in &currencies {
+        for user in &users {
+            if get_spending_exists(&mut con, chat_id, user, &currency)? {
+                valid_currencies.push(currency.to_string());
+                break;
+            }
+        }
+    }
+
+    Ok(valid_currencies)
+}
+
 /* Gets all balances for a chat.
  * Used when updating default currencies for a chat.
  */
@@ -1337,6 +1363,14 @@ mod tests {
         assert_eq!(
             retrieved_spendings.unwrap(),
             vec![spendings.clone(), new_spendings.clone()]
+        );
+
+        // Checks validity of currencies
+        let valid_currencies = get_valid_chat_currencies(chat_id);
+        assert!(valid_currencies.is_ok());
+        assert_eq!(
+            valid_currencies.unwrap(),
+            vec!["USD".to_string(), "JPY".to_string()]
         );
 
         // Deletes spendings
