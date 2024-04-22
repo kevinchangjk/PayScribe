@@ -37,6 +37,7 @@ pub const COMMAND_VIEW_PAYMENTS: &str = "/viewpayments";
 pub const COMMAND_EDIT_PAYMENT: &str = "/editpayment";
 pub const COMMAND_DELETE_PAYMENT: &str = "/deletepayment";
 pub const COMMAND_BALANCES: &str = "/balances";
+pub const COMMAND_SPENDINGS: &str = "/spendings";
 pub const USER_GUIDE_URL: &str = "https://github.com/kevinchangjk/PayScribe/wiki/User-Guide";
 
 // List of all supported time zones

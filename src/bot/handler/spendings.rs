@@ -29,7 +29,7 @@ pub enum SpendingsOption {
 
 fn display_individual_spending(spending: UserSpending, currency: Currency) -> String {
     format!(
-        "{} spent {}, and paid {}",
+        "{}\n    Total Spent: {}\n    Total Paid For: {}\n",
         display_username(&spending.username),
         display_amount(spending.spending, currency.1),
         display_amount(spending.paid, currency.1)
@@ -49,14 +49,14 @@ fn display_spendings(spending_data: SpendingData) -> String {
 
     let mut individual_spendings = String::new();
     for spending in &spending_data.user_spendings {
-        individual_spendings.push_str(&format!(
-            "    {}\n",
-            display_individual_spending(spending.clone(), currency.clone())
+        individual_spendings.push_str(&display_individual_spending(
+            spending.clone(),
+            currency.clone(),
         ));
     }
 
     format!(
-        "Total Group Spending: {}\nTotal Individual Spendings:\n{}",
+        "Total Group Spending: {}\nTotal Individual Spendings:\n\n{}",
         display_amount(spending_data.group_spending, currency.1),
         individual_spendings
     )

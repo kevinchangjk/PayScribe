@@ -478,20 +478,27 @@ fn retrieve_spending_data_by_default_currency(
 ) -> Result<SpendingData, ProcessError> {
     let spendings_curr = retrieve_chat_spendings_currency(chat_id, currency)?;
     let spendings_nil = retrieve_chat_spendings_currency(chat_id, CURRENCY_CODE_DEFAULT)?;
-    let balances_curr = get_chat_balances_currency(chat_id, currency)?;
-    let balances_nil = get_chat_balances_currency(chat_id, CURRENCY_CODE_DEFAULT)?;
+    let mut balances_curr = get_chat_balances_currency(chat_id, currency)?;
+    let mut balances_nil = get_chat_balances_currency(chat_id, CURRENCY_CODE_DEFAULT)?;
 
     let mut group_spending = 0;
     let mut user_spendings: Vec<UserSpending> = Vec::new();
     for spending in spendings_curr {
         group_spending += spending.balance;
 
-        let balance = balances_curr
+        let paid: i64;
+        let balance_index = balances_curr
             .iter()
-            .find(|bal| bal.username == spending.username)
-            .map(|bal| bal.balance)
-            .unwrap_or(0);
-        let paid = spending.balance + balance;
+            .position(|bal| bal.username == spending.username);
+        match balance_index {
+            Some(index) => {
+                paid = spending.balance + balances_curr[index].balance;
+                balances_curr[index].balance = 0;
+            }
+            None => {
+                paid = 0;
+            }
+        }
 
         user_spendings.push(UserSpending {
             username: spending.username.clone(),
@@ -503,12 +510,19 @@ fn retrieve_spending_data_by_default_currency(
     for spending in spendings_nil {
         group_spending += spending.balance;
 
-        let balance = balances_nil
+        let paid: i64;
+        let balance_index = balances_nil
             .iter()
-            .find(|bal| bal.username == spending.username)
-            .map(|bal| bal.balance)
-            .unwrap_or(0);
-        let paid = spending.balance + balance;
+            .position(|bal| bal.username == spending.username);
+        match balance_index {
+            Some(index) => {
+                paid = spending.balance + balances_nil[index].balance;
+                balances_nil[index].balance = 0;
+            }
+            None => {
+                paid = 0;
+            }
+        }
 
         let user = user_spendings
             .iter()
@@ -531,37 +545,41 @@ fn retrieve_spending_data_by_default_currency(
 
     // Check through for any balances that aren't accounted for in a spending
     for balance in balances_curr {
-        let user = user_spendings
-            .iter()
-            .position(|spending| spending.username == balance.username);
-        match user {
-            Some(_) => {
-                continue;
-            }
-            None => {
-                user_spendings.push(UserSpending {
-                    username: balance.username,
-                    spending: 0,
-                    paid: balance.balance,
-                });
+        if balance.balance != 0 {
+            let user = user_spendings
+                .iter()
+                .position(|spending| spending.username == balance.username);
+            match user {
+                Some(index) => {
+                    user_spendings[index].paid += balance.balance;
+                }
+                None => {
+                    user_spendings.push(UserSpending {
+                        username: balance.username,
+                        spending: 0,
+                        paid: balance.balance,
+                    });
+                }
             }
         }
     }
 
     for balance in balances_nil {
-        let user = user_spendings
-            .iter()
-            .position(|spending| spending.username == balance.username);
-        match user {
-            Some(_) => {
-                continue;
-            }
-            None => {
-                user_spendings.push(UserSpending {
-                    username: balance.username,
-                    spending: 0,
-                    paid: balance.balance,
-                });
+        if balance.balance != 0 {
+            let user = user_spendings
+                .iter()
+                .position(|spending| spending.username == balance.username);
+            match user {
+                Some(index) => {
+                    user_spendings[index].paid += balance.balance;
+                }
+                None => {
+                    user_spendings.push(UserSpending {
+                        username: balance.username,
+                        spending: 0,
+                        paid: balance.balance,
+                    });
+                }
             }
         }
     }
@@ -645,7 +663,7 @@ fn retrieve_spending_data_by_currency(
  */
 async fn retrieve_spending_data_converted(chat_id: &str) -> Result<SpendingData, ProcessError> {
     let mut spendings = retrieve_chat_spendings(chat_id)?;
-    let balances = get_chat_balances(chat_id)?;
+    let mut balances = get_chat_balances(chat_id)?;
 
     let default_currency = get_default_currency(chat_id)?;
     let mut group_spending = 0;
@@ -670,19 +688,29 @@ async fn retrieve_spending_data_converted(chat_id: &str) -> Result<SpendingData,
             1.0
         };
 
-        let balances_currency = balances
-            .iter()
-            .find(|bal| bal.len() > 0 && bal[0].currency == *currency);
+        let mut empty_balances: Vec<UserBalance> = Vec::new();
+        let balances_currency: &mut Vec<UserBalance> = match balances
+            .iter_mut()
+            .find(|bal| bal.len() > 0 && bal[0].currency == *currency)
+        {
+            Some(bal) => bal,
+            None => &mut empty_balances,
+        };
 
         for spending in spending_currency {
-            let balance = balances_currency
-                .unwrap_or(&Vec::new())
+            let balance_index = balances_currency
                 .iter()
-                .find(|bal| bal.username == spending.username)
-                .map(|bal| bal.balance)
-                .unwrap_or(0);
+                .position(|bal| bal.username == spending.username);
 
-            let mut paid_amount = spending.balance + balance;
+            let mut paid_amount = spending.balance;
+            match balance_index {
+                Some(index) => {
+                    paid_amount += balances_currency[index].balance;
+                    balances_currency[index].balance = 0;
+                }
+                None => {}
+            }
+
             let mut spending_amount = spending.balance.clone();
 
             if should_convert {
@@ -722,26 +750,28 @@ async fn retrieve_spending_data_converted(chat_id: &str) -> Result<SpendingData,
         }
 
         // Check through for any balances that aren't accounted for in a spending
-        for balance in balances_currency.unwrap_or(&Vec::new()) {
-            let user = user_spendings
-                .iter()
-                .position(|spending| spending.username == balance.username);
-            match user {
-                Some(_) => {
-                    continue;
-                }
-                None => {
-                    let converted_balance = convert_currency_with_rate(
-                        balance.balance,
-                        &currency,
-                        &default_currency,
-                        conversion_rate,
-                    );
-                    user_spendings.push(UserSpending {
-                        username: balance.username.clone(),
-                        spending: 0,
-                        paid: converted_balance,
-                    });
+        for balance in balances_currency {
+            if balance.balance != 0 {
+                let user = user_spendings
+                    .iter()
+                    .position(|spending| spending.username == balance.username);
+                let converted_balance = convert_currency_with_rate(
+                    balance.balance,
+                    &currency,
+                    &default_currency,
+                    conversion_rate,
+                );
+                match user {
+                    Some(index) => {
+                        user_spendings[index].paid += converted_balance;
+                    }
+                    None => {
+                        user_spendings.push(UserSpending {
+                            username: balance.username.clone(),
+                            spending: 0,
+                            paid: converted_balance,
+                        });
+                    }
                 }
             }
         }
