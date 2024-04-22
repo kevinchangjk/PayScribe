@@ -529,6 +529,43 @@ fn retrieve_spending_data_by_default_currency(
         }
     }
 
+    // Check through for any balances that aren't accounted for in a spending
+    for balance in balances_curr {
+        let user = user_spendings
+            .iter()
+            .position(|spending| spending.username == balance.username);
+        match user {
+            Some(_) => {
+                continue;
+            }
+            None => {
+                user_spendings.push(UserSpending {
+                    username: balance.username,
+                    spending: 0,
+                    paid: balance.balance,
+                });
+            }
+        }
+    }
+
+    for balance in balances_nil {
+        let user = user_spendings
+            .iter()
+            .position(|spending| spending.username == balance.username);
+        match user {
+            Some(_) => {
+                continue;
+            }
+            None => {
+                user_spendings.push(UserSpending {
+                    username: balance.username,
+                    spending: 0,
+                    paid: balance.balance,
+                });
+            }
+        }
+    }
+
     Ok(SpendingData {
         currency: currency.to_string(),
         group_spending,
@@ -567,11 +604,32 @@ fn retrieve_spending_data_by_currency(
             .unwrap_or(0);
         let paid = spending.balance + balance;
 
-        user_spendings.push(UserSpending {
-            username: spending.username.clone(),
-            spending: spending.balance,
-            paid,
-        });
+        if spending.balance != 0 || paid != 0 {
+            user_spendings.push(UserSpending {
+                username: spending.username.clone(),
+                spending: spending.balance,
+                paid,
+            });
+        }
+    }
+
+    // Check through for any balances that aren't accounted for in a spending
+    for balance in balances {
+        let user = user_spendings
+            .iter()
+            .position(|spending| spending.username == balance.username);
+        match user {
+            Some(_) => {
+                continue;
+            }
+            None => {
+                user_spendings.push(UserSpending {
+                    username: balance.username,
+                    spending: 0,
+                    paid: balance.balance,
+                });
+            }
+        }
     }
 
     Ok(SpendingData {
@@ -658,6 +716,31 @@ async fn retrieve_spending_data_converted(chat_id: &str) -> Result<SpendingData,
                         username: spending.username.clone(),
                         spending: spending_amount,
                         paid: paid_amount,
+                    });
+                }
+            }
+        }
+
+        // Check through for any balances that aren't accounted for in a spending
+        for balance in balances_currency.unwrap_or(&Vec::new()) {
+            let user = user_spendings
+                .iter()
+                .position(|spending| spending.username == balance.username);
+            match user {
+                Some(_) => {
+                    continue;
+                }
+                None => {
+                    let converted_balance = convert_currency_with_rate(
+                        balance.balance,
+                        &currency,
+                        &default_currency,
+                        conversion_rate,
+                    );
+                    user_spendings.push(UserSpending {
+                        username: balance.username.clone(),
+                        spending: 0,
+                        paid: converted_balance,
                     });
                 }
             }
@@ -761,26 +844,39 @@ pub async fn update_chat_default_currency(
             }
 
             // Update all balances to old currency
-            let balances = get_chat_balances(chat_id)?;
-            for currency_balances in balances {
-                if currency_balances.len() > 0
-                    && currency_balances[0].currency == CURRENCY_CODE_DEFAULT
-                {
-                    for balance in currency_balances {
-                        let change_sub = UserBalance {
-                            username: balance.username.clone(),
-                            currency: balance.currency,
-                            balance: balance.balance.neg(),
-                        };
-                        let change_add = UserBalance {
-                            username: balance.username.clone(),
-                            currency: old_currency.clone(),
-                            balance: balance.balance,
-                        };
-                        changes.extend(vec![change_sub, change_add]);
-                    }
-                }
+            let balances = get_chat_balances_currency(chat_id, CURRENCY_CODE_DEFAULT)?;
+            for balance in balances {
+                let change_sub = UserBalance {
+                    username: balance.username.clone(),
+                    currency: balance.currency,
+                    balance: balance.balance.neg(),
+                };
+                let change_add = UserBalance {
+                    username: balance.username.clone(),
+                    currency: old_currency.clone(),
+                    balance: balance.balance,
+                };
+                changes.extend(vec![change_sub, change_add]);
             }
+
+            // Update all spendings to old currency
+            let mut spendings_changes: Vec<UserBalance> = Vec::new();
+            let spendings = retrieve_spending_data_by_currency(chat_id, CURRENCY_CODE_DEFAULT)?;
+            for spending in spendings.user_spendings {
+                let change_sub = UserBalance {
+                    username: spending.username.clone(),
+                    currency: CURRENCY_CODE_DEFAULT.to_string(),
+                    balance: spending.spending.neg(),
+                };
+                let change_add = UserBalance {
+                    username: spending.username.clone(),
+                    currency: old_currency.clone(),
+                    balance: spending.spending,
+                };
+                spendings_changes.extend(vec![change_sub, change_add]);
+            }
+
+            update_chat_spendings(chat_id, spendings_changes)?;
         }
         Err(_) => {
             // This means that there were no payments found

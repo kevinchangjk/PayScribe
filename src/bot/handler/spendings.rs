@@ -37,11 +37,16 @@ fn display_individual_spending(spending: UserSpending, currency: Currency) -> St
 }
 
 fn display_spendings(spending_data: SpendingData) -> String {
+    if spending_data.group_spending == 0 {
+        return format!("Total Group Spending: 0");
+    }
+
     let currency = match get_currency(&spending_data.currency) {
         Ok(currency) => currency,
         // Should not occur. Currency string is from database, so should exist.
         Err(_) => ("NIL".to_string(), 2),
     };
+
     let mut individual_spendings = String::new();
     for spending in &spending_data.user_spendings {
         individual_spendings.push_str(&format!(
@@ -80,13 +85,6 @@ async fn handle_spendings_with_option(
                     vec![]
                 }
             };
-            let mut valid_currencies: Vec<&str> =
-                valid_currencies.iter().map(|s| s.as_ref()).collect();
-            if let SpendingsOption::Currency(ref curr) = option {
-                valid_currencies.retain(|&x| x != curr && x != CURRENCY_DEFAULT.0);
-            } else {
-                valid_currencies.retain(|&x| x != CURRENCY_DEFAULT.0);
-            }
 
             let default_currency =
                 match get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None)) {
@@ -94,12 +92,34 @@ async fn handle_spendings_with_option(
                     _ => CURRENCY_DEFAULT.0.to_string(),
                 };
 
+            let mut valid_currencies: Vec<&str> =
+                valid_currencies.iter().map(|s| s.as_ref()).collect();
+            valid_currencies.retain(|&x| x != CURRENCY_DEFAULT.0 && x != default_currency);
+
+            if let SpendingsOption::Currency(ref curr) = option {
+                valid_currencies.retain(|&x| x != curr);
+            }
+
+            // Add back default currency button if not NIL, and currently not default
+            if default_currency != CURRENCY_DEFAULT.0 {
+                if let SpendingsOption::Currency(ref curr) = option {
+                    if curr != &default_currency {
+                        valid_currencies.push(&default_currency);
+                    }
+                } else {
+                    valid_currencies.push(&default_currency);
+                }
+            }
+
+            // Special buttons
             let conversion_button = format!("Convert to {default_currency}");
+            // Add conversion button only if not currently on convert, and have default currency
             if option != SpendingsOption::ConvertCurrency
                 && default_currency != CURRENCY_DEFAULT.0
                 && valid_currencies.len() > 0
             {
                 valid_currencies.push(&conversion_button);
+                // Add no currency button if no default currency, and not currently NIL
             } else if default_currency == CURRENCY_DEFAULT.0 {
                 if let SpendingsOption::Currency(ref curr) = option {
                     if curr != CURRENCY_DEFAULT.0 {
@@ -127,7 +147,7 @@ async fn handle_spendings_with_option(
                         chat_id,
                         id,
                         format!(
-                            "{}\n\n{}\n\n{}",
+                            "{}\n\n{}\n{}",
                             header,
                             display_spendings(spending_data),
                             if has_buttons {
@@ -144,7 +164,7 @@ async fn handle_spendings_with_option(
                     bot.send_message(
                         chat_id,
                         format!(
-                            "{}\n\n{}\n\n{}",
+                            "{}\n\n{}\n{}",
                             header,
                             display_spendings(spending_data),
                             if has_buttons {
