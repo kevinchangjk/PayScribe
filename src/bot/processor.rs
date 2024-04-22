@@ -4,11 +4,13 @@ use super::{
     currency::convert_currency,
     optimizer::optimize_debts,
     redis::{
-        add_payment_entry, delete_payment_entry, get_chat_balances, get_chat_payments_details,
-        get_currency_conversion, get_default_currency, get_payment_entry, get_time_zone,
-        retrieve_chat_debts, set_currency_conversion, set_default_currency, set_time_zone,
-        update_chat, update_chat_balances, update_chat_debts, update_payment_entry, update_user,
-        CrudError, Debt, Payment, UserBalance, UserPayment, CURRENCY_CODE_DEFAULT,
+        add_payment_entry, delete_payment_entry, get_chat_balances, get_chat_balances_currency,
+        get_chat_payments_details, get_currency_conversion, get_default_currency,
+        get_payment_entry, get_time_zone, retrieve_chat_debts, retrieve_chat_spendings,
+        retrieve_chat_spendings_currency, set_currency_conversion, set_default_currency,
+        set_time_zone, update_chat, update_chat_balances, update_chat_debts, update_chat_spendings,
+        update_payment_entry, update_user, CrudError, Debt, Payment, UserBalance, UserPayment,
+        CURRENCY_CODE_DEFAULT,
     },
 };
 
@@ -24,6 +26,26 @@ pub enum ChatSetting {
     TimeZone(Option<String>),
     DefaultCurrency(Option<String>),
     CurrencyConversion(Option<bool>),
+}
+
+#[derive(Debug, Clone)]
+pub enum SpendingsOption {
+    Currency(String),
+    ConvertCurrency,
+}
+
+#[derive(Debug, Clone)]
+pub struct UserSpending {
+    username: String,
+    spending: i64,
+    paid: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct SpendingData {
+    currency: String,
+    group_spending: i64,
+    user_spendings: Vec<UserSpending>,
 }
 
 #[derive(thiserror::Error, Debug, PartialEq)]
@@ -226,6 +248,17 @@ pub async fn add_payment(
     };
     add_payment_entry(&chat_id, &payment)?;
 
+    // Update spendings
+    let spendings: Vec<UserBalance> = debts
+        .iter()
+        .map(|(user, amount)| UserBalance {
+            username: user.to_string(),
+            currency: currency.to_string(),
+            balance: *amount,
+        })
+        .collect();
+    update_chat_spendings(&chat_id, spendings)?;
+
     // Update balances
     let mut changes: Vec<UserBalance> = debts
         .iter()
@@ -306,11 +339,24 @@ pub async fn edit_payment(
             currency: prev_currency.to_string(),
             balance: current_payment.total.neg(),
         });
-        update_chat_balances(&chat_id, prev_changes.clone())?;
+        update_chat_balances(&chat_id, prev_changes)?;
+
+        // Update spendings as well
+        let prev_spendings: Vec<UserBalance> = current_payment
+            .debts
+            .iter()
+            .map(|debt| UserBalance {
+                username: debt.0.to_string(),
+                currency: prev_currency.to_string(),
+                balance: debt.1.neg(),
+            })
+            .collect();
+        update_chat_spendings(&chat_id, prev_spendings)?;
 
         // Second round of update
         let mut changes: Vec<UserBalance> = debts
-            .unwrap_or(current_payment.debts)
+            .clone()
+            .unwrap_or(current_payment.debts.clone())
             .iter()
             .map(|debt| UserBalance {
                 username: debt.0.to_string(),
@@ -323,6 +369,18 @@ pub async fn edit_payment(
             currency: currency.unwrap_or(prev_currency).to_string(),
             balance: *total.unwrap_or(&current_payment.total),
         });
+
+        // Update spendings as well
+        let new_spendings: Vec<UserBalance> = debts
+            .unwrap_or(current_payment.debts)
+            .iter()
+            .map(|debt| UserBalance {
+                username: debt.0.to_string(),
+                currency: currency.unwrap_or(prev_currency).to_string(),
+                balance: debt.1,
+            })
+            .collect();
+        update_chat_spendings(&chat_id, new_spendings)?;
 
         let res = update_balances_debts(&chat_id, changes).await?;
         return Ok(Some(res));
@@ -342,6 +400,18 @@ pub async fn delete_payment(chat_id: &str, payment_id: &str) -> Result<Vec<Debt>
 
     // Delete payment entry
     delete_payment_entry(&chat_id, payment_id)?;
+
+    // Update spendings
+    let spendings: Vec<UserBalance> = payment
+        .debts
+        .iter()
+        .map(|debt| UserBalance {
+            username: debt.0.to_string(),
+            currency: payment.currency.clone(),
+            balance: debt.1.neg(),
+        })
+        .collect();
+    update_chat_spendings(&chat_id, spendings)?;
 
     // Update balances
     let mut changes: Vec<UserBalance> = payment
@@ -374,6 +444,121 @@ pub fn view_debts(
 
     let debts = retrieve_chat_debts(&chat_id)?;
     Ok(debts)
+}
+
+/* View spendings of a group chat for a specific currency.
+ * Retrieves all spendings, gets current balances, and returns:
+ * Total group spending, total individual spendings, and total individual payments
+ */
+fn retrieve_spending_data_by_currency(
+    chat_id: &str,
+    currency: &str,
+) -> Result<SpendingData, ProcessError> {
+    let spendings = retrieve_chat_spendings_currency(chat_id, currency)?;
+    let balances = get_chat_balances_currency(chat_id, currency)?;
+
+    let mut group_spending = 0;
+    let mut user_spendings: Vec<UserSpending> = Vec::new();
+    for spending in spendings {
+        group_spending += spending.balance;
+
+        let balance = balances
+            .iter()
+            .find(|bal| bal.username == spending.username)
+            .map(|bal| bal.balance)
+            .unwrap_or(0);
+        let paid = spending.balance + balance;
+
+        user_spendings.push(UserSpending {
+            username: spending.username.clone(),
+            spending: spending.balance,
+            paid,
+        });
+    }
+
+    Ok(SpendingData {
+        currency: currency.to_string(),
+        group_spending,
+        user_spendings,
+    })
+}
+
+/* View spendings of a group chat, converted to default currency.
+ * Only called if currency conversion is enabled.
+* Retrieves all spendings, gets current balances, converts them.
+ */
+async fn retrieve_spending_data_converted(chat_id: &str) -> Result<SpendingData, ProcessError> {
+    let mut spendings = retrieve_chat_spendings(chat_id)?;
+    let balances = get_chat_balances(chat_id)?;
+
+    let default_currency = get_default_currency(chat_id)?;
+    let mut group_spending = 0;
+    let mut user_spendings: Vec<UserSpending> = Vec::new();
+    for spending_currency in &mut spendings {
+        if spending_currency.len() == 0 {
+            continue;
+        }
+
+        let currency = spending_currency[0].currency.clone();
+        let balances_currency = balances
+            .iter()
+            .find(|bal| bal.len() > 0 && bal[0].currency == *currency);
+
+        for spending in spending_currency {
+            let balance = balances_currency
+                .unwrap_or(&Vec::new())
+                .iter()
+                .find(|bal| bal.username == spending.username)
+                .map(|bal| bal.balance)
+                .unwrap_or(0);
+            let paid = spending.balance + balance;
+            let paid_converted = convert_currency(paid, &currency, &default_currency).await;
+            let spending_converted =
+                convert_currency(spending.balance, &currency, &default_currency).await;
+
+            group_spending += spending_converted;
+
+            let user = user_spendings
+                .iter()
+                .position(|user| user.username == spending.username);
+
+            match user {
+                Some(index) => {
+                    user_spendings[index].spending += spending_converted;
+                    user_spendings[index].paid += paid_converted;
+                }
+                None => {
+                    user_spendings.push(UserSpending {
+                        username: spending.username.clone(),
+                        spending: spending_converted,
+                        paid: paid_converted,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(SpendingData {
+        currency: default_currency.to_string(),
+        group_spending,
+        user_spendings,
+    })
+}
+
+/* View spendings of a group chat.
+ * Takes in a specification of the options for viewing.
+ * Which is whether the currency is to be converted, and which currency.
+ */
+pub async fn retrieve_spending_data(
+    chat_id: &str,
+    option: SpendingsOption,
+) -> Result<SpendingData, ProcessError> {
+    match option {
+        SpendingsOption::Currency(currency) => {
+            retrieve_spending_data_by_currency(chat_id, &currency)
+        }
+        SpendingsOption::ConvertCurrency => retrieve_spending_data_converted(chat_id).await,
+    }
 }
 
 /* Retrieves a group chat setting.

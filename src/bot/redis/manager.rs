@@ -231,6 +231,35 @@ pub fn get_chat_balances(chat_id: &str) -> Result<Vec<Vec<UserBalance>>, CrudErr
     Ok(balances)
 }
 
+/* Gets all balances for a chat for a specific currency.
+ */
+pub fn get_chat_balances_currency(
+    chat_id: &str,
+    currency: &str,
+) -> Result<Vec<UserBalance>, CrudError> {
+    let mut con = connect()?;
+
+    // Retrieve all balances
+    let mut balances: Vec<UserBalance> = Vec::new();
+    let users = get_chat_users(&mut con, chat_id)?;
+
+    for user in &users {
+        if get_balance_exists(&mut con, chat_id, user, currency)? {
+            let balance = get_balance(&mut con, chat_id, user, currency)?;
+            if balance != 0 {
+                let username = get_preferred_username(&mut con, user)?;
+                balances.push(UserBalance {
+                    username,
+                    currency: currency.to_string(),
+                    balance,
+                });
+            }
+        }
+    }
+
+    Ok(balances)
+}
+
 /* Updates balances for a chat based on given change amounts.
  * If balance does not exist, creates it.
  * Returns the updated balances.
@@ -426,8 +455,8 @@ pub fn update_chat_spendings(chat_id: &str, spendings: Vec<UserBalance>) -> Resu
     Ok(())
 }
 
-/* Retrieves all spendings for a chat
- * Returns a vector of vectors of UserBalance, by currency, then by user.
+/* Retrieves all spendings for a chat for specific currency.
+ * Returns a vector of UserBalance by user.
  */
 pub fn retrieve_chat_spendings(chat_id: &str) -> Result<Vec<Vec<UserBalance>>, CrudError> {
     let mut con = connect()?;
@@ -455,6 +484,35 @@ pub fn retrieve_chat_spendings(chat_id: &str) -> Result<Vec<Vec<UserBalance>>, C
         }
 
         curr_index += 1;
+    }
+
+    Ok(spendings)
+}
+
+/* Retrieves all spendings for a chat for specific currency.
+ * Returns a vector of UserBalance by user.
+ */
+pub fn retrieve_chat_spendings_currency(
+    chat_id: &str,
+    currency: &str,
+) -> Result<Vec<UserBalance>, CrudError> {
+    let mut con = connect()?;
+
+    let mut spendings: Vec<UserBalance> = Vec::new();
+    let users = get_chat_users(&mut con, chat_id)?;
+
+    for user in &users {
+        if get_spending_exists(&mut con, chat_id, user, &currency)? {
+            let spending = get_spending(&mut con, chat_id, user, &currency)?;
+            if spending != 0 {
+                let username = get_preferred_username(&mut con, user)?;
+                spendings.push(UserBalance {
+                    username,
+                    currency: currency.to_string(),
+                    balance: spending as i64,
+                });
+            }
+        }
     }
 
     Ok(spendings)
@@ -1040,6 +1098,50 @@ mod tests {
 
         assert_eq!(new_balances, balances);
 
+        // Checks balances for individual currency
+        let balances_usd = get_chat_balances_currency(chat_id, "USD").unwrap();
+        assert_eq!(
+            balances_usd,
+            vec![
+                UserBalance {
+                    username: "manager_test_user_26".to_string(),
+                    balance: 10000,
+                    currency: "USD".to_string(),
+                },
+                UserBalance {
+                    username: "manager_test_user_27".to_string(),
+                    balance: -5000,
+                    currency: "USD".to_string(),
+                },
+                UserBalance {
+                    username: "manager_test_user_28".to_string(),
+                    balance: -5000,
+                    currency: "USD".to_string(),
+                },
+            ]
+        );
+        let balances_jpy = get_chat_balances_currency(chat_id, "JPY").unwrap();
+        assert_eq!(
+            balances_jpy,
+            vec![
+                UserBalance {
+                    username: "manager_test_user_26".to_string(),
+                    balance: -5000,
+                    currency: "JPY".to_string(),
+                },
+                UserBalance {
+                    username: "manager_test_user_27".to_string(),
+                    balance: -5000,
+                    currency: "JPY".to_string(),
+                },
+                UserBalance {
+                    username: "manager_test_user_28".to_string(),
+                    balance: 10000,
+                    currency: "JPY".to_string(),
+                },
+            ]
+        );
+
         // Deletes balances
         for current in balances {
             for balance in current {
@@ -1197,9 +1299,9 @@ mod tests {
         assert!(add_chat_currency(&mut con, chat_id, "USD").is_ok());
 
         // Retrieves spendings
-        let retrieved_spendings = retrieve_chat_spendings(chat_id);
+        let retrieved_spendings = retrieve_chat_spendings_currency(chat_id, "USD");
         assert!(retrieved_spendings.is_ok());
-        assert_eq!(retrieved_spendings.unwrap(), vec![spendings.clone()]);
+        assert_eq!(retrieved_spendings.unwrap(), spendings.clone());
 
         // Updates spendings with another currency
         let new_spendings = vec![
@@ -1226,8 +1328,12 @@ mod tests {
         assert!(add_chat_currency(&mut con, chat_id, "JPY").is_ok());
 
         // Retrieves and checks spendings again
-        let retrieved_spendings = retrieve_chat_spendings(chat_id);
+        let retrieved_spendings = retrieve_chat_spendings_currency(chat_id, "JPY");
         assert!(retrieved_spendings.is_ok());
+        assert_eq!(retrieved_spendings.unwrap(), new_spendings.clone());
+        let retrieved_spendings = retrieve_chat_spendings_currency(chat_id, "USD");
+        assert_eq!(retrieved_spendings.unwrap(), spendings.clone());
+        let retrieved_spendings = retrieve_chat_spendings(chat_id);
         assert_eq!(
             retrieved_spendings.unwrap(),
             vec![spendings.clone(), new_spendings.clone()]
