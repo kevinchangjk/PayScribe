@@ -1,10 +1,16 @@
-use teloxide::{prelude::*, types::Message};
+use teloxide::{
+    prelude::*,
+    types::{Message, MessageId},
+};
 
 use crate::bot::{
     currency::{Currency, CURRENCY_DEFAULT},
     handler::{
         constants::{SPENDINGS_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE},
-        utils::{display_amount, display_username, get_currency, HandlerResult},
+        utils::{
+            display_amount, display_username, get_currency, make_keyboard, HandlerResult,
+            UserDialogue,
+        },
     },
     processor::{
         get_chat_setting, retrieve_spending_data, retrieve_valid_currencies, ChatSetting,
@@ -13,9 +19,14 @@ use crate::bot::{
     State,
 };
 
-use super::utils::{make_keyboard, UserDialogue};
-
 /* Utilities */
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum SpendingsOption {
+    Currency(String),
+    ConvertCurrency,
+}
+
 fn display_individual_spending(spending: UserSpending, currency: Currency) -> String {
     format!(
         "{} spent {}, and paid {}",
@@ -46,10 +57,128 @@ fn display_spendings(spending_data: SpendingData) -> String {
     )
 }
 
-#[derive(Debug, Clone)]
-pub enum SpendingsOption {
-    Currency(String),
-    ConvertCurrency,
+async fn handle_spendings_with_option(
+    bot: Bot,
+    dialogue: UserDialogue,
+    chat_id: String,
+    sender_id: String,
+    option: SpendingsOption,
+    id: Option<MessageId>,
+) -> HandlerResult {
+    let spending_data = retrieve_spending_data(&chat_id, option.clone()).await;
+
+    match spending_data {
+        Ok(spending_data) => {
+            let valid_currencies = match retrieve_valid_currencies(&chat_id) {
+                Ok(currencies) => currencies,
+                Err(_) => {
+                    log::error!(
+                        "View Spendings - User {} failed to retrieve valid currencies for group {}",
+                        sender_id,
+                        chat_id
+                    );
+                    vec![]
+                }
+            };
+            let mut valid_currencies: Vec<&str> =
+                valid_currencies.iter().map(|s| s.as_ref()).collect();
+            if let SpendingsOption::Currency(ref curr) = option {
+                valid_currencies.retain(|&x| x != curr && x != CURRENCY_DEFAULT.0);
+            } else {
+                valid_currencies.retain(|&x| x != CURRENCY_DEFAULT.0);
+            }
+
+            let is_convert = option != SpendingsOption::ConvertCurrency;
+            let default_currency =
+                match get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None)) {
+                    Ok(ChatSetting::DefaultCurrency(Some(currency))) => currency,
+                    _ => CURRENCY_DEFAULT.0.to_string(),
+                };
+
+            let conversion_button = format!("Convert to {default_currency}");
+            if !is_convert && default_currency != CURRENCY_DEFAULT.0 {
+                valid_currencies.push(&conversion_button);
+            } else if default_currency == CURRENCY_DEFAULT.0 {
+                if let SpendingsOption::Currency(ref curr) = option {
+                    if curr != CURRENCY_DEFAULT.0 {
+                        valid_currencies.push("No Currency");
+                    }
+                }
+            }
+
+            let has_buttons = valid_currencies.len() > 0;
+            let keyboard = make_keyboard(valid_currencies, Some(2));
+
+            let header = if let SpendingsOption::Currency(curr) = option {
+                if curr == CURRENCY_DEFAULT.0 {
+                    format!("Here are the total spendings!")
+                } else {
+                    format!("Here are the total spendings for {curr}!")
+                }
+            } else {
+                format!("Here are the total spendings, converted to {default_currency}!")
+            };
+
+            match id {
+                Some(id) => {
+                    bot.edit_message_text(
+                        chat_id,
+                        id,
+                        format!(
+                            "{}\n\n{}\n\n{}",
+                            header,
+                            display_spendings(spending_data),
+                            if has_buttons {
+                                SPENDINGS_INSTRUCTIONS_MESSAGE
+                            } else {
+                                ""
+                            }
+                        ),
+                    )
+                    .reply_markup(keyboard)
+                    .await?;
+                }
+                None => {
+                    bot.send_message(
+                        chat_id,
+                        format!(
+                            "{}\n\n{}\n\n{}",
+                            header,
+                            display_spendings(spending_data),
+                            if has_buttons {
+                                SPENDINGS_INSTRUCTIONS_MESSAGE
+                            } else {
+                                ""
+                            }
+                        ),
+                    )
+                    .reply_markup(keyboard)
+                    .await?;
+                }
+            }
+            dialogue.update(State::SpendingsMenu).await?;
+        }
+        Err(err) => {
+            match id {
+                Some(id) => {
+                    bot.edit_message_text(chat_id.clone(), id, UNKNOWN_ERROR_MESSAGE)
+                        .await?;
+                }
+                None => {
+                    bot.send_message(chat_id.clone(), UNKNOWN_ERROR_MESSAGE)
+                        .await?;
+                }
+            }
+            log::error!(
+                "View Spendings - User {} failed to view spendings for group {}: {}",
+                sender_id,
+                chat_id,
+                err.to_string()
+            );
+        }
+    }
+
+    Ok(())
 }
 
 /* View the spendings for the group.
@@ -60,89 +189,23 @@ pub async fn action_view_spendings(
     msg: Message,
 ) -> HandlerResult {
     let chat_id = msg.chat.id.to_string();
-    if let Some(user) = msg.from() {
-        let sender_id = user.id.to_string();
-        let sender_username = user.username.clone();
+    let sender_id = msg.from().as_ref().unwrap().id.to_string();
+    let is_convert = match get_chat_setting(&chat_id, ChatSetting::CurrencyConversion(None)) {
+        Ok(ChatSetting::CurrencyConversion(Some(value))) => value,
+        _ => false,
+    };
+    let default_currency = match get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None)) {
+        Ok(ChatSetting::DefaultCurrency(Some(currency))) => currency,
+        _ => "NIL".to_string(),
+    };
 
-        let is_convert = match get_chat_setting(&chat_id, ChatSetting::CurrencyConversion(None)) {
-            Ok(ChatSetting::CurrencyConversion(Some(value))) => value,
-            _ => false,
-        };
-        let default_currency = match get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None))
-        {
-            Ok(ChatSetting::DefaultCurrency(Some(currency))) => currency,
-            _ => "NIL".to_string(),
-        };
+    let option = if is_convert {
+        SpendingsOption::ConvertCurrency
+    } else {
+        SpendingsOption::Currency(default_currency.clone())
+    };
 
-        let option = if is_convert {
-            SpendingsOption::ConvertCurrency
-        } else {
-            SpendingsOption::Currency(default_currency.clone())
-        };
-
-        let spending_data = retrieve_spending_data(
-            &chat_id,
-            option.clone(),
-            &sender_id,
-            sender_username.as_deref(),
-        )
-        .await;
-
-        match spending_data {
-            Ok(spending_data) => {
-                let valid_currencies = match retrieve_valid_currencies(&chat_id) {
-                    Ok(currencies) => currencies,
-                    Err(_) => {
-                        log::error!(
-                            "View Spendings - User {} failed to retrieve valid currencies for group {}",
-                            sender_id,
-                            chat_id
-                        );
-                        vec![]
-                    }
-                };
-                let mut valid_currencies: Vec<&str> =
-                    valid_currencies.iter().map(|s| s.as_ref()).collect();
-                valid_currencies.retain(|&x| x != &default_currency && x != CURRENCY_DEFAULT.0);
-                let conversion_button = format!("Convert to {default_currency}");
-                if !is_convert && default_currency != CURRENCY_DEFAULT.0 {
-                    valid_currencies.push(&conversion_button);
-                }
-
-                let keyboard = make_keyboard(valid_currencies, Some(2));
-
-                let header = if is_convert {
-                    format!("Here are the total spendings, converted to {default_currency}!")
-                } else if default_currency == CURRENCY_DEFAULT.0 {
-                    format!("Here are the total spendings!")
-                } else {
-                    format!("Here are the total spendings for {default_currency}!")
-                };
-
-                bot.send_message(
-                    chat_id,
-                    format!(
-                        "{}\n\n{}\n\n{SPENDINGS_INSTRUCTIONS_MESSAGE}",
-                        header,
-                        display_spendings(spending_data)
-                    ),
-                )
-                .reply_markup(keyboard)
-                .await?;
-                dialogue.update(State::SpendingsMenu).await?;
-            }
-            Err(err) => {
-                bot.send_message(chat_id.clone(), UNKNOWN_ERROR_MESSAGE)
-                    .await?;
-                log::error!(
-                    "View Spendings - User {} failed to view spendings for group {}: {}",
-                    sender_id,
-                    chat_id,
-                    err.to_string()
-                );
-            }
-        }
-    }
+    handle_spendings_with_option(bot, dialogue, chat_id, sender_id, option, None).await?;
 
     Ok(())
 }
@@ -155,5 +218,60 @@ pub async fn action_spendings_menu(
     dialogue: UserDialogue,
     query: CallbackQuery,
 ) -> HandlerResult {
+    if let Some(button) = &query.data {
+        bot.answer_callback_query(query.id.to_string()).await?;
+        let sender_id = query.from.id.to_string();
+
+        if let Some(Message { id, chat, .. }) = query.message {
+            let chat_id = chat.id.to_string();
+            match button.as_str() {
+                _ if button.as_str().starts_with("Convert to ") => {
+                    let option = SpendingsOption::ConvertCurrency;
+                    handle_spendings_with_option(
+                        bot,
+                        dialogue,
+                        chat_id,
+                        sender_id,
+                        option,
+                        Some(id),
+                    )
+                    .await?;
+                }
+                _ if button.as_str() == "No Currency" => {
+                    let option = SpendingsOption::Currency(CURRENCY_DEFAULT.0.to_string());
+                    handle_spendings_with_option(
+                        bot,
+                        dialogue,
+                        chat_id,
+                        sender_id,
+                        option,
+                        Some(id),
+                    )
+                    .await?;
+                }
+                _ if button.as_str().len() == 3 => {
+                    let option = SpendingsOption::Currency(button.as_str().to_string());
+                    handle_spendings_with_option(
+                        bot,
+                        dialogue,
+                        chat_id,
+                        sender_id,
+                        option,
+                        Some(id),
+                    )
+                    .await?;
+                }
+                _ => {
+                    log::error!(
+                        "View Payments Menu - Invalid button in chat {} by user {}: {}",
+                        chat_id,
+                        sender_id,
+                        button
+                    );
+                }
+            }
+        }
+    }
+
     Ok(())
 }
