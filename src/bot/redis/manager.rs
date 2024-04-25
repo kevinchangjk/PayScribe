@@ -212,7 +212,9 @@ pub fn get_valid_chat_currencies(chat_id: &str) -> Result<Vec<String>, CrudError
     let mut valid_currencies: Vec<String> = Vec::new();
     for currency in &currencies {
         for user in &users {
-            if get_spending_exists(&mut con, chat_id, user, &currency)? {
+            if get_spending_exists(&mut con, chat_id, user, &currency)?
+                && get_spending(&mut con, chat_id, user, &currency)? > 0
+            {
                 valid_currencies.push(currency.to_string());
                 break;
             }
@@ -457,11 +459,10 @@ pub fn update_chat_spendings(chat_id: &str, spendings: Vec<UserBalance>) -> Resu
 
     for spending in spendings {
         let mut amount = spending.balance;
-        let is_exists =
-            get_spending_exists(&mut con, chat_id, &spending.username, &spending.currency)?;
+        let username = &spending.username.to_lowercase();
+        let is_exists = get_spending_exists(&mut con, chat_id, username, &spending.currency)?;
         if is_exists {
-            let current_spending =
-                get_spending(&mut con, chat_id, &spending.username, &spending.currency)?;
+            let current_spending = get_spending(&mut con, chat_id, username, &spending.currency)?;
             amount += current_spending as i64;
         }
 
@@ -471,7 +472,7 @@ pub fn update_chat_spendings(chat_id: &str, spendings: Vec<UserBalance>) -> Resu
             set_spending(
                 &mut con,
                 chat_id,
-                &spending.username,
+                username,
                 &spending.currency,
                 amount as u64,
             )?;

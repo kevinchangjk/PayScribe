@@ -32,7 +32,7 @@ fn display_individual_spending(spending: UserSpending, currency: Currency) -> St
     )
 }
 
-fn display_spendings(spending_data: SpendingData) -> String {
+fn display_spendings(spending_data: &SpendingData) -> String {
     if spending_data.group_spending == 0 {
         return format!("Total Group Spending: 0");
     }
@@ -145,7 +145,7 @@ async fn handle_spendings_with_option(
                         format!(
                             "{}\n\n{}\n{}",
                             header,
-                            display_spendings(spending_data),
+                            display_spendings(&spending_data),
                             if has_buttons {
                                 STATEMENT_INSTRUCTIONS_MESSAGE
                             } else {
@@ -162,7 +162,7 @@ async fn handle_spendings_with_option(
                         format!(
                             "{}\n\n{}\n{}",
                             header,
-                            display_spendings(spending_data),
+                            display_spendings(&spending_data),
                             if has_buttons {
                                 STATEMENT_INSTRUCTIONS_MESSAGE
                             } else {
@@ -177,9 +177,10 @@ async fn handle_spendings_with_option(
             dialogue.update(State::SpendingsMenu).await?;
 
             log::info!(
-                "View Spendings - User {} viewed spendings for group {}",
+                "View Spendings - User {} viewed spendings for group {}: {}",
                 sender_id,
-                chat_id
+                chat_id,
+                display_spendings(&spending_data)
             );
         }
         Err(err) => {

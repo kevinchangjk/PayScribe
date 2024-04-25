@@ -136,9 +136,10 @@ async fn handle_balances_with_option(
             dialogue.update(State::BalancesMenu).await?;
 
             log::info!(
-                "View Balances - User {} viewed balances for group {}",
+                "View Balances - User {} viewed balances for group {}: {}",
                 sender_id,
-                chat_id
+                chat_id,
+                display_balances(&balances_data)
             );
         }
         Err(err) => {
