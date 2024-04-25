@@ -15,10 +15,10 @@ use crate::bot::{
             DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, TOTAL_INSTRUCTIONS_MESSAGE,
         },
         utils::{
-            display_balances, display_currency_amount, display_debts, display_payment,
-            display_username, make_keyboard, make_keyboard_debt_selection, parse_currency_amount,
-            parse_username, process_debts, retrieve_time_zone, use_currency, HandlerResult,
-            UserDialogue,
+            display_balance_header, display_balances, display_currency_amount, display_debts,
+            display_payment, display_username, make_keyboard, make_keyboard_debt_selection,
+            parse_currency_amount, parse_username, process_debts, retrieve_time_zone, use_currency,
+            HandlerResult, UserDialogue,
         },
         AddDebtsFormat, AddPaymentEdit, Payment,
     },
@@ -135,7 +135,7 @@ async fn call_processor_edit_payment(
             &payment.payment_id,
             edited_payment.description.as_deref(),
             edited_payment.creditor.as_deref(),
-            edited_payment.currency.unzip().0.as_deref(),
+            edited_payment.currency.clone().unzip().0.as_deref(),
             edited_payment.total.as_ref(),
             edited_payment.debts,
         )
@@ -143,19 +143,28 @@ async fn call_processor_edit_payment(
 
         match edited {
             Ok(balances) => {
-                let edit_overview = display_edit_payment(payment, edited_clone);
+                let edit_overview = display_edit_payment(payment.clone(), edited_clone);
                 match balances {
                     Some(balances) => {
                         bot.edit_message_text(
                             chat_id.clone(),
                             id,
                             format!(
-                                "🎉 I've edited the payment! 🎉\n\n{}\nHere are the updated balances:\n\n{}",
+                                "🎉 I've edited the payment! 🎉\n\n{}\n{}{}",
                                 edit_overview,
-                                display_balances(&balances)
+                                display_balance_header(
+                                    &chat_id,
+                                    edited_payment
+                                        .currency
+                                        .unzip()
+                                        .0
+                                        .as_deref()
+                                        .unwrap_or(&payment.currency.0)
                                 ),
-                                )
-                            .await?;
+                                display_balances(&balances)
+                            ),
+                        )
+                        .await?;
                     }
                     None => {
                         bot.edit_message_text(

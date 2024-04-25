@@ -9,9 +9,9 @@ use crate::bot::{
             PAY_BACK_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
         },
         utils::{
-            display_balances, display_debts, display_username, get_chat_default_currency,
-            get_currency, make_keyboard, parse_debts_payback, parse_username, use_currency,
-            HandlerResult, UserDialogue,
+            display_balance_header, display_balances, display_debts, display_username,
+            get_chat_default_currency, get_currency, make_keyboard, parse_debts_payback,
+            parse_username, use_currency, HandlerResult, UserDialogue,
         },
     },
     processor::add_payment,
@@ -114,8 +114,9 @@ async fn call_processor_pay_back(
                     chat.id,
                     id,
                     format!(
-                        "🎉 I've added the payment! 🎉\n\n{}\nHere are the updated balances:\n\n{}",
+                        "🎉 I've added the payment! 🎉\n\n{}\n{}{}",
                         payment_overview,
+                        display_balance_header(&chat.id.to_string(), &payment.currency.0),
                         display_balances(&balances)
                     ),
                 )

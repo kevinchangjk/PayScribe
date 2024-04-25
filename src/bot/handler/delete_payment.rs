@@ -7,7 +7,10 @@ use crate::bot::{
     dispatcher::State,
     handler::{
         constants::{COMMAND_CANCEL, COMMAND_VIEW_PAYMENTS},
-        utils::{display_balances, display_payment, make_keyboard, HandlerResult, UserDialogue},
+        utils::{
+            display_balance_header, display_balances, display_payment, make_keyboard,
+            HandlerResult, UserDialogue,
+        },
         Payment,
     },
     processor::delete_payment,
@@ -138,11 +141,12 @@ pub async fn action_delete_payment_confirm(
                                 chat_id.clone(),
                                 id,
                                 format!(
-                                    "🎉 I've deleted the payment! 🎉\n\nHere are the updated balances:\n\n{}",
-                                    display_balances(&balances)
-                                    ),
-                                    )
-                                .await?;
+                                    "🎉 I've deleted the payment! 🎉\n\n{}{}",
+                                    display_balances(&balances),
+                                    display_balance_header(&chat_id, &payment.currency.0)
+                                ),
+                            )
+                            .await?;
 
                             // Logging
                             log::info!(

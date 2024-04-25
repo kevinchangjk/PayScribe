@@ -11,9 +11,9 @@ use crate::bot::{
             TOTAL_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE,
         },
         utils::{
-            display_balances, display_currency_amount, display_debts, display_username,
-            make_keyboard, make_keyboard_debt_selection, parse_currency_amount, parse_username,
-            process_debts, use_currency, HandlerResult, UserDialogue,
+            display_balance_header, display_balances, display_currency_amount, display_debts,
+            display_username, make_keyboard, make_keyboard_debt_selection, parse_currency_amount,
+            parse_username, process_debts, use_currency, HandlerResult, UserDialogue,
         },
     },
     processor::add_payment,
@@ -259,7 +259,7 @@ async fn call_processor_add_payment(
         };
         let payment_overview = display_add_payment(&payment_clone);
         let updated_balances = add_payment(
-            payment.chat_id,
+            payment.chat_id.clone(),
             payment.sender_username,
             payment.sender_id,
             payment.datetime,
@@ -276,8 +276,9 @@ async fn call_processor_add_payment(
                     chat.id,
                     id,
                     format!(
-                        "🎉 I've added the payment! 🎉\n\n{}Here are the updated balances:\n\n{}",
+                        "🎉 I've added the payment! 🎉\n\n{}{}{}",
                         payment_overview,
+                        display_balance_header(&payment.chat_id, &currency.0),
                         display_balances(&balances)
                     ),
                 )

@@ -130,6 +130,33 @@ pub fn use_currency(currency: Currency, chat_id: &str) -> Currency {
     }
 }
 
+// Displays the header for the balances, depending on the statement option applied.
+pub fn display_balance_header(chat_id: &str, currency: &str) -> String {
+    let conversion = match get_chat_setting(chat_id, ChatSetting::CurrencyConversion(None)) {
+        Ok(ChatSetting::CurrencyConversion(Some(value))) => value,
+        _ => false,
+    };
+    let default_currency = match get_chat_setting(chat_id, ChatSetting::DefaultCurrency(None)) {
+        Ok(ChatSetting::DefaultCurrency(Some(currency))) => currency,
+        _ => CURRENCY_DEFAULT.0.to_string(),
+    };
+
+    if conversion {
+        format!(
+            "Here are the updated balances, converted to {}:\n\n",
+            default_currency
+        )
+    } else if currency == CURRENCY_DEFAULT.0 {
+        if default_currency != CURRENCY_DEFAULT.0 {
+            format!("Here are the updated {} balances:\n\n", default_currency)
+        } else {
+            format!("Here are the updated balances:\n\n")
+        }
+    } else {
+        format!("Here are the updated {} balances:\n\n", currency)
+    }
+}
+
 // Displays balances in a more readable format. Now only shows in one currency.
 pub fn display_balances(debts: &Vec<Debt>) -> String {
     let mut message = String::new();

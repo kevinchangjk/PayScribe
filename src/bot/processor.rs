@@ -189,19 +189,14 @@ fn update_balances(chat_id: &str, changes: Vec<UserBalance>) -> Result<(), Proce
 // Utility function required by many commands.
 // Updates the balances based on changes that are given.
 // Returns the debts for the relevant currency.
-fn update_balances_debts(
+async fn update_balances_debts(
     chat_id: &str,
     changes: Vec<UserBalance>,
-    currency: &str,
+    currency: StatementOption,
 ) -> Result<Vec<Debt>, ProcessError> {
     update_balances(chat_id, changes)?;
 
-    let balances = get_chat_balances_currency(chat_id, currency)?;
-    if balances.is_empty() {
-        return Ok(Vec::new());
-    }
-
-    let debts = optimize_debts(balances);
+    let debts = retrieve_debts(chat_id, currency).await?;
 
     Ok(debts)
 }
@@ -296,7 +291,14 @@ pub async fn add_payment(
         balance: total,
     });
 
-    update_balances_debts(&chat_id, changes, currency)
+    let conversion = get_currency_conversion(&chat_id)?;
+    let option = if conversion {
+        StatementOption::ConvertCurrency
+    } else {
+        StatementOption::Currency(currency.to_string())
+    };
+
+    update_balances_debts(&chat_id, changes, option).await
 }
 
 /* View all payment entries of a group chat.
@@ -403,7 +405,14 @@ pub async fn edit_payment(
             .collect();
         update_chat_spendings(&chat_id, new_spendings)?;
 
-        let res = update_balances_debts(&chat_id, changes, currency.unwrap_or(prev_currency))?;
+        let conversion = get_currency_conversion(&chat_id)?;
+        let option = if conversion {
+            StatementOption::ConvertCurrency
+        } else {
+            StatementOption::Currency(currency.unwrap_or(prev_currency).to_string())
+        };
+
+        let res = update_balances_debts(&chat_id, changes, option).await?;
         return Ok(Some(res));
     }
 
@@ -450,7 +459,14 @@ pub async fn delete_payment(chat_id: &str, payment_id: &str) -> Result<Vec<Debt>
         balance: payment.total.neg(),
     });
 
-    update_balances_debts(&chat_id, changes, &payment.currency)
+    let conversion = get_currency_conversion(&chat_id)?;
+    let option = if conversion {
+        StatementOption::ConvertCurrency
+    } else {
+        StatementOption::Currency(payment.currency.clone())
+    };
+
+    update_balances_debts(&chat_id, changes, option).await
 }
 
 /* View all debts (balances) of a group chat.
