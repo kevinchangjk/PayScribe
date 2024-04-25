@@ -27,8 +27,8 @@ pub use self::settings::{
     action_settings_default_currency, action_settings_menu, action_settings_time_zone,
     action_time_zone_menu, block_settings, cancel_settings, handle_repeated_settings,
 };
-pub use self::spendings::{action_spendings_menu, action_view_spendings, SpendingsOption};
-pub use self::utils::SelectPaymentType;
+pub use self::spendings::{action_spendings_menu, action_view_spendings};
+pub use self::utils::{SelectPaymentType, StatementOption};
 pub use self::view_balances::action_view_balances;
 pub use self::view_payments::{
     action_select_payment_delete, action_select_payment_edit, action_select_payment_number,

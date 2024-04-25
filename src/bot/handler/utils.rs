@@ -25,6 +25,12 @@ use super::{
 pub type UserDialogue = Dialogue<State, InMemStorage<State>>;
 pub type HandlerResult = Result<(), BotError>;
 
+#[derive(PartialEq, Debug, Clone)]
+pub enum StatementOption {
+    Currency(String),
+    ConvertCurrency,
+}
+
 #[derive(Debug, Clone)]
 pub enum SelectPaymentType {
     EditPayment,

@@ -481,7 +481,7 @@ pub fn update_chat_spendings(chat_id: &str, spendings: Vec<UserBalance>) -> Resu
     Ok(())
 }
 
-/* Retrieves all spendings for a chat for specific currency.
+/* Retrieves all spendings for a chat for all currencies.
  * Returns a vector of UserBalance by user.
  */
 pub fn retrieve_chat_spendings(chat_id: &str) -> Result<Vec<Vec<UserBalance>>, CrudError> {

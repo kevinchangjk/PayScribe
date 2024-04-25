@@ -19,13 +19,9 @@ use crate::bot::{
     State,
 };
 
-/* Utilities */
+use super::utils::StatementOption;
 
-#[derive(PartialEq, Debug, Clone)]
-pub enum SpendingsOption {
-    Currency(String),
-    ConvertCurrency,
-}
+/* Utilities */
 
 fn display_individual_spending(spending: UserSpending, currency: Currency) -> String {
     format!(
@@ -67,7 +63,7 @@ async fn handle_spendings_with_option(
     dialogue: UserDialogue,
     chat_id: String,
     sender_id: String,
-    option: SpendingsOption,
+    option: StatementOption,
     id: Option<MessageId>,
 ) -> HandlerResult {
     let spending_data = retrieve_spending_data(&chat_id, option.clone()).await;
@@ -96,13 +92,13 @@ async fn handle_spendings_with_option(
                 valid_currencies.iter().map(|s| s.as_ref()).collect();
             valid_currencies.retain(|&x| x != CURRENCY_DEFAULT.0 && x != default_currency);
 
-            if let SpendingsOption::Currency(ref curr) = option {
+            if let StatementOption::Currency(ref curr) = option {
                 valid_currencies.retain(|&x| x != curr);
             }
 
             // Add back default currency button if not NIL, and currently not default
             if default_currency != CURRENCY_DEFAULT.0 {
-                if let SpendingsOption::Currency(ref curr) = option {
+                if let StatementOption::Currency(ref curr) = option {
                     if curr != &default_currency {
                         valid_currencies.push(&default_currency);
                     }
@@ -114,14 +110,14 @@ async fn handle_spendings_with_option(
             // Special buttons
             let conversion_button = format!("Convert to {default_currency}");
             // Add conversion button only if not currently on convert, and have default currency
-            if option != SpendingsOption::ConvertCurrency
+            if option != StatementOption::ConvertCurrency
                 && default_currency != CURRENCY_DEFAULT.0
                 && valid_currencies.len() > 0
             {
                 valid_currencies.push(&conversion_button);
                 // Add no currency button if no default currency, and not currently NIL
             } else if default_currency == CURRENCY_DEFAULT.0 {
-                if let SpendingsOption::Currency(ref curr) = option {
+                if let StatementOption::Currency(ref curr) = option {
                     if curr != CURRENCY_DEFAULT.0 {
                         valid_currencies.push("No Currency");
                     }
@@ -131,7 +127,7 @@ async fn handle_spendings_with_option(
             let has_buttons = valid_currencies.len() > 0;
             let keyboard = make_keyboard(valid_currencies, Some(2));
 
-            let header = if let SpendingsOption::Currency(curr) = option {
+            let header = if let StatementOption::Currency(curr) = option {
                 if curr == CURRENCY_DEFAULT.0 {
                     format!("Here are the total spendings!")
                 } else {
@@ -222,9 +218,9 @@ pub async fn action_view_spendings(
     };
 
     let option = if is_convert {
-        SpendingsOption::ConvertCurrency
+        StatementOption::ConvertCurrency
     } else {
-        SpendingsOption::Currency(default_currency.clone())
+        StatementOption::Currency(default_currency.clone())
     };
 
     handle_spendings_with_option(bot, dialogue, chat_id, sender_id, option, None).await?;
@@ -248,7 +244,7 @@ pub async fn action_spendings_menu(
             let chat_id = chat.id.to_string();
             match button.as_str() {
                 _ if button.as_str().starts_with("Convert to ") => {
-                    let option = SpendingsOption::ConvertCurrency;
+                    let option = StatementOption::ConvertCurrency;
                     handle_spendings_with_option(
                         bot,
                         dialogue,
@@ -260,7 +256,7 @@ pub async fn action_spendings_menu(
                     .await?;
                 }
                 _ if button.as_str() == "No Currency" => {
-                    let option = SpendingsOption::Currency(CURRENCY_DEFAULT.0.to_string());
+                    let option = StatementOption::Currency(CURRENCY_DEFAULT.0.to_string());
                     handle_spendings_with_option(
                         bot,
                         dialogue,
@@ -272,7 +268,7 @@ pub async fn action_spendings_menu(
                     .await?;
                 }
                 _ if button.as_str().len() == 3 => {
-                    let option = SpendingsOption::Currency(button.as_str().to_string());
+                    let option = StatementOption::Currency(button.as_str().to_string());
                     handle_spendings_with_option(
                         bot,
                         dialogue,

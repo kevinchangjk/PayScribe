@@ -2,7 +2,7 @@ use std::ops::Neg;
 
 use super::{
     currency::{convert_currency_with_rate, fetch_currency_conversion},
-    handler::SpendingsOption,
+    handler::StatementOption,
     optimizer::optimize_debts,
     redis::{
         add_payment_entry, delete_payment_entry, get_chat_balances, get_chat_balances_currency,
@@ -213,6 +213,14 @@ async fn update_balances_debts(
     update_chat_debts(&chat_id, &all_debts)?;
 
     Ok(all_debts)
+}
+
+/* Retrieves all valid currencies for a chat.
+ * Valid currencies are currencies with some payments.
+ */
+pub fn retrieve_valid_currencies(chat_id: &str) -> Result<Vec<String>, ProcessError> {
+    let currencies = get_valid_chat_currencies(chat_id)?;
+    Ok(currencies)
 }
 
 /* Add a new payment entry in a group chat.
@@ -468,6 +476,211 @@ pub fn view_debts(
     Ok(debts)
 }
 
+/* View balances of a group chat.
+ * Takes in a specification of the options for viewing.
+ * Which is whether the currency is to be converted, and which currency.
+ */
+pub async fn retrieve_debts(
+    chat_id: &str,
+    option: StatementOption,
+) -> Result<Vec<Debt>, ProcessError> {
+    match option {
+        StatementOption::Currency(currency) => retrieve_debts_by_currency(chat_id, &currency),
+        StatementOption::ConvertCurrency => retrieve_debts_converted(chat_id).await,
+    }
+}
+
+/* View debts of a group chat for a specific currency.
+ * Retrieves all balances, optimizes debts, and returns.
+ */
+fn retrieve_debts_by_currency(chat_id: &str, currency: &str) -> Result<Vec<Debt>, ProcessError> {
+    let default_currency = match get_chat_setting(chat_id, ChatSetting::DefaultCurrency(None))? {
+        ChatSetting::DefaultCurrency(Some(curr)) => curr,
+        _ => CURRENCY_CODE_DEFAULT.to_string(),
+    };
+    if default_currency == currency && currency != CURRENCY_CODE_DEFAULT {
+        return retrieve_debts_by_default_currency(chat_id, currency);
+    }
+
+    let balances = get_chat_balances_currency(chat_id, currency)?;
+    let debts = optimize_debts(balances);
+
+    Ok(debts)
+}
+
+/* View debts of a group chat for the default currency.
+ * Retrieves all balances, optimizes debts, and returns.
+ */
+fn retrieve_debts_by_default_currency(
+    chat_id: &str,
+    currency: &str,
+) -> Result<Vec<Debt>, ProcessError> {
+    let mut balances_curr = get_chat_balances_currency(chat_id, currency)?;
+    let balances_nil = get_chat_balances_currency(chat_id, CURRENCY_CODE_DEFAULT)?;
+
+    for balance in balances_nil {
+        let curr_index = balances_curr
+            .iter()
+            .position(|bal| bal.username == balance.username);
+        match curr_index {
+            Some(index) => {
+                balances_curr[index].balance += balance.balance;
+            }
+            None => {
+                balances_curr.push(balance);
+            }
+        }
+    }
+
+    let debts = optimize_debts(balances_curr);
+
+    Ok(debts)
+}
+
+/* View debts of a group chat for all currencies, converted to default currency.
+ * Retrieves all balances, optimizes debts, and returns.
+ */
+async fn retrieve_debts_converted(chat_id: &str) -> Result<Vec<Debt>, ProcessError> {
+    let mut balances = get_chat_balances(chat_id)?;
+    let default_currency = get_default_currency(chat_id)?;
+
+    let mut converted_balances: Vec<UserBalance> = Vec::new();
+    for balances_currency in &mut balances {
+        if balances_currency.len() == 0 {
+            continue;
+        }
+
+        let currency = balances_currency[0].currency.clone();
+        let should_convert = currency != default_currency && currency != CURRENCY_CODE_DEFAULT;
+
+        let conversion_rate = if should_convert {
+            match fetch_currency_conversion(&currency, &default_currency).await {
+                Ok(rate) => rate,
+                Err(err) => {
+                    log::error!("Error fetching currency conversion from {currency} to {default_currency}: {}", err);
+                    1.0
+                }
+            }
+        } else {
+            1.0
+        };
+
+        for balance in balances_currency {
+            let mut amount = balance.balance;
+            if should_convert {
+                amount = convert_currency_with_rate(
+                    amount,
+                    &currency,
+                    &default_currency,
+                    conversion_rate,
+                );
+            }
+            let user = converted_balances
+                .iter()
+                .position(|bal| bal.username == balance.username);
+
+            match user {
+                Some(index) => {
+                    converted_balances[index].balance += amount;
+                }
+                None => {
+                    converted_balances.push(UserBalance {
+                        username: balance.username.clone(),
+                        currency: default_currency.clone(),
+                        balance: amount,
+                    });
+                }
+            }
+        }
+    }
+
+    let debts = optimize_debts(converted_balances);
+
+    Ok(debts)
+}
+
+/* View spendings of a group chat.
+ * Takes in a specification of the options for viewing.
+ * Which is whether the currency is to be converted, and which currency.
+ */
+pub async fn retrieve_spending_data(
+    chat_id: &str,
+    option: StatementOption,
+) -> Result<SpendingData, ProcessError> {
+    match option {
+        StatementOption::Currency(currency) => {
+            retrieve_spending_data_by_currency(chat_id, &currency)
+        }
+        StatementOption::ConvertCurrency => retrieve_spending_data_converted(chat_id).await,
+    }
+}
+
+/* View spendings of a group chat for a specific currency.
+ * Retrieves all spendings, gets current balances, and returns:
+ * Total group spending, total individual spendings, and total individual payments
+ */
+fn retrieve_spending_data_by_currency(
+    chat_id: &str,
+    currency: &str,
+) -> Result<SpendingData, ProcessError> {
+    let default_currency = match get_chat_setting(chat_id, ChatSetting::DefaultCurrency(None))? {
+        ChatSetting::DefaultCurrency(Some(curr)) => curr,
+        _ => CURRENCY_CODE_DEFAULT.to_string(),
+    };
+    if default_currency == currency && currency != CURRENCY_CODE_DEFAULT {
+        return retrieve_spending_data_by_default_currency(chat_id, currency);
+    }
+
+    let spendings = retrieve_chat_spendings_currency(chat_id, currency)?;
+    let balances = get_chat_balances_currency(chat_id, currency)?;
+
+    let mut group_spending = 0;
+    let mut user_spendings: Vec<UserSpending> = Vec::new();
+    for spending in spendings {
+        group_spending += spending.balance;
+
+        let balance = balances
+            .iter()
+            .find(|bal| bal.username == spending.username)
+            .map(|bal| bal.balance)
+            .unwrap_or(0);
+        let paid = spending.balance + balance;
+
+        if spending.balance != 0 || paid != 0 {
+            user_spendings.push(UserSpending {
+                username: spending.username.clone(),
+                spending: spending.balance,
+                paid,
+            });
+        }
+    }
+
+    // Check through for any balances that aren't accounted for in a spending
+    for balance in balances {
+        let user = user_spendings
+            .iter()
+            .position(|spending| spending.username == balance.username);
+        match user {
+            Some(_) => {
+                continue;
+            }
+            None => {
+                user_spendings.push(UserSpending {
+                    username: balance.username,
+                    spending: 0,
+                    paid: balance.balance,
+                });
+            }
+        }
+    }
+
+    Ok(SpendingData {
+        currency: currency.to_string(),
+        group_spending,
+        user_spendings,
+    })
+}
+
 /* View spendings of a group chat for the default currency.
  * Retrieves all spendings, gets current balances, and returns:
  * Total group spending, total individual spendings, and total individual payments
@@ -580,72 +793,6 @@ fn retrieve_spending_data_by_default_currency(
                         paid: balance.balance,
                     });
                 }
-            }
-        }
-    }
-
-    Ok(SpendingData {
-        currency: currency.to_string(),
-        group_spending,
-        user_spendings,
-    })
-}
-
-/* View spendings of a group chat for a specific currency.
- * Retrieves all spendings, gets current balances, and returns:
- * Total group spending, total individual spendings, and total individual payments
- */
-fn retrieve_spending_data_by_currency(
-    chat_id: &str,
-    currency: &str,
-) -> Result<SpendingData, ProcessError> {
-    let default_currency = match get_chat_setting(chat_id, ChatSetting::DefaultCurrency(None))? {
-        ChatSetting::DefaultCurrency(Some(curr)) => curr,
-        _ => CURRENCY_CODE_DEFAULT.to_string(),
-    };
-    if default_currency == currency && currency != CURRENCY_CODE_DEFAULT {
-        return retrieve_spending_data_by_default_currency(chat_id, currency);
-    }
-
-    let spendings = retrieve_chat_spendings_currency(chat_id, currency)?;
-    let balances = get_chat_balances_currency(chat_id, currency)?;
-
-    let mut group_spending = 0;
-    let mut user_spendings: Vec<UserSpending> = Vec::new();
-    for spending in spendings {
-        group_spending += spending.balance;
-
-        let balance = balances
-            .iter()
-            .find(|bal| bal.username == spending.username)
-            .map(|bal| bal.balance)
-            .unwrap_or(0);
-        let paid = spending.balance + balance;
-
-        if spending.balance != 0 || paid != 0 {
-            user_spendings.push(UserSpending {
-                username: spending.username.clone(),
-                spending: spending.balance,
-                paid,
-            });
-        }
-    }
-
-    // Check through for any balances that aren't accounted for in a spending
-    for balance in balances {
-        let user = user_spendings
-            .iter()
-            .position(|spending| spending.username == balance.username);
-        match user {
-            Some(_) => {
-                continue;
-            }
-            None => {
-                user_spendings.push(UserSpending {
-                    username: balance.username,
-                    spending: 0,
-                    paid: balance.balance,
-                });
             }
         }
     }
@@ -784,22 +931,6 @@ async fn retrieve_spending_data_converted(chat_id: &str) -> Result<SpendingData,
     })
 }
 
-/* View spendings of a group chat.
- * Takes in a specification of the options for viewing.
- * Which is whether the currency is to be converted, and which currency.
- */
-pub async fn retrieve_spending_data(
-    chat_id: &str,
-    option: SpendingsOption,
-) -> Result<SpendingData, ProcessError> {
-    match option {
-        SpendingsOption::Currency(currency) => {
-            retrieve_spending_data_by_currency(chat_id, &currency)
-        }
-        SpendingsOption::ConvertCurrency => retrieve_spending_data_converted(chat_id).await,
-    }
-}
-
 /* Retrieves a group chat setting.
  */
 pub fn get_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<ChatSetting, ProcessError> {
@@ -923,12 +1054,4 @@ pub async fn update_chat_default_currency(
     update_balances_debts(chat_id, changes).await?;
 
     Ok(())
-}
-
-/* Retrieves all valid currencies for a chat.
- * Valid currencies are currencies with some payments.
- */
-pub fn retrieve_valid_currencies(chat_id: &str) -> Result<Vec<String>, ProcessError> {
-    let currencies = get_valid_chat_currencies(chat_id)?;
-    Ok(currencies)
 }
