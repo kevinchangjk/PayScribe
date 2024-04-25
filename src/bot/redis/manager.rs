@@ -4,10 +4,10 @@ use super::{
     balance::{get_balance, get_balance_exists, set_balance},
     chat::{
         add_chat, add_chat_currency, add_chat_payment, add_chat_user_multiple, delete_chat_payment,
-        get_chat_currencies, get_chat_currency_conversion, get_chat_debt,
-        get_chat_default_currency, get_chat_exists, get_chat_payment_exists, get_chat_payments,
-        get_chat_time_zone, get_chat_users, set_chat_currency_conversion, set_chat_debt,
-        set_chat_default_currency, set_chat_time_zone, Debt,
+        get_chat_currencies, get_chat_currency_conversion, get_chat_default_currency,
+        get_chat_exists, get_chat_payment_exists, get_chat_payments, get_chat_time_zone,
+        get_chat_users, set_chat_currency_conversion, set_chat_default_currency,
+        set_chat_time_zone,
     },
     connect::{connect, DBError},
     payment::{add_payment, delete_payment, get_payment, update_payment, Payment},
@@ -320,26 +320,6 @@ pub fn update_chat_balances(chat_id: &str, changes: Vec<UserBalance>) -> Result<
     Ok(())
 }
 
-/* Sets the latest state of simplified debts for a chat.
- */
-pub fn update_chat_debts(chat_id: &str, debts: &Vec<Debt>) -> Result<(), CrudError> {
-    let mut con = connect()?;
-
-    set_chat_debt(&mut con, chat_id, debts)?;
-
-    Ok(())
-}
-
-/* Retrieves the latest state of simplified debts for a chat.
- */
-pub fn retrieve_chat_debts(chat_id: &str) -> Result<Vec<Debt>, CrudError> {
-    let mut con = connect()?;
-
-    let debts = get_chat_debt(&mut con, chat_id)?;
-
-    Ok(debts)
-}
-
 /* Adds a payment.
  * Sets a new key-value pair for the payment, and updates the payments list in chat.
  * Called whenever a new payment is added.
@@ -549,10 +529,7 @@ pub fn retrieve_chat_spendings_currency(
 mod tests {
     use crate::bot::redis::{
         balance::delete_balance,
-        chat::{
-            delete_chat, delete_chat_currencies, delete_chat_debt, delete_chat_settings,
-            get_chat_users,
-        },
+        chat::{delete_chat, delete_chat_currencies, delete_chat_settings, get_chat_users},
         spending::delete_spending,
         user::{delete_preferred_username, delete_user, get_preferred_username, get_user_chats},
     };
@@ -1186,56 +1163,6 @@ mod tests {
         delete_chat(&mut con, chat_id).unwrap();
         delete_chat_currencies(&mut con, chat_id).unwrap();
         delete_chat_settings(&mut con, chat_id).unwrap();
-    }
-
-    #[test]
-    fn test_update_chat_debt() {
-        let mut con = connect().unwrap();
-
-        let chat_id = "manager_12345678990";
-        let debts = vec![
-            Debt {
-                debtor: "manager_test_user_25".to_string(),
-                creditor: "manager_test_user_26".to_string(),
-                currency: "USD".to_string(),
-                amount: 10000,
-            },
-            Debt {
-                debtor: "manager_test_user_27".to_string(),
-                creditor: "manager_test_user_28".to_string(),
-                currency: "USD".to_string(),
-                amount: 5000,
-            },
-        ];
-
-        // Adds debts
-        assert!(update_chat_debts(chat_id, &debts).is_ok());
-
-        // Checks that debts are correct
-        assert_eq!(retrieve_chat_debts(chat_id).unwrap(), debts);
-
-        // Updates debts
-        let new_debts = vec![
-            Debt {
-                debtor: "manager_test_user_25".to_string(),
-                creditor: "manager_test_user_26".to_string(),
-                currency: "USD".to_string(),
-                amount: 5000,
-            },
-            Debt {
-                debtor: "manager_test_user_27".to_string(),
-                creditor: "manager_test_user_28".to_string(),
-                currency: "USD".to_string(),
-                amount: 10000,
-            },
-        ];
-        assert!(update_chat_debts(chat_id, &new_debts).is_ok());
-
-        // Checks that debts are correct
-        assert_eq!(retrieve_chat_debts(chat_id).unwrap(), new_debts);
-
-        // Deletes debts
-        delete_chat_debt(&mut con, chat_id).unwrap();
     }
 
     #[test]

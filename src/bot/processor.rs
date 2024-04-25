@@ -7,11 +7,11 @@ use super::{
     redis::{
         add_payment_entry, delete_payment_entry, get_chat_balances, get_chat_balances_currency,
         get_chat_payments_details, get_currency_conversion, get_default_currency,
-        get_payment_entry, get_time_zone, get_valid_chat_currencies, retrieve_chat_debts,
-        retrieve_chat_spendings, retrieve_chat_spendings_currency, set_currency_conversion,
-        set_default_currency, set_time_zone, update_chat, update_chat_balances,
-        update_chat_spendings, update_payment_entry, update_user, CrudError, Debt, Payment,
-        UserBalance, UserPayment, CURRENCY_CODE_DEFAULT,
+        get_payment_entry, get_time_zone, get_valid_chat_currencies, retrieve_chat_spendings,
+        retrieve_chat_spendings_currency, set_currency_conversion, set_default_currency,
+        set_time_zone, update_chat, update_chat_balances, update_chat_spendings,
+        update_payment_entry, update_user, CrudError, Debt, Payment, UserBalance, UserPayment,
+        CURRENCY_CODE_DEFAULT,
     },
 };
 
@@ -66,118 +66,6 @@ fn auto_update_user(
         update_user(&username, chat_id, Some(sender_id))?;
     }
     Ok(())
-}
-
-// Sets "NIL" to default currency (which can be "NIL").
-fn process_balances_currencies(
-    mut balances: Vec<Vec<UserBalance>>,
-    chat_id: &str,
-) -> Vec<Vec<UserBalance>> {
-    let default_currency = get_default_currency(chat_id);
-    let default_currency = match default_currency {
-        Ok(currency) => currency,
-        Err(_) => CURRENCY_CODE_DEFAULT.to_string(),
-    };
-
-    let mut splits: Vec<Vec<UserBalance>> = vec![Vec::new()];
-    let default_currency_index = 0;
-    let mut curr_index = 0;
-    for currency_balances in &mut balances {
-        let target_index: usize;
-
-        if currency_balances.len() > 0 {
-            let currency = currency_balances[0].currency.as_str();
-            if currency == CURRENCY_CODE_DEFAULT {
-                currency_balances[0].currency = default_currency.clone();
-                target_index = default_currency_index;
-            } else if currency == default_currency {
-                target_index = default_currency_index;
-            } else {
-                splits.push(Vec::new());
-                curr_index += 1;
-                target_index = curr_index;
-            }
-
-            for balance in &mut *currency_balances {
-                let user_index = splits[target_index]
-                    .iter()
-                    .position(|bal| bal.username == balance.username);
-                match user_index {
-                    Some(user_index) => {
-                        splits[target_index][user_index].balance += balance.balance;
-                    }
-                    None => {
-                        splits[target_index].push(balance.clone());
-                    }
-                }
-            }
-        }
-    }
-
-    splits
-}
-
-// Converts all balances to default currency. Cannot be called when default is NIL.
-async fn convert_balances_currencies(
-    mut balances: Vec<Vec<UserBalance>>,
-    chat_id: &str,
-) -> Vec<UserBalance> {
-    let default_currency = get_default_currency(chat_id);
-    let default_currency = match default_currency {
-        Ok(currency) => currency,
-        Err(_) => CURRENCY_CODE_DEFAULT.to_string(),
-    };
-    let mut result: Vec<UserBalance> = Vec::new();
-
-    for currency_balances in &mut balances {
-        if currency_balances.len() == 0 {
-            continue;
-        }
-
-        let currency = currency_balances[0].currency.as_str();
-        let should_update = currency != default_currency;
-        let should_convert = should_update && currency != CURRENCY_CODE_DEFAULT;
-        let conversion_rate = if should_convert {
-            match fetch_currency_conversion(currency, &default_currency).await {
-                Ok(rate) => rate,
-                Err(err) => {
-                    log::error!("Error fetching currency conversion from {currency} to {default_currency}: {}", err);
-                    1.0
-                }
-            }
-        } else {
-            1.0
-        };
-
-        for balance in currency_balances {
-            if should_convert {
-                balance.balance = convert_currency_with_rate(
-                    balance.balance,
-                    &balance.currency,
-                    &default_currency,
-                    conversion_rate,
-                );
-            }
-
-            if should_update {
-                balance.currency = default_currency.clone();
-            }
-
-            let index = result
-                .iter()
-                .position(|bal| bal.username == balance.username);
-            match index {
-                Some(index) => {
-                    result[index].balance += balance.balance;
-                }
-                None => {
-                    result.push(balance.clone());
-                }
-            }
-        }
-    }
-
-    result
 }
 
 fn update_balances(chat_id: &str, changes: Vec<UserBalance>) -> Result<(), ProcessError> {
@@ -467,20 +355,6 @@ pub async fn delete_payment(chat_id: &str, payment_id: &str) -> Result<Vec<Debt>
     };
 
     update_balances_debts(&chat_id, changes, option).await
-}
-
-/* View all debts (balances) of a group chat.
- * Execution flow: Retrieve all debts.
- */
-pub fn view_debts(
-    chat_id: &str,
-    sender_id: &str,
-    sender_username: Option<&str>,
-) -> Result<Vec<Debt>, ProcessError> {
-    auto_update_user(chat_id, sender_id, sender_username)?;
-
-    let debts = retrieve_chat_debts(&chat_id)?;
-    Ok(debts)
 }
 
 /* View balances of a group chat.
