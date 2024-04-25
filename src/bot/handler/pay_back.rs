@@ -114,9 +114,9 @@ async fn call_processor_pay_back(
                     chat.id,
                     id,
                     format!(
-                        "🎉 I've added the payment! 🎉\n\n{}\nHere are the updated balances:\n{}",
+                        "🎉 I've added the payment! 🎉\n\n{}\nHere are the updated balances:\n\n{}",
                         payment_overview,
-                        display_balances(&balances, &chat.id.to_string())
+                        display_balances(&balances)
                     ),
                 )
                 .await?;

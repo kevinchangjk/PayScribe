@@ -130,19 +130,18 @@ pub fn use_currency(currency: Currency, chat_id: &str) -> Currency {
     }
 }
 
-// Displays balances in a more readable format.
-pub fn display_balances(debts: &Vec<Debt>, chat_id: &str) -> String {
+// Displays balances in a more readable format. Now only shows in one currency.
+pub fn display_balances(debts: &Vec<Debt>) -> String {
     let mut message = String::new();
     for debt in debts {
         let currency = get_currency(&debt.currency);
         match currency {
             Ok(currency) => {
-                let actual_currency = use_currency(currency, chat_id);
                 message.push_str(&format!(
                     "{} owes {}: {}\n",
                     display_username(&debt.debtor),
                     display_username(&debt.creditor),
-                    display_currency_amount(debt.amount, actual_currency),
+                    display_amount(debt.amount, currency.1),
                 ));
             }
             // Should not occur, since code is already processed and stored in database
@@ -152,8 +151,8 @@ pub fn display_balances(debts: &Vec<Debt>, chat_id: &str) -> String {
         }
     }
 
-    if message.is_empty() {
-        "No outstanding balances! 👍".to_string()
+    if debts.is_empty() {
+        "There are no outstanding balances! 👍".to_string()
     } else {
         message
     }

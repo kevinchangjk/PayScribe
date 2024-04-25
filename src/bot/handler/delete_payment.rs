@@ -138,8 +138,8 @@ pub async fn action_delete_payment_confirm(
                                 chat_id.clone(),
                                 id,
                                 format!(
-                                    "🎉 I've deleted the payment! 🎉\n\nHere are the updated balances:\n{}",
-                                    display_balances(&balances, &chat_id)
+                                    "🎉 I've deleted the payment! 🎉\n\nHere are the updated balances:\n\n{}",
+                                    display_balances(&balances)
                                     ),
                                     )
                                 .await?;

@@ -276,9 +276,9 @@ async fn call_processor_add_payment(
                     chat.id,
                     id,
                     format!(
-                        "🎉 I've added the payment! 🎉\n\n{}Here are the updated balances:\n{}",
+                        "🎉 I've added the payment! 🎉\n\n{}Here are the updated balances:\n\n{}",
                         payment_overview,
-                        display_balances(&balances, &payment_clone.chat_id)
+                        display_balances(&balances)
                     ),
                 )
                 .await?;

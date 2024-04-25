@@ -9,7 +9,7 @@ use super::{
         get_chat_payments_details, get_currency_conversion, get_default_currency,
         get_payment_entry, get_time_zone, get_valid_chat_currencies, retrieve_chat_debts,
         retrieve_chat_spendings, retrieve_chat_spendings_currency, set_currency_conversion,
-        set_default_currency, set_time_zone, update_chat, update_chat_balances, update_chat_debts,
+        set_default_currency, set_time_zone, update_chat, update_chat_balances,
         update_chat_spendings, update_payment_entry, update_user, CrudError, Debt, Payment,
         UserBalance, UserPayment, CURRENCY_CODE_DEFAULT,
     },
@@ -180,39 +180,30 @@ async fn convert_balances_currencies(
     result
 }
 
-async fn update_balances_debts(
-    chat_id: &str,
-    changes: Vec<UserBalance>,
-) -> Result<Vec<Debt>, ProcessError> {
+fn update_balances(chat_id: &str, changes: Vec<UserBalance>) -> Result<(), ProcessError> {
     // Update balances
     update_chat_balances(chat_id, changes)?;
-    let balances = get_chat_balances(chat_id)?;
+    Ok(())
+}
 
+// Utility function required by many commands.
+// Updates the balances based on changes that are given.
+// Returns the debts for the relevant currency.
+fn update_balances_debts(
+    chat_id: &str,
+    changes: Vec<UserBalance>,
+    currency: &str,
+) -> Result<Vec<Debt>, ProcessError> {
+    update_balances(chat_id, changes)?;
+
+    let balances = get_chat_balances_currency(chat_id, currency)?;
     if balances.is_empty() {
         return Ok(Vec::new());
     }
 
-    // Update group debts
-    let mut all_debts = Vec::new();
-    let conversion = get_currency_conversion(chat_id)?;
-    if conversion {
-        let balances = convert_balances_currencies(balances, chat_id).await;
-        let debts = optimize_debts(balances);
-        all_debts.extend(debts);
-    } else {
-        let processed_balances = process_balances_currencies(balances, chat_id);
-        for split in processed_balances {
-            if split.len() == 0 {
-                continue;
-            }
-            let debts = optimize_debts(split);
-            all_debts.extend(debts);
-        }
-    }
+    let debts = optimize_debts(balances);
 
-    update_chat_debts(&chat_id, &all_debts)?;
-
-    Ok(all_debts)
+    Ok(debts)
 }
 
 /* Retrieves all valid currencies for a chat.
@@ -305,7 +296,7 @@ pub async fn add_payment(
         balance: total,
     });
 
-    update_balances_debts(&chat_id, changes).await
+    update_balances_debts(&chat_id, changes, currency)
 }
 
 /* View all payment entries of a group chat.
@@ -412,7 +403,7 @@ pub async fn edit_payment(
             .collect();
         update_chat_spendings(&chat_id, new_spendings)?;
 
-        let res = update_balances_debts(&chat_id, changes).await?;
+        let res = update_balances_debts(&chat_id, changes, currency.unwrap_or(prev_currency))?;
         return Ok(Some(res));
     }
 
@@ -455,11 +446,11 @@ pub async fn delete_payment(chat_id: &str, payment_id: &str) -> Result<Vec<Debt>
         .collect();
     changes.push(UserBalance {
         username: payment.creditor,
-        currency: payment.currency,
+        currency: payment.currency.clone(),
         balance: payment.total.neg(),
     });
 
-    update_balances_debts(&chat_id, changes).await
+    update_balances_debts(&chat_id, changes, &payment.currency)
 }
 
 /* View all debts (balances) of a group chat.
@@ -806,7 +797,7 @@ fn retrieve_spending_data_by_default_currency(
 
 /* View spendings of a group chat, converted to default currency.
  * Only called if currency conversion is enabled.
-* Retrieves all spendings, gets current balances, converts them.
+ * Retrieves all spendings, gets current balances, converts them.
  */
 async fn retrieve_spending_data_converted(chat_id: &str) -> Result<SpendingData, ProcessError> {
     let mut spendings = retrieve_chat_spendings(chat_id)?;
@@ -932,7 +923,7 @@ async fn retrieve_spending_data_converted(chat_id: &str) -> Result<SpendingData,
 }
 
 /* Retrieves a group chat setting.
- */
+*/
 pub fn get_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<ChatSetting, ProcessError> {
     match setting {
         ChatSetting::TimeZone(_) => {
@@ -951,7 +942,7 @@ pub fn get_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<ChatSetti
 }
 
 /* Sets a group chat setting.
- */
+*/
 pub async fn set_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<(), ProcessError> {
     match setting {
         ChatSetting::TimeZone(time_zone) => {
@@ -969,7 +960,7 @@ pub async fn set_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<(),
                 set_currency_conversion(chat_id, convert)?;
 
                 // If currency conversion is updated, need to update balances
-                update_balances_debts(chat_id, Vec::new()).await?;
+                update_balances(chat_id, Vec::new())?;
             }
         }
     }
@@ -1051,7 +1042,7 @@ pub async fn update_chat_default_currency(
     }
 
     // Finally, update balances and debts
-    update_balances_debts(chat_id, changes).await?;
+    update_balances(chat_id, changes)?;
 
     Ok(())
 }

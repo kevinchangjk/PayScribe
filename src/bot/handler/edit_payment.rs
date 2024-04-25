@@ -150,9 +150,9 @@ async fn call_processor_edit_payment(
                             chat_id.clone(),
                             id,
                             format!(
-                                "🎉 I've edited the payment! 🎉\n\n{}\nHere are the updated balances:\n{}",
+                                "🎉 I've edited the payment! 🎉\n\n{}\nHere are the updated balances:\n\n{}",
                                 edit_overview,
-                                display_balances(&balances, &chat_id)
+                                display_balances(&balances)
                                 ),
                                 )
                             .await?;

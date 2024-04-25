@@ -104,7 +104,7 @@ async fn handle_balances_with_option(
                         format!(
                             "{}\n\n{}\n{}",
                             header,
-                            display_balances(&balances_data, &chat_id),
+                            display_balances(&balances_data),
                             if has_buttons {
                                 STATEMENT_INSTRUCTIONS_MESSAGE
                             } else {
@@ -121,7 +121,7 @@ async fn handle_balances_with_option(
                         format!(
                             "{}\n\n{}\n{}",
                             header,
-                            display_balances(&balances_data, &chat_id),
+                            display_balances(&balances_data),
                             if has_buttons {
                                 STATEMENT_INSTRUCTIONS_MESSAGE
                             } else {
