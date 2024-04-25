@@ -6,7 +6,7 @@ use teloxide::{
 use crate::bot::{
     currency::{Currency, CURRENCY_DEFAULT},
     handler::{
-        constants::{SPENDINGS_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE},
+        constants::{STATEMENT_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE},
         utils::{
             display_amount, display_username, get_currency, make_keyboard, HandlerResult,
             UserDialogue,
@@ -108,7 +108,7 @@ async fn handle_spendings_with_option(
             }
 
             // Special buttons
-            let conversion_button = format!("Convert to {default_currency}");
+            let conversion_button = format!("Convert To {default_currency}");
             // Add conversion button only if not currently on convert, and have default currency
             if option != StatementOption::ConvertCurrency
                 && default_currency != CURRENCY_DEFAULT.0
@@ -140,14 +140,14 @@ async fn handle_spendings_with_option(
             match id {
                 Some(id) => {
                     bot.edit_message_text(
-                        chat_id,
+                        chat_id.clone(),
                         id,
                         format!(
                             "{}\n\n{}\n{}",
                             header,
                             display_spendings(spending_data),
                             if has_buttons {
-                                SPENDINGS_INSTRUCTIONS_MESSAGE
+                                STATEMENT_INSTRUCTIONS_MESSAGE
                             } else {
                                 ""
                             }
@@ -158,13 +158,13 @@ async fn handle_spendings_with_option(
                 }
                 None => {
                     bot.send_message(
-                        chat_id,
+                        chat_id.clone(),
                         format!(
                             "{}\n\n{}\n{}",
                             header,
                             display_spendings(spending_data),
                             if has_buttons {
-                                SPENDINGS_INSTRUCTIONS_MESSAGE
+                                STATEMENT_INSTRUCTIONS_MESSAGE
                             } else {
                                 ""
                             }
@@ -175,6 +175,12 @@ async fn handle_spendings_with_option(
                 }
             }
             dialogue.update(State::SpendingsMenu).await?;
+
+            log::info!(
+                "View Spendings - User {} viewed spendings for group {}",
+                sender_id,
+                chat_id
+            );
         }
         Err(err) => {
             match id {
@@ -243,7 +249,7 @@ pub async fn action_spendings_menu(
         if let Some(Message { id, chat, .. }) = query.message {
             let chat_id = chat.id.to_string();
             match button.as_str() {
-                _ if button.as_str().starts_with("Convert to ") => {
+                _ if button.as_str().starts_with("Convert To ") => {
                     let option = StatementOption::ConvertCurrency;
                     handle_spendings_with_option(
                         bot,
@@ -281,7 +287,7 @@ pub async fn action_spendings_menu(
                 }
                 _ => {
                     log::error!(
-                        "View Payments Menu - Invalid button in chat {} by user {}: {}",
+                        "View Spendings Menu - Invalid button in chat {} by user {}: {}",
                         chat_id,
                         sender_id,
                         button

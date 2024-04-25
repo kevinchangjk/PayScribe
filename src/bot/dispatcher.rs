@@ -87,6 +87,7 @@ pub enum State {
         payments: Vec<Payment>,
         page: usize,
     },
+    BalancesMenu,
     SpendingsMenu,
     SettingsMenu,
     SettingsTimeZoneMenu,
@@ -506,6 +507,20 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::TotalSpendings].endpoint(block_settings)),
         )
         .branch(
+            case![State::BalancesMenu]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::Cancel].endpoint(action_cancel))
+                .branch(case![Command::AddPayment].endpoint(action_add_payment))
+                .branch(case![Command::Balances].endpoint(action_view_balances))
+                .branch(case![Command::PayBack].endpoint(action_pay_back))
+                .branch(case![Command::ViewPayments].endpoint(action_view_payments))
+                .branch(case![Command::EditPayment].endpoint(action_select_payment_edit))
+                .branch(case![Command::DeletePayment].endpoint(action_select_payment_delete))
+                .branch(case![Command::Settings].endpoint(action_settings))
+                .branch(case![Command::TotalSpendings].endpoint(action_view_spendings)),
+        )
+        .branch(
             case![State::SpendingsMenu]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
@@ -592,6 +607,7 @@ pub async fn run_dispatcher(bot: Bot) {
         .branch(case![State::SettingsDefaultCurrencyMenu].endpoint(callback_invalid_message))
         .branch(case![State::SettingsCurrencyConversion].endpoint(callback_invalid_message))
         .branch(case![State::ViewPayments { payments, page }].endpoint(invalid_state))
+        .branch(case![State::BalancesMenu].endpoint(invalid_state))
         .branch(case![State::SpendingsMenu].endpoint(invalid_state))
         .branch(case![State::Start].endpoint(invalid_state));
 
@@ -637,6 +653,7 @@ pub async fn run_dispatcher(bot: Bot) {
             }]
             .endpoint(action_delete_payment_confirm),
         )
+        .branch(case![State::BalancesMenu].endpoint(action_balances_menu))
         .branch(case![State::SpendingsMenu].endpoint(action_spendings_menu))
         .branch(case![State::SettingsMenu].endpoint(action_settings_menu))
         .branch(case![State::SettingsTimeZoneMenu].endpoint(action_time_zone_menu))

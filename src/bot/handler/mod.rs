@@ -29,7 +29,7 @@ pub use self::settings::{
 };
 pub use self::spendings::{action_spendings_menu, action_view_spendings};
 pub use self::utils::{SelectPaymentType, StatementOption};
-pub use self::view_balances::action_view_balances;
+pub use self::view_balances::{action_balances_menu, action_view_balances};
 pub use self::view_payments::{
     action_select_payment_delete, action_select_payment_edit, action_select_payment_number,
     action_view_more, action_view_payments, block_select_payment, cancel_select_payment,
