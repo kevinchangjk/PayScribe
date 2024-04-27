@@ -100,27 +100,27 @@ pub enum State {
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
 pub enum Command {
-    #[command(description = "Starts the bot")]
+    #[command(description = "Starts me\\!")]
     Start,
-    #[command(description = "Show all commands, and how to use the bot")]
+    #[command(description = "Shows this message")]
     Help,
-    #[command(description = "Add a payment entry for the group")]
+    #[command(description = "Add a new payment")]
     AddPayment,
-    #[command(description = "Add an entry paying back others in the group")]
+    #[command(description = "Add a record of paying back a debt")]
     PayBack,
-    #[command(description = "View all payment records for the group")]
+    #[command(description = "View all payment records")]
     ViewPayments,
-    #[command(description = "Edit a payment record previously added")]
+    #[command(description = "Edit a previous payment")]
     EditPayment,
-    #[command(description = "Delete a payment record previously added")]
+    #[command(description = "Delete a previous payment")]
     DeletePayment,
-    #[command(description = "View the current balances for the group")]
+    #[command(description = "View the current balances for everyone")]
     Balances,
-    #[command(description = "View a summary of the total spendings for the group")]
+    #[command(description = "View the total spendings for everyone")]
     TotalSpendings,
-    #[command(description = "View and edit bot settings for the chat")]
+    #[command(description = "View and edit my settings for everyone")]
     Settings,
-    #[command(description = "Cancels an ongoing action")]
+    #[command(description = "Cancels whatever I'm doing")]
     Cancel,
 }
 
