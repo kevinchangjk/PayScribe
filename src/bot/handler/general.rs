@@ -29,13 +29,16 @@ pub async fn invalid_state(_bot: Bot, msg: Message) -> HandlerResult {
 }
 
 /* Invalid message during callback expected.
+ * Currently, simply does not respond to anything. Reduces spam.
  */
-pub async fn callback_invalid_message(bot: Bot, msg: Message) -> HandlerResult {
+pub async fn callback_invalid_message(_bot: Bot, _msg: Message) -> HandlerResult {
+    /*
     bot.send_message(
         msg.chat.id,
         "Hey, you don't have to text me...\nJust click on any of the buttons above 👆 to continue!",
     )
     .await?;
+    */
     Ok(())
 }
 
@@ -43,7 +46,7 @@ pub async fn callback_invalid_message(bot: Bot, msg: Message) -> HandlerResult {
  * Displays a welcome message to the user.
  */
 pub async fn action_start(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, format!("👋 Hi, I'm PayScribe!\n\nEnter {COMMAND_HELP} to check out the various commands I can assist you with, and let's get straight into tracking payments together!")).await?;
+    bot.send_message(msg.chat.id, format!("👋 Hello! I'm PayScribe! 😊\n\nJust type {COMMAND_HELP} to see all the cool stuff I can help you with, and let's get dive right into tracking payments together!")).await?;
     Ok(())
 }
 
@@ -54,7 +57,7 @@ pub async fn action_help(bot: Bot, msg: Message) -> HandlerResult {
     let mut commands = Command::descriptions().to_string();
     commands = commands.replace("–", "\\—");
 
-    let introduction = "👋 Hey there\\! Need some help?\n\n_PayScribe_ is a handy assistant for keeping track of group payments, and simplifying your debts to keep you updated with how much everyone owes one another\\.";
+    let introduction = "👋 Hello\\! Need some help? 😉\n\n_PayScribe_ is your handy assistant for keeping track of group payments\\! I'll also mathematically simplify your debts to keep you updated with how much everyone owes one another\\!";
     let add_info = &format!("To begin, you can add new payment records with {COMMAND_ADD_PAYMENT}\\. When splitting the total amount, you can:\n\\- Divide the total cost equally \\(e\\.g\\. sharing ticket prices equally among friends\\)\n\\- Specify the exact amount for each person\n\\- Provide a proportion of how much each person owes \\(e\\.g\\. splitting the electricity bill 40\\-60\\)");
     let view_info = &format!("Use {COMMAND_BALANCES} see how much everyone owes one another, and {COMMAND_SPENDINGS} to see how much everyone has spent\\. To edit or delete payments, use {COMMAND_VIEW_PAYMENTS}, then {COMMAND_EDIT_PAYMENT} or {COMMAND_DELETE_PAYMENT}\\.");
     let payback_info = &format!("After paying back your friends, be sure to record those down with the {COMMAND_PAY_BACK} command\\!");
@@ -75,7 +78,7 @@ pub async fn action_help(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn action_cancel(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "I'm not doing anything right now. There's nothing to cancel! 👀",
+        "I'm not doing anything right now... 👀 There's nothing to cancel!",
     )
     .await?;
     Ok(())
