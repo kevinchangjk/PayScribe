@@ -21,7 +21,7 @@ use super::utils::retrieve_time_zone;
 /* Utilities */
 
 const CANCEL_MESSAGE: &str =
-    "Sure, I've cancelled deleting the payment. No changes have been made! 👌";
+    "Okay! I've cancelled deleting the payment. No changes have been made! 🌟";
 
 /* Action handler functions */
 
@@ -31,7 +31,7 @@ const CANCEL_MESSAGE: &str =
 pub async fn handle_repeated_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("🚫 You are already deleting a payment entry! Please complete or {COMMAND_CANCEL} the current operation before starting a new one."),
+        format!("🚫 Oops! It seems like you're already in the middle of deleting a payment! Please finish or {COMMAND_CANCEL} this before starting another one with me."),
         ).await?;
     Ok(())
 }
@@ -55,7 +55,7 @@ pub async fn cancel_delete_payment(
 pub async fn block_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("🚫 You are currently deleting a payment entry! Please complete or {COMMAND_CANCEL} the current payment entry before starting another command."),
+        format!("🚫 Oops! It seems like you're in the middle of deleting a payment! Please finish or {COMMAND_CANCEL} this before starting something new with me."),
         ).await?;
     Ok(())
 }
@@ -92,7 +92,7 @@ pub async fn action_delete_payment(
         chat_id,
         msg_id,
         format!(
-            "Are you sure you want to delete the following payment?\n\n{}",
+            "Do you really, really, want to delete this payment? I won't be able to undo this... 🫢\n\n{}",
             display_payment(&payment, index + 1, time_zone)
         ),
     )
@@ -141,7 +141,7 @@ pub async fn action_delete_payment_confirm(
                                 chat_id.clone(),
                                 id,
                                 format!(
-                                    "🎉 I've deleted the payment! 🎉\n\n{}{}",
+                                    "🎉 Yay! I've deleted the payment! 🎉\n\n{}{}",
                                     display_balances(&balances),
                                     display_balance_header(&chat_id, &payment.currency.0)
                                 ),
@@ -163,7 +163,7 @@ pub async fn action_delete_payment_confirm(
                             bot.edit_message_text(
                                 chat_id.clone(),
                                 id,
-                                format!("❓ Hmm, Something went wrong! Sorry, I can't delete the payment right now." ),
+                                format!("⁉️ Oh no! Something went wrong! 🥺 I'm sorry, but I can't delete the payment right now. Please try again later!\n\n" ),
                                 )
                                 .await?;
 

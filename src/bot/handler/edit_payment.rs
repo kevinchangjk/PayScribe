@@ -35,8 +35,7 @@ pub struct EditPaymentParams {
     debts: Option<Vec<(String, i64)>>,
 }
 
-const CANCEL_MESSAGE: &str =
-    "Sure, I've cancelled editing the payment. No changes have been made! 👌";
+const CANCEL_MESSAGE: &str = "Okay! I've cancelled the edit. No changes have been made! 🌟";
 
 /* Displays a payment entry by combining original entry and edited fields.
 */
@@ -74,7 +73,7 @@ async fn display_edit_overview(
         "Description",
         "Payer",
         "Total",
-        "Splits",
+        "Split",
         "Cancel",
         "Confirm",
     ];
@@ -85,7 +84,7 @@ async fn display_edit_overview(
                 chat_id,
                 id,
                 format!(
-                    "Sure! What do you want to edit?\n\n{}",
+                    "Sure! What would you like to edit?\n\n{}",
                     display_edit_payment(payment.clone(), edited_payment.clone())
                 ),
             )
@@ -96,7 +95,7 @@ async fn display_edit_overview(
             bot.send_message(
                 chat_id,
                 format!(
-                    "Sure! What do you want to edit?\n\n{}",
+                    "Sure! What would you like to edit?\n\n{}",
                     display_edit_payment(payment.clone(), edited_payment.clone())
                 ),
             )
@@ -150,7 +149,7 @@ async fn call_processor_edit_payment(
                             chat_id.clone(),
                             id,
                             format!(
-                                "🎉 I've edited the payment! 🎉\n\n{}\n{}{}",
+                                "🎉 Yay! I've edited the payment! 🎉\n\n{}\n{}{}",
                                 edit_overview,
                                 display_balance_header(
                                     &chat_id,
@@ -171,7 +170,7 @@ async fn call_processor_edit_payment(
                             chat_id.clone(),
                             id,
                             format!(
-                                "🎉 I've edited the payment! 🎉\n\n{}\nThere are no changes to the balances.",
+                                "🎉 Yay! I've edited the payment! 🎉\n\n{}\nThere are no changes to the balances! 🥳",
                                 edit_overview
                                 ),
                                 )
@@ -196,7 +195,7 @@ async fn call_processor_edit_payment(
                     chat.id,
                     id,
                     format!(
-                        "❓ Hmm, something went wrong! Sorry, I can't edit the payment right now."
+                        "⁉️ Oh no! Something went wrong! 🥺 I'm sorry, but I can't edit the payment right now. Please try again later!\n\n"
                     ),
                 )
                 .await?;
@@ -227,7 +226,7 @@ async fn call_processor_edit_payment(
 pub async fn handle_repeated_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("🚫 You are already editing a payment entry! Please complete or {COMMAND_CANCEL} the current operation before starting a new one."),
+        format!("🚫 Oops! It seems like you're already in the middle of editing a payment! Please finish or {COMMAND_CANCEL} this before starting another one with me."),
         ).await?;
     Ok(())
 }
@@ -247,7 +246,7 @@ pub async fn cancel_edit_payment(bot: Bot, dialogue: UserDialogue, msg: Message)
 pub async fn block_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("🚫 You are currently editing a payment entry! Please complete or {COMMAND_CANCEL} the current payment entry before starting another command."),
+        format!("🚫 Oops! It seems like you're in the middle of editing a payment! Please finish or {COMMAND_CANCEL} this before starting something new with me."),
         ).await?;
     Ok(())
 }
@@ -258,7 +257,7 @@ pub async fn block_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn no_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("❌ Please view the payment records first with {COMMAND_VIEW_PAYMENTS}!"),
+        format!("Uh-oh! ❌ Please view the payment records first with {COMMAND_VIEW_PAYMENTS}!"),
     )
     .await?;
     Ok(())
@@ -335,12 +334,15 @@ pub async fn action_edit_payment_confirm(
                 "Description" => {
                     bot.send_message(
                         chat.id,
-                        format!("Current description: {}\n\nWhat do you want the new description to be?",
-                                edited_payment.description.clone().unwrap_or(payment.description.clone())
-
-                               ),
-                               )
-                        .await?;
+                        format!(
+                            "Current description: {}\n\nWhat should the description be?",
+                            edited_payment
+                                .description
+                                .clone()
+                                .unwrap_or(payment.description.clone())
+                        ),
+                    )
+                    .await?;
                     dialogue
                         .update(State::EditPaymentDetails {
                             payment,
@@ -399,11 +401,11 @@ pub async fn action_edit_payment_confirm(
                         })
                         .await?;
                 }
-                "Splits" => {
+                "Split" => {
                     bot.send_message(
                         chat.id,
                         format!(
-                            "Current splits:\n{}\nHow are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
+                            "Current split:\n{}\nHow should we split this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
                             display_debts(&edited_payment.debts.clone().unwrap_or(payment.debts.clone()), edited_payment.currency.clone().unwrap_or(payment.currency.clone()).1)
                             ),
                             ).reply_markup(make_keyboard_debt_selection())
@@ -453,7 +455,7 @@ pub async fn action_edit_payment_debts(
                         chat.id,
                         id,
                         format!(
-                            "Okay, who is involved in the payment?\n\n{DEBT_EQUAL_INSTRUCTIONS_MESSAGE}",
+                            "Okay! Who is involved in the payment?\n\n{DEBT_EQUAL_INSTRUCTIONS_MESSAGE}",
                             ),
                             )
                         .await?;
@@ -474,7 +476,7 @@ pub async fn action_edit_payment_debts(
                         chat.id,
                         id,
                         format!(
-                            "Okay, who is involved and how much do they owe?\n\n{DEBT_EXACT_INSTRUCTIONS_MESSAGE}",
+                            "Okay! Who is involved and how much do they owe?\n\n{DEBT_EXACT_INSTRUCTIONS_MESSAGE}",
                             )).await?;
                     dialogue
                         .update(State::EditPaymentDetails {
@@ -493,7 +495,7 @@ pub async fn action_edit_payment_debts(
                         chat.id,
                         id,
                         format!(
-                            "Okay, who is involved and what proportions do they owe?\n\n{DEBT_RATIO_INSTRUCTIONS_MESSAGE}",
+                            "Okay! Who is involved and how much do they owe?\n\n{DEBT_RATIO_INSTRUCTIONS_MESSAGE}",
                             )).await?;
                     dialogue
                         .update(State::EditPaymentDetails {
@@ -591,7 +593,7 @@ pub async fn action_edit_payment_edit(
 
                         bot.send_message(
                             msg.chat.id,
-                            format!("How are we splitting this new total?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}")
+                            format!("Fantastic! How should we split this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}")
                             )
                             .reply_markup(make_keyboard_debt_selection())
                             .await?;
@@ -608,7 +610,7 @@ pub async fn action_edit_payment_edit(
                         bot.send_message(
                             msg.chat.id,
                             format!(
-                                "{}\n\n{TOTAL_INSTRUCTIONS_MESSAGE}\n\nWhat should the total be?",
+                                "{}\n\nWhat should the total be?\n\n{TOTAL_INSTRUCTIONS_MESSAGE}",
                                 err.to_string()
                             ),
                         )

@@ -30,7 +30,7 @@ pub struct PayBackParams {
 }
 
 const CANCEL_MESSAGE: &str =
-    "Sure, I've cancelled adding the payment. No changes have been made! 👌";
+    "Okay! I've cancelled adding the payment. No changes have been made! 🌟";
 
 fn display_pay_back_entry(payment: &PayBackParams) -> String {
     let currency_info: String;
@@ -42,7 +42,7 @@ fn display_pay_back_entry(payment: &PayBackParams) -> String {
     }
 
     format!(
-        "You paid the following amounts {}to:\n{}",
+        "You've paid {}:\n{}",
         currency_info,
         display_debts(&payment.debts, actual_currency.1)
     )
@@ -95,7 +95,7 @@ async fn call_processor_pay_back(
                     chat.id,
                     id,
                     format!(
-                        "❓ Hmm, something went wrong! Sorry, I can't add the payment right now."
+                        "⁉️ Oh no! Something went wrong! 🥺 I'm sorry, but I can't add the payment right now. Please try again later!\n\n"
                     ),
                 )
                 .await?;
@@ -114,7 +114,7 @@ async fn call_processor_pay_back(
                     chat.id,
                     id,
                     format!(
-                        "🎉 I've added the payment! 🎉\n\n{}\n{}{}",
+                        "🎉 Yay! I've added the payment! 🎉\n\n{}\n{}{}",
                         payment_overview,
                         display_balance_header(&chat.id.to_string(), &payment.currency.0),
                         display_balances(&balances)
@@ -144,7 +144,7 @@ async fn call_processor_pay_back(
 pub async fn handle_repeated_pay_back(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("🚫 You are already paying back! Please complete or {COMMAND_CANCEL} the current operation before starting a new one."),
+        format!("🚫 Oops! It seems like you're already in the middle of paying back! Please finish or {COMMAND_CANCEL} this before starting another one with me."),
         ).await?;
     Ok(())
 }
@@ -164,7 +164,7 @@ pub async fn cancel_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
 pub async fn block_pay_back(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("🚫 You are currently paying back! Please complete or {COMMAND_CANCEL} the current payment before starting another command."),
+        format!("🚫 Oops! It seems like you're in the middle of paying back! Please finish or {COMMAND_CANCEL} this before starting something new with me."),
         ).await?;
     Ok(())
 }
@@ -177,7 +177,7 @@ pub async fn action_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
     let keyboard = make_keyboard(buttons, Some(3));
     bot.send_message(
         msg.chat.id,
-        format!("Alright! What currency did you pay in? You can also choose to skip and not enter a currency."),
+        format!("Absolutely! Would you like to set a currency for this payment? You can also choose to skip this step."),
         )
         .reply_markup(keyboard)
         .await?;
@@ -209,7 +209,7 @@ pub async fn action_pay_back_currency_menu(
                         chat.id,
                         id,
                         format!(
-                            "Sure! Who did you pay back and how much did you pay?\n\n{PAY_BACK_INSTRUCTIONS_MESSAGE}"
+                            "Sure! Who and how much did you pay back?\n\n{PAY_BACK_INSTRUCTIONS_MESSAGE}"
                             ),
                             )
                         .await?;
@@ -267,7 +267,7 @@ pub async fn action_pay_back_currency(
                     bot.send_message(
                         msg.chat.id,
                         format!(
-                            "Sure! We're working with {}.\n\nWho did you pay back and how much did you pay?\n{PAY_BACK_INSTRUCTIONS_MESSAGE}",
+                            "{}, awesome! Who and how much did you pay back?\n\n{PAY_BACK_INSTRUCTIONS_MESSAGE}",
                             currency_code
                             ),
                             ).await?;
@@ -277,7 +277,7 @@ pub async fn action_pay_back_currency(
                     bot.send_message(
                         msg.chat.id,
                         format!(
-                            "{} You can check out the supported currencies in the User Guide with {COMMAND_HELP}.",
+                            "{}\n\n⭐️ If you're unsure of the currency code, you can always check out my User Guide with {COMMAND_HELP}.",
                             err.to_string()
                         ),
                     )
@@ -389,7 +389,7 @@ pub async fn action_pay_back_confirm(
                         chat.id,
                         id,
                         format!(
-                            "Alright! What currency did you pay in? You can also choose to skip and not enter a currency."
+                            "Absolutely! Would you like to set a currency for this payment? You can also choose to skip this step."
                             ),
                             )
                         .reply_markup(keyboard)

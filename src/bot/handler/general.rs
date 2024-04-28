@@ -46,7 +46,7 @@ pub async fn callback_invalid_message(_bot: Bot, _msg: Message) -> HandlerResult
  * Displays a welcome message to the user.
  */
 pub async fn action_start(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, format!("👋 Hello! I'm PayScribe! 😊\n\nJust type {COMMAND_HELP} to see everything I can help you with, and let's dive right into tracking payments together!")).await?;
+    bot.send_message(msg.chat.id, format!("👋 Hello! I'm PayScribe! 😊\n\nJust type {COMMAND_HELP} to see what I can help you with, and let's dive right into tracking payments together!")).await?;
     Ok(())
 }
 
@@ -65,7 +65,7 @@ pub async fn action_help(bot: Bot, msg: Message) -> HandlerResult {
 
     bot.send_message(
         msg.chat.id,
-        format!("{introduction}\n\n{add_info}\n\n{view_info}\n\n{payback_info}\n\n{settings_info}\n\n🌟 *My Commands* 🌟\n\n{}", commands),
+        format!("{introduction}\n\n{add_info}\n\n{view_info}\n\n{payback_info}\n\n{settings_info}\n\n⭐️ *My Commands* ⭐️\n\n{}", commands),
         )
         .parse_mode(ParseMode::MarkdownV2)
         .await?;

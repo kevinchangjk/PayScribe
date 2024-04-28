@@ -25,8 +25,8 @@ use super::{
 };
 
 /* Utilities */
-const HEADER_MESSAGE_FRONT: &str = "I've recorded ";
-const HEADER_MESSAGE_BACK: &str = " payments for this group.\nHere are the latest ones:\n\n";
+const HEADER_MESSAGE_FRONT: &str = "Anytime! ☺️\nI've recorded ";
+const HEADER_MESSAGE_BACK: &str = " payments. Here are the latest entries!\n\n";
 
 #[derive(Clone, Debug)]
 pub struct Payment {
@@ -208,7 +208,7 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
                     .await?;
             }
             Err(ProcessError::CrudError(CrudError::NoPaymentsError())) => {
-                bot.send_message(msg.chat.id, format!("I have not recorded any payment entry for this group. Use {COMMAND_ADD_PAYMENT} to let me know when you need my help with that!"))
+                bot.send_message(msg.chat.id, format!("😖 I can't find any payment records! But I'm always ready to help you get started with {COMMAND_ADD_PAYMENT}!"))
                     .await?;
 
                 // Logging
@@ -321,12 +321,9 @@ pub async fn action_select_payment_edit(
 ) -> HandlerResult {
     let keyboard = get_select_menu(page, &payments);
 
-    bot.send_message(
-        msg.chat.id,
-        "Sure! Which payment would you like to edit? Pick the corresponding serial number below.",
-    )
-    .reply_markup(keyboard)
-    .await?;
+    bot.send_message(msg.chat.id, "🙌 Which payment no. would you like to edit?")
+        .reply_markup(keyboard)
+        .await?;
 
     dialogue
         .update(State::SelectPayment {
@@ -353,7 +350,7 @@ pub async fn action_select_payment_delete(
 
     bot.send_message(
         msg.chat.id,
-        "Sure! Which payment would you like to delete? Pick the corresponding serial number below.",
+        "🙌 Which payment no. would you like to delete?",
     )
     .reply_markup(keyboard)
     .await?;
