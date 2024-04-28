@@ -3,7 +3,8 @@ use reqwest::header;
 use serde_json::Value;
 use std::error::Error;
 
-use super::handler::Currency;
+// Represents a currency with a code and decimal places.
+pub type Currency = (String, i32);
 
 // Converts a (&str, i32) to a Currency.
 fn to_currency(currency: (&str, i32)) -> Currency {
@@ -26,15 +27,13 @@ pub fn get_default_currency() -> Currency {
     to_currency(CURRENCY_DEFAULT)
 }
 
-// Converts an amount from one currency to another.
-pub async fn convert_currency(amount: i64, currency_from: &str, currency_to: &str) -> i64 {
-    let conversion_rate =
-        match fetch_currency_conversion(&currency_from.to_lowercase(), &currency_to.to_lowercase())
-            .await
-        {
-            Ok(rate) => rate,
-            Err(_) => return amount,
-        };
+// Converts an amount from one currency to another, given the conversion rate.
+pub fn convert_currency_with_rate(
+    amount: i64,
+    currency_from: &str,
+    currency_to: &str,
+    conversion_rate: f64,
+) -> i64 {
     let currency_from = match get_currency_from_code(currency_from) {
         Some(currency) => currency,
         None => return amount,
@@ -54,6 +53,8 @@ pub async fn fetch_currency_conversion(
     base_currency: &str,
     target_currency: &str,
 ) -> Result<f64, Box<dyn Error>> {
+    let base_currency = base_currency.to_lowercase();
+    let target_currency = target_currency.to_lowercase();
     let url = format!("https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/{base_currency}.json");
 
     let mut h = header::HeaderMap::new();

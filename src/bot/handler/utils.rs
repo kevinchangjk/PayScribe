@@ -8,7 +8,7 @@ use teloxide::{
 };
 
 use crate::bot::{
-    currency::{get_currency_from_code, get_default_currency, CURRENCY_DEFAULT},
+    currency::{get_currency_from_code, get_default_currency, Currency, CURRENCY_DEFAULT},
     processor::{get_chat_setting, ChatSetting, ProcessError},
     redis::Debt,
     State,
@@ -24,8 +24,12 @@ use super::{
 /* Types */
 pub type UserDialogue = Dialogue<State, InMemStorage<State>>;
 pub type HandlerResult = Result<(), BotError>;
-// Represents a currency with a code and decimal places.
-pub type Currency = (String, i32);
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum StatementOption {
+    Currency(String),
+    ConvertCurrency,
+}
 
 #[derive(Debug, Clone)]
 pub enum SelectPaymentType {
@@ -67,7 +71,7 @@ pub fn get_currency(code: &str) -> Result<Currency, BotError> {
     match currency {
         Some(currency) => Ok(currency),
         None => Err(BotError::UserError(
-            "❌ Sorry, I don't have that currency!".to_string(),
+            "🥺 Sorry, I don't know that currency!".to_string(),
         )),
     }
 }
@@ -126,19 +130,51 @@ pub fn use_currency(currency: Currency, chat_id: &str) -> Currency {
     }
 }
 
-// Displays balances in a more readable format.
-pub fn display_balances(debts: &Vec<Debt>, chat_id: &str) -> String {
+// Displays the header for the balances, depending on the statement option applied.
+pub fn display_balance_header(chat_id: &str, currency: &str) -> String {
+    let conversion = match get_chat_setting(chat_id, ChatSetting::CurrencyConversion(None)) {
+        Ok(ChatSetting::CurrencyConversion(Some(value))) => value,
+        _ => false,
+    };
+    let default_currency = match get_chat_setting(chat_id, ChatSetting::DefaultCurrency(None)) {
+        Ok(ChatSetting::DefaultCurrency(Some(currency))) => currency,
+        _ => CURRENCY_DEFAULT.0.to_string(),
+    };
+
+    if conversion {
+        format!(
+            "✨ Ta-da! Here are the updated balances, all converted to {}!\n\n",
+            default_currency
+        )
+    } else if currency == CURRENCY_DEFAULT.0 {
+        if default_currency != CURRENCY_DEFAULT.0 {
+            format!(
+                "✨ Ta-da! Here are the updated balances in {}!\n\n",
+                default_currency
+            )
+        } else {
+            format!("✨ Ta-da! Here are the updated balances!\n\n")
+        }
+    } else {
+        format!(
+            "✨ Ta-da! Here are the updated balances in {}!\n\n",
+            currency
+        )
+    }
+}
+
+// Displays balances in a more readable format. Now only shows in one currency.
+pub fn display_balances(debts: &Vec<Debt>) -> String {
     let mut message = String::new();
     for debt in debts {
         let currency = get_currency(&debt.currency);
         match currency {
             Ok(currency) => {
-                let actual_currency = use_currency(currency, chat_id);
                 message.push_str(&format!(
                     "{} owes {}: {}\n",
                     display_username(&debt.debtor),
                     display_username(&debt.creditor),
-                    display_currency_amount(debt.amount, actual_currency),
+                    display_amount(debt.amount, currency.1),
                 ));
             }
             // Should not occur, since code is already processed and stored in database
@@ -148,8 +184,8 @@ pub fn display_balances(debts: &Vec<Debt>, chat_id: &str) -> String {
         }
     }
 
-    if message.is_empty() {
-        "No outstanding balances! 👍".to_string()
+    if debts.is_empty() {
+        "Yay! No outstanding balances! 🥳".to_string()
     } else {
         message
     }
@@ -236,7 +272,7 @@ pub fn parse_username(username: &str) -> Result<String, BotError> {
     }
 
     Err(BotError::UserError(
-        "❌ Please provide a valid username!".to_string(),
+        "Uh-oh! ❌ Please give me a valid username!".to_string(),
     ))
 }
 
@@ -249,7 +285,7 @@ pub fn parse_amount(text: &str, decimal_places: i32) -> Result<i64, BotError> {
             Ok(val) => (val * factor).round() as i64,
             Err(_) => {
                 return Err(BotError::UserError(
-                    "❌ Please provide a valid number!".to_string(),
+                    "Uh-oh! ❌ Please give me a valid number!".to_string(),
                 ))
             }
         },
@@ -257,11 +293,11 @@ pub fn parse_amount(text: &str, decimal_places: i32) -> Result<i64, BotError> {
 
     if amount > MAX_VALUE {
         Err(BotError::UserError(
-            "❌ This number is too large for me to process!".to_string(),
+            "Uh-oh! 🥺 This number is too large for me to handle!".to_string(),
         ))
     } else if amount <= 0 {
         Err(BotError::UserError(
-            "❌ Please provide a positive value!".to_string(),
+            "Uh-oh! ❌ Please give me a positive number!".to_string(),
         ))
     } else {
         Ok(amount)
@@ -276,7 +312,7 @@ pub fn parse_float(text: &str) -> Result<f64, BotError> {
             Ok(val) => val as f64,
             Err(_) => {
                 return Err(BotError::UserError(
-                    "❌ Please provide a valid number!".to_string(),
+                    "Uh-oh! ❌ Please give me a valid number!".to_string(),
                 ))
             }
         },
@@ -284,11 +320,11 @@ pub fn parse_float(text: &str) -> Result<f64, BotError> {
 
     if amount > MAX_VALUE as f64 {
         Err(BotError::UserError(
-            "❌ This number is too large for me to process!".to_string(),
+            "Uh-oh! 🥺 This number is too large for me to handle!".to_string(),
         ))
     } else if amount <= 0.0 {
         Err(BotError::UserError(
-            "❌ Please provide a positive value!".to_string(),
+            "Uh-oh! ❌ Please give me a positive number!".to_string(),
         ))
     } else {
         Ok(amount)
@@ -300,7 +336,7 @@ pub fn parse_currency_amount(text: &str) -> Result<(i64, Currency), BotError> {
     let items = text.split_whitespace().collect::<Vec<&str>>();
     if items.len() > 2 {
         return Err(BotError::UserError(
-            "❌ Please use the following format!".to_string(),
+            "Uh-oh! ❌ I don't understand... Please use the following format!".to_string(),
         ));
     } else if items.len() == 1 {
         let currency = get_default_currency();
@@ -318,7 +354,7 @@ pub fn process_debts_equal(text: &str, total: Option<i64>) -> Result<Vec<(String
     let users = text.split_whitespace().collect::<Vec<&str>>();
     if users.len() == 0 {
         return Err(BotError::UserError(
-            "❌ Please provide at least one username!".to_string(),
+            "Uh-oh! ❌ Please give me at least one username!".to_string(),
         ));
     }
 
@@ -326,7 +362,7 @@ pub fn process_debts_equal(text: &str, total: Option<i64>) -> Result<Vec<(String
         Some(val) => val,
         None => {
             return Err(BotError::UserError(
-                "❌ Something's wrong! The total amount isn't provided.".to_string(),
+                "Uh-oh! ❌ The total amount isn't provided.".to_string(),
             ));
         }
     };
@@ -360,7 +396,8 @@ pub fn process_debts_exact(
                 let items: Vec<&str> = text.split_whitespace().collect();
                 if items.len() % 2 != 0 {
                     return Err(BotError::UserError(
-                        "❌ Please use the following format!".to_string(),
+                        "Uh-oh! ❌ I don't understand... Please use the following format!"
+                            .to_string(),
                     ));
                 }
 
@@ -385,7 +422,7 @@ pub fn process_debts_exact(
 
                 if sum > total {
                     Err(BotError::UserError(
-                        "❌ Something's wrong! The sum of the amounts exceeds the total paid."
+                        "Uh-oh! ❌ The amounts you gave me are more than the total paid!"
                             .to_string(),
                     ))
                 } else if sum < total {
@@ -403,17 +440,17 @@ pub fn process_debts_exact(
                 }
             } else {
                 Err(BotError::UserError(
-                    "❌ Something's wrong! The currency isn't provided.".to_string(),
+                    "Uh-oh! ❌ The currency isn't provided.".to_string(),
                 ))
             }
         } else {
             Err(BotError::UserError(
-                "❌ Something's wrong! The total amount isn't provided.".to_string(),
+                "Uh-oh! ❌ The total amount isn't provided.".to_string(),
             ))
         }
     } else {
         Err(BotError::UserError(
-            "❌ Something's wrong! The payer isn't provided.".to_string(),
+            "Uh-oh! ❌ The payer isn't provided.".to_string(),
         ))
     }
 }
@@ -427,7 +464,7 @@ pub fn process_debts_ratio(text: &str, total: Option<i64>) -> Result<Vec<(String
 
     if items.len() % 2 != 0 {
         return Err(BotError::UserError(
-            "❌ Please use the following format!".to_string(),
+            "Uh-oh! ❌ I don't understand... Please use the following format!".to_string(),
         ));
     }
 
@@ -443,7 +480,7 @@ pub fn process_debts_ratio(text: &str, total: Option<i64>) -> Result<Vec<(String
         Some(val) => val,
         None => {
             return Err(BotError::UserError(
-                "❌ Something's wrong! The total amount isn't provided.".to_string(),
+                "Uh-oh! ❌ The total amount isn't provided.".to_string(),
             ));
         }
     };
@@ -487,7 +524,7 @@ pub fn parse_debts_payback(
     let items: Vec<&str> = text.split_whitespace().collect();
     if items.len() % 2 != 0 {
         return Err(BotError::UserError(
-            "❌ Please use the following format!".to_string(),
+            "Uh-oh! ❌ I don't understand... Please use the following format!".to_string(),
         ));
     }
 
@@ -496,7 +533,7 @@ pub fn parse_debts_payback(
         let amount = parse_amount(items[i + 1], currency.1)?;
         if username == sender {
             return Err(BotError::UserError(
-                "❌ You can't pay back yourself!".to_string(),
+                "Uh-oh! ❌ You can't pay back yourself!".to_string(),
             ));
         }
         let mut found = false;
@@ -524,7 +561,7 @@ pub fn parse_time_zone(text: &str) -> Result<Tz, BotError> {
     match time_zone {
         Some(time_zone) => Ok(*time_zone),
         None => Err(BotError::UserError(
-            "❌ Sorry, I don't recognize that time zone!".to_string(),
+            "🥺 Sorry, I don't recognize that time zone!".to_string(),
         )),
     }
 }

@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 
 const CHAT_KEY: &str = "chat";
 const CHAT_PAYMENT_KEY: &str = "chat_payment";
-const CHAT_DEBT_KEY: &str = "chat_debt";
 const CHAT_CURRENCY_KEY: &str = "chat_currency";
 const CHAT_SETTING_KEY: &str = "chat_setting";
 
@@ -31,8 +30,6 @@ pub struct Debt {
     pub currency: String,
     pub amount: i64,
 }
-
-pub type Debts = Vec<Debt>;
 
 // Adds a new chat to Redis
 pub fn add_chat(con: &mut Connection, chat_id: &str, username: &str) -> RedisResult<()> {
@@ -119,32 +116,6 @@ pub fn delete_all_chat_payment(con: &mut Connection, chat_id: &str) -> RedisResu
     con.del(format!("{CHAT_PAYMENT_KEY}:{chat_id}"))
 }
 
-/* Chat Debts CRUD Operations */
-// Sets the optimized debts for a chat
-pub fn set_chat_debt(con: &mut Connection, chat_id: &str, debts: &Vec<Debt>) -> RedisResult<()> {
-    let serialized = serde_json::to_string(debts).unwrap();
-
-    con.set(format!("{CHAT_DEBT_KEY}:{chat_id}"), serialized)
-}
-
-// Retrieves the optimized debts for a chat
-pub fn get_chat_debt(con: &mut Connection, chat_id: &str) -> RedisResult<Debts> {
-    if !con.exists(format!("{CHAT_DEBT_KEY}:{chat_id}"))? {
-        return Ok(vec![]);
-    }
-    let serialized: String = con.get(format!("{CHAT_DEBT_KEY}:{chat_id}"))?;
-    let deserialized: Debts = serde_json::from_str(&serialized).unwrap();
-    Ok(deserialized)
-}
-
-// Deletes the optimized debts for a chat
-// Mainly for testing purposes
-// In application, no real need to delete keys
-#[allow(dead_code)]
-pub fn delete_chat_debt(con: &mut Connection, chat_id: &str) -> RedisResult<()> {
-    con.del(format!("{CHAT_DEBT_KEY}:{chat_id}"))
-}
-
 /* Chat Currency CRUD Operations */
 // Adds a currency to a chat
 pub fn add_chat_currency(con: &mut Connection, chat_id: &str, currency: &str) -> RedisResult<()> {
@@ -201,15 +172,12 @@ pub fn set_chat_currency_conversion(
 }
 
 // Gets time zone for a chat
-pub fn get_chat_time_zone(con: &mut Connection, chat_id: &str) -> RedisResult<Option<String>> {
+pub fn get_chat_time_zone(con: &mut Connection, chat_id: &str) -> RedisResult<String> {
     con.hget(format!("{CHAT_SETTING_KEY}:{chat_id}"), SETTING_TIME_ZONE)
 }
 
 // Gets default currency for a chat
-pub fn get_chat_default_currency(
-    con: &mut Connection,
-    chat_id: &str,
-) -> RedisResult<Option<String>> {
+pub fn get_chat_default_currency(con: &mut Connection, chat_id: &str) -> RedisResult<String> {
     con.hget(
         format!("{CHAT_SETTING_KEY}:{chat_id}"),
         SETTING_DEFAULT_CURRENCY,
@@ -217,10 +185,7 @@ pub fn get_chat_default_currency(
 }
 
 // Gets currency conversion for a chat
-pub fn get_chat_currency_conversion(
-    con: &mut Connection,
-    chat_id: &str,
-) -> RedisResult<Option<bool>> {
+pub fn get_chat_currency_conversion(con: &mut Connection, chat_id: &str) -> RedisResult<bool> {
     con.hget(
         format!("{CHAT_SETTING_KEY}:{chat_id}"),
         SETTING_CURRENCY_CONVERSION,
@@ -379,30 +344,6 @@ mod tests {
     }
 
     #[test]
-    fn test_set_get_chat_debt() {
-        let mut con = connect().unwrap();
-
-        let chat_id = "1234567898";
-        let debts = vec![
-            Debt {
-                debtor: "debtor1".to_string(),
-                creditor: "creditor1".to_string(),
-                currency: "USD".to_string(),
-                amount: 1000,
-            },
-            Debt {
-                debtor: "debtor2".to_string(),
-                creditor: "creditor2".to_string(),
-                currency: "JPY".to_string(),
-                amount: 2000,
-            },
-        ];
-        assert!(set_chat_debt(&mut con, chat_id, &debts).is_ok());
-        assert_eq!(get_chat_debt(&mut con, chat_id).unwrap(), debts);
-        assert!(delete_chat_debt(&mut con, chat_id).is_ok());
-    }
-
-    #[test]
     fn test_add_get_chat_currency() {
         let mut con = connect().unwrap();
 
@@ -433,14 +374,14 @@ mod tests {
         assert!(set_chat_time_zone(&mut con, chat_id, time_zone).is_ok());
         assert_eq!(
             get_chat_time_zone(&mut con, chat_id).unwrap(),
-            Some(time_zone.to_string())
+            time_zone.to_string()
         );
 
         let second_time_zone = "PST";
         assert!(set_chat_time_zone(&mut con, chat_id, second_time_zone).is_ok());
         assert_eq!(
             get_chat_time_zone(&mut con, chat_id).unwrap(),
-            Some(second_time_zone.to_string())
+            second_time_zone.to_string()
         );
 
         assert!(delete_chat_settings(&mut con, chat_id).is_ok());
@@ -456,14 +397,14 @@ mod tests {
         assert!(set_chat_default_currency(&mut con, chat_id, currency).is_ok());
         assert_eq!(
             get_chat_default_currency(&mut con, chat_id).unwrap(),
-            Some(currency.to_string())
+            currency.to_string()
         );
 
         let second_currency = "EUR";
         assert!(set_chat_default_currency(&mut con, chat_id, second_currency).is_ok());
         assert_eq!(
             get_chat_default_currency(&mut con, chat_id).unwrap(),
-            Some(second_currency.to_string())
+            second_currency.to_string()
         );
 
         assert!(delete_chat_settings(&mut con, chat_id).is_ok());
@@ -479,7 +420,7 @@ mod tests {
         assert!(set_chat_currency_conversion(&mut con, chat_id, currency_conversion).is_ok());
         assert_eq!(
             get_chat_currency_conversion(&mut con, chat_id).unwrap(),
-            Some(currency_conversion)
+            currency_conversion
         );
 
         let second_currency_conversion = false;
@@ -488,7 +429,7 @@ mod tests {
         );
         assert_eq!(
             get_chat_currency_conversion(&mut con, chat_id).unwrap(),
-            Some(second_currency_conversion)
+            second_currency_conversion
         );
 
         assert!(delete_chat_settings(&mut con, chat_id).is_ok());

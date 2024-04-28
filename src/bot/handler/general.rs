@@ -4,34 +4,41 @@ use crate::bot::dispatcher::Command;
 
 use super::{
     constants::{
-        COMMAND_ADD_PAYMENT, COMMAND_DELETE_PAYMENT, COMMAND_EDIT_PAYMENT, COMMAND_HELP,
-        COMMAND_PAY_BACK, COMMAND_SETTINGS, COMMAND_VIEW_BALANCES, COMMAND_VIEW_PAYMENTS,
+        COMMAND_ADD_PAYMENT, COMMAND_BALANCES, COMMAND_DELETE_PAYMENT, COMMAND_EDIT_PAYMENT,
+        COMMAND_HELP, COMMAND_PAY_BACK, COMMAND_SETTINGS, COMMAND_SPENDINGS, COMMAND_VIEW_PAYMENTS,
+        USER_GUIDE_URL,
     },
     utils::HandlerResult,
 };
 
 /* Invalid state.
-*/
-pub async fn invalid_state(bot: Bot, msg: Message) -> HandlerResult {
+ * This action is invoked when the bot is in start state, and there is a non-command message
+ * addressed to it.
+ * Currently, simply does not respond to anything. Reduces spam.
+ */
+pub async fn invalid_state(_bot: Bot, msg: Message) -> HandlerResult {
     // Checks if msg is a service message, ignores it if so
     let is_service_msg = msg.from().is_none();
 
     if is_service_msg {
         Ok(())
     } else {
-        bot.send_message(msg.chat.id, format!("Sorry, I'm not intelligent enough to process that! 🤖\nPlease refer to {COMMAND_HELP} on how to use me!")).await?;
+        // bot.send_message(msg.chat.id, format!("Sorry, I'm not intelligent enough to process that! 🤖\nPlease refer to {COMMAND_HELP} on how to use me!")).await?;
         Ok(())
     }
 }
 
 /* Invalid message during callback expected.
-*/
-pub async fn callback_invalid_message(bot: Bot, msg: Message) -> HandlerResult {
+ * Currently, simply does not respond to anything. Reduces spam.
+ */
+pub async fn callback_invalid_message(_bot: Bot, _msg: Message) -> HandlerResult {
+    /*
     bot.send_message(
         msg.chat.id,
         "Hey, you don't have to text me...\nJust click on any of the buttons above 👆 to continue!",
     )
     .await?;
+    */
     Ok(())
 }
 
@@ -39,7 +46,7 @@ pub async fn callback_invalid_message(bot: Bot, msg: Message) -> HandlerResult {
  * Displays a welcome message to the user.
  */
 pub async fn action_start(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, format!("👋 Hi, I'm PayScribe!\n\nEnter {COMMAND_HELP} to check out the various commands I can assist you with, and let's get straight into tracking payments together!")).await?;
+    bot.send_message(msg.chat.id, format!("👋 Hello! I'm PayScribe! 😊\n\nJust type {COMMAND_HELP} to see what I can help you with, and let's dive right into tracking payments together!")).await?;
     Ok(())
 }
 
@@ -50,15 +57,15 @@ pub async fn action_help(bot: Bot, msg: Message) -> HandlerResult {
     let mut commands = Command::descriptions().to_string();
     commands = commands.replace("–", "\\—");
 
-    let introduction = "👋 Hey there\\! Need some help?\n\n_PayScribe_ is a handy assistant for keeping track of group payments, and simplifying your debts to keep you updated with how much everyone owes one another\\.";
-    let add_info = &format!("To begin, you can add new payment records with {COMMAND_ADD_PAYMENT}\\. When splitting the total amount, you can:\n\\- Divide the total cost equally \\(e\\.g\\. sharing ticket prices equally among friends\\)\n\\- Specify the exact amount for each person\n\\- Provide a proportion of how much each person owes \\(e\\.g\\. splitting the electricity bill 40\\-60\\)");
-    let view_info = &format!("Use {COMMAND_VIEW_BALANCES} see how much everyone owes one another\\. To edit or delete payments, use {COMMAND_VIEW_PAYMENTS}, then {COMMAND_EDIT_PAYMENT} or {COMMAND_DELETE_PAYMENT}\\.");
-    let payback_info = &format!("After paying back your friends, be sure to record those down with the {COMMAND_PAY_BACK} command\\!");
-    let settings_info = &format!("With {COMMAND_SETTINGS}, you can configure settings for the chat\\. You can find all supported time zones, currencies, along with other useful details in my [User Guide](https://github.com/kevinchangjk/PayScribe/wiki/User-Guide)\\!");
+    let introduction = "👋 Hello\\! Need a hand? 😉\n\n_PayScribe_ is your handy assistant for tracking group payments\\! Plus, I'll work my magic to simplify your debts, so you won't have to juggle so many payments back to your friends\\!";
+    let add_info = &format!("✍️ Ready to start tracking? You can add new payment records with {COMMAND_ADD_PAYMENT}\\! When it comes to splitting the total, you can choose between:\n\\- Dividing it equally\n\\- Entering the exact amount for each person\n\\- Specifying the proportion of the total owed for each person");
+    let view_info = &format!("🙈 Use {COMMAND_BALANCES} to peek at who owes what, and {COMMAND_SPENDINGS} to see who's been splurging\\! If you need to edit any records, just start with {COMMAND_VIEW_PAYMENTS}, then try {COMMAND_EDIT_PAYMENT} or {COMMAND_DELETE_PAYMENT}\\!");
+    let payback_info = &format!("💸 Once you've paid back your friends, don't forget to jot it down with {COMMAND_PAY_BACK}\\!");
+    let settings_info = &format!("⚙️ Lastly, I've got some group settings you can tweak with {COMMAND_SETTINGS}\\! For all the nitty\\-gritty details on supported time zones, currencies, and more, check out my [User Guide]({USER_GUIDE_URL})\\!");
 
     bot.send_message(
         msg.chat.id,
-        format!("{introduction}\n\n{add_info}\n\n{view_info}\n\n{payback_info}\n\n{settings_info}\n\n*All commands*:\n\n{}", commands),
+        format!("{introduction}\n\n{add_info}\n\n{view_info}\n\n{payback_info}\n\n{settings_info}\n\n⭐️ *My Commands* ⭐️\n\n{}", commands),
         )
         .parse_mode(ParseMode::MarkdownV2)
         .await?;
@@ -71,7 +78,7 @@ pub async fn action_help(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn action_cancel(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        "I'm not doing anything right now. There's nothing to cancel! 👀",
+        "I'm not doing anything right now... 👀 There's nothing to cancel!",
     )
     .await?;
     Ok(())

@@ -3,37 +3,42 @@ use std::collections::HashMap;
 
 pub const MAX_VALUE: i64 = 1_000_000_000_000_000_000;
 pub const UNKNOWN_ERROR_MESSAGE: &str =
-    "❓ Hmm, something went wrong! Sorry, I can't do that right now, please try again later!\n\n";
+    "⁉️ Oh no! Something went wrong! 🥺 I'm sorry, but I can't do that right now. Please try again later!\n\n";
 pub const NO_TEXT_MESSAGE: &str =
-    "❓ Sorry, I can't understand that! Please reply to me in text.\n\n";
+    "❓ I'm having a bit of trouble understanding that! Please reply to me in text!\n\n";
 pub const TOTAL_INSTRUCTIONS_MESSAGE: &str =
-"Enter the amount followed by the 3 letter abbreviation for the currency (Check out the User Guide with /help if unsure, or you can also leave out the currency entirely).\n\nE.g. 7.50 USD, 320 JPY, 28.75, etc.";
+"Enter the amount and optionally, the 3-letter currency code. For example: 100.00 USD, 200 JPY, 300.00, etc.\n\n⭐️ If you're unsure of the currency code, you can always check out my User Guide with /help!";
 pub const CURRENCY_INSTRUCTIONS_MESSAGE: &str =
-    "Enter the 3 letter code for the currency (Check out the User Guide with /help if unsure).\nE.g. USD, EUR, JPY, etc.";
+    "Enter the 3-letter currency code. For example: USD, EUR, JPY, etc.\n\n⭐️ If you're unsure of the currency code, you can always check out my User Guide with /help!";
 pub const TIME_ZONE_INSTRUCTIONS_MESSAGE: &str =
-    "Check out the User Guide with /help for all supported time zones.";
+    "⭐️ Check out my User Guide with /help for all my supported time zones!";
 pub const DEBT_EQUAL_DESCRIPTION_MESSAGE: &str =
     "Equal — Divide the total amount equally among users\n";
 pub const DEBT_EXACT_DESCRIPTION_MESSAGE: &str =
-    "Exact — Share the total cost by specifying exact amounts for each user\n";
+    "Exact — Split the total cost by exact amounts for each user\n";
 pub const DEBT_RATIO_DESCRIPTION_MESSAGE: &str =
-"Proportion — Split the total cost by specifying relative proportions of the total that each user owes\n";
+    "Proportion — Share the total cost by relative proportions for each user\n";
 pub const DEBT_EQUAL_INSTRUCTIONS_MESSAGE: &str =
-"Enter the usernames of those sharing the cost (including the payer if sharing too) as follows: \n\n@username__1\n@username__2\n@username__3\n...\n\n";
+"Enter the Telegram usernames of everyone sharing like this:\n\n@username__1\n@username__2\n@username__3\n...\n\n⭐️ Remember to include the payer if they're chipping in too!";
 pub const DEBT_EXACT_INSTRUCTIONS_MESSAGE: &str =
-"Enter the usernames and exact amounts (without currency) as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\nAny leftover amount will be taken as the payer's share.";
-pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
-"Enter the usernames and exact amounts (without currency) as follows: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n";
+"Enter the Telegram usernames and exact amounts like this: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n⭐️ If there are any leftover amounts, I'll assume it's the payer's!";
 pub const DEBT_RATIO_INSTRUCTIONS_MESSAGE: &str =
-"Enter the usernames and proportions as follows: \n\n@username__1 portion1\n@username__2 portion2\n@username__3 portion3\n...\n\nThe portions can be any whole or decimal number.";
+"Enter the Telegram usernames and portions like this: \n\n@username__1 portion1\n@username__2 portion2\n@username__3 portion3\n...\n\n⭐️ I can work with any positive number, whole or decimal!";
+pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
+"Enter the Telegram usernames and exact amounts like this: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n";
+pub const STATEMENT_INSTRUCTIONS_MESSAGE: &str =
+    "⭐️ I can also present in the other currencies/formats below!";
 pub const COMMAND_HELP: &str = "/help";
+pub const COMMAND_CANCEL: &str = "/cancel";
 pub const COMMAND_SETTINGS: &str = "/settings";
 pub const COMMAND_ADD_PAYMENT: &str = "/addpayment";
 pub const COMMAND_PAY_BACK: &str = "/payback";
 pub const COMMAND_VIEW_PAYMENTS: &str = "/viewpayments";
 pub const COMMAND_EDIT_PAYMENT: &str = "/editpayment";
 pub const COMMAND_DELETE_PAYMENT: &str = "/deletepayment";
-pub const COMMAND_VIEW_BALANCES: &str = "/viewbalances";
+pub const COMMAND_BALANCES: &str = "/balances";
+pub const COMMAND_SPENDINGS: &str = "/spendings";
+pub const USER_GUIDE_URL: &str = "https://github.com/kevinchangjk/PayScribe/wiki/User-Guide";
 
 // List of all supported time zones
 pub fn all_time_zones() -> HashMap<String, Tz> {

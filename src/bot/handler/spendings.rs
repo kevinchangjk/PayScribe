@@ -4,20 +4,61 @@ use teloxide::{
 };
 
 use crate::bot::{
-    currency::CURRENCY_DEFAULT,
+    currency::{Currency, CURRENCY_DEFAULT},
     handler::{
-        constants::UNKNOWN_ERROR_MESSAGE,
-        utils::{display_balances, HandlerResult, StatementOption, UserDialogue},
+        constants::{STATEMENT_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE},
+        utils::{
+            display_amount, display_username, get_currency, make_keyboard, HandlerResult,
+            UserDialogue,
+        },
     },
-    processor::{get_chat_setting, retrieve_debts, retrieve_valid_currencies, ChatSetting},
+    processor::{
+        get_chat_setting, retrieve_spending_data, retrieve_valid_currencies, ChatSetting,
+        SpendingData, UserSpending,
+    },
     State,
 };
 
-use super::{constants::STATEMENT_INSTRUCTIONS_MESSAGE, utils::make_keyboard};
+use super::utils::StatementOption;
 
 /* Utilities */
 
-async fn handle_balances_with_option(
+fn display_individual_spending(spending: UserSpending, currency: Currency) -> String {
+    format!(
+        "{}\n    Total Spent: {}\n    Total Paid For: {}\n",
+        display_username(&spending.username),
+        display_amount(spending.spending, currency.1),
+        display_amount(spending.paid, currency.1)
+    )
+}
+
+fn display_spendings(spending_data: &SpendingData) -> String {
+    if spending_data.group_spending == 0 {
+        return format!("Total Group Spending: 0");
+    }
+
+    let currency = match get_currency(&spending_data.currency) {
+        Ok(currency) => currency,
+        // Should not occur. Currency string is from database, so should exist.
+        Err(_) => ("NIL".to_string(), 2),
+    };
+
+    let mut individual_spendings = String::new();
+    for spending in &spending_data.user_spendings {
+        individual_spendings.push_str(&display_individual_spending(
+            spending.clone(),
+            currency.clone(),
+        ));
+    }
+
+    format!(
+        "Total Group Spending: {}\nTotal Individual Spendings:\n\n{}",
+        display_amount(spending_data.group_spending, currency.1),
+        individual_spendings
+    )
+}
+
+async fn handle_spendings_with_option(
     bot: Bot,
     dialogue: UserDialogue,
     chat_id: String,
@@ -25,10 +66,10 @@ async fn handle_balances_with_option(
     option: StatementOption,
     id: Option<MessageId>,
 ) -> HandlerResult {
-    let balances_data = retrieve_debts(&chat_id, option.clone()).await;
+    let spending_data = retrieve_spending_data(&chat_id, option.clone()).await;
 
-    match balances_data {
-        Ok(balances_data) => {
+    match spending_data {
+        Ok(spending_data) => {
             let valid_currencies = match retrieve_valid_currencies(&chat_id) {
                 Ok(currencies) => currencies,
                 Err(_) => {
@@ -88,12 +129,12 @@ async fn handle_balances_with_option(
 
             let header = if let StatementOption::Currency(curr) = option {
                 if curr == CURRENCY_DEFAULT.0 {
-                    format!("📊 Here are the current balances!")
+                    format!("🔥 Here are the total spendings!")
                 } else {
-                    format!("📊 Here are the current {curr} balances!")
+                    format!("🔥 Here are the total spendings for {curr}!")
                 }
             } else {
-                format!("📊 Here are the current balances, converted to {default_currency}!")
+                format!("🔥 Here are the total spendings, converted to {default_currency}!")
             };
 
             match id {
@@ -104,7 +145,7 @@ async fn handle_balances_with_option(
                         format!(
                             "{}\n\n{}\n{}",
                             header,
-                            display_balances(&balances_data),
+                            display_spendings(&spending_data),
                             if has_buttons {
                                 STATEMENT_INSTRUCTIONS_MESSAGE
                             } else {
@@ -121,7 +162,7 @@ async fn handle_balances_with_option(
                         format!(
                             "{}\n\n{}\n{}",
                             header,
-                            display_balances(&balances_data),
+                            display_spendings(&spending_data),
                             if has_buttons {
                                 STATEMENT_INSTRUCTIONS_MESSAGE
                             } else {
@@ -133,13 +174,13 @@ async fn handle_balances_with_option(
                     .await?;
                 }
             }
-            dialogue.update(State::BalancesMenu).await?;
+            dialogue.update(State::SpendingsMenu).await?;
 
             log::info!(
-                "View Balances - User {} viewed balances for group {}: {}",
+                "View Spendings - User {} viewed spendings for group {}: {}",
                 sender_id,
                 chat_id,
-                display_balances(&balances_data)
+                display_spendings(&spending_data)
             );
         }
         Err(err) => {
@@ -154,7 +195,7 @@ async fn handle_balances_with_option(
                 }
             }
             log::error!(
-                "View Balances - User {} failed to view balances for group {}: {}",
+                "View Spendings - User {} failed to view spendings for group {}: {}",
                 sender_id,
                 chat_id,
                 err.to_string()
@@ -165,9 +206,13 @@ async fn handle_balances_with_option(
     Ok(())
 }
 
-/* View the balances for the group.
+/* View the spendings for the group.
 */
-pub async fn action_view_balances(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+pub async fn action_view_spendings(
+    bot: Bot,
+    dialogue: UserDialogue,
+    msg: Message,
+) -> HandlerResult {
     let chat_id = msg.chat.id.to_string();
     let sender_id = msg.from().as_ref().unwrap().id.to_string();
     let is_convert = match get_chat_setting(&chat_id, ChatSetting::CurrencyConversion(None)) {
@@ -185,15 +230,15 @@ pub async fn action_view_balances(bot: Bot, dialogue: UserDialogue, msg: Message
         StatementOption::Currency(default_currency.clone())
     };
 
-    handle_balances_with_option(bot, dialogue, chat_id, sender_id, option, None).await?;
+    handle_spendings_with_option(bot, dialogue, chat_id, sender_id, option, None).await?;
 
     Ok(())
 }
 
-/* Views the balances for the group.
- * Takes in a callback query representing the user option on format to display.
+/* Changes the display format of the spendings for the group.
+ * Receives a callback query indicating new format change.
  */
-pub async fn action_balances_menu(
+pub async fn action_spendings_menu(
     bot: Bot,
     dialogue: UserDialogue,
     query: CallbackQuery,
@@ -207,7 +252,7 @@ pub async fn action_balances_menu(
             match button.as_str() {
                 _ if button.as_str().starts_with("Convert To ") => {
                     let option = StatementOption::ConvertCurrency;
-                    handle_balances_with_option(
+                    handle_spendings_with_option(
                         bot,
                         dialogue,
                         chat_id,
@@ -219,7 +264,7 @@ pub async fn action_balances_menu(
                 }
                 _ if button.as_str() == "No Currency" => {
                     let option = StatementOption::Currency(CURRENCY_DEFAULT.0.to_string());
-                    handle_balances_with_option(
+                    handle_spendings_with_option(
                         bot,
                         dialogue,
                         chat_id,
@@ -231,7 +276,7 @@ pub async fn action_balances_menu(
                 }
                 _ if button.as_str().len() == 3 => {
                     let option = StatementOption::Currency(button.as_str().to_string());
-                    handle_balances_with_option(
+                    handle_spendings_with_option(
                         bot,
                         dialogue,
                         chat_id,
@@ -243,7 +288,7 @@ pub async fn action_balances_menu(
                 }
                 _ => {
                     log::error!(
-                        "View Balances Menu - Invalid button in chat {} by user {}: {}",
+                        "View Spendings Menu - Invalid button in chat {} by user {}: {}",
                         chat_id,
                         sender_id,
                         button

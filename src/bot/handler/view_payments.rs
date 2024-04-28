@@ -5,13 +5,13 @@ use teloxide::{
 };
 
 use crate::bot::{
-    currency::get_default_currency,
+    currency::{get_default_currency, Currency},
     dispatcher::State,
     handler::{
         constants::{COMMAND_ADD_PAYMENT, UNKNOWN_ERROR_MESSAGE},
         utils::{
-            display_payment, get_currency, make_keyboard, retrieve_time_zone, Currency,
-            HandlerResult, UserDialogue,
+            display_payment, get_currency, make_keyboard, retrieve_time_zone, HandlerResult,
+            UserDialogue,
         },
     },
     processor::{view_payments, ProcessError},
@@ -25,8 +25,8 @@ use super::{
 };
 
 /* Utilities */
-const HEADER_MESSAGE_FRONT: &str = "I've recorded ";
-const HEADER_MESSAGE_BACK: &str = " payments for this group.\nHere are the latest ones:\n\n";
+const HEADER_MESSAGE_FRONT: &str = "Anytime! ☺️\nI've recorded ";
+const HEADER_MESSAGE_BACK: &str = " payments. Here are the latest entries!\n\n";
 
 #[derive(Clone, Debug)]
 pub struct Payment {
@@ -184,12 +184,6 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
                     .into_iter()
                     .map(|payment| unfold_payment(payment))
                     .collect();
-                log::info!(
-                    "View Payments - User {} viewed payments for group {}, found: {}",
-                    sender_id,
-                    chat_id,
-                    display_payments_paged(&payments, 0, &chat_id)
-                );
                 bot.send_message(
                     msg.chat.id,
                     format!(
@@ -200,33 +194,48 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
                 )
                 .reply_markup(get_navigation_menu())
                 .await?;
+
+                // Logging
+                log::info!(
+                    "View Payments - User {} viewed payments for group {}, found: {}",
+                    sender_id,
+                    chat_id,
+                    display_payments_paged(&payments, 0, &chat_id)
+                );
+
                 dialogue
                     .update(State::ViewPayments { payments, page: 0 })
                     .await?;
-                return Ok(());
             }
             Err(ProcessError::CrudError(CrudError::NoPaymentsError())) => {
-                bot.send_message(msg.chat.id, format!("I have not recorded any payment entry for this group. Use {COMMAND_ADD_PAYMENT} to let me know when you need my help with that!"))
+                bot.send_message(msg.chat.id, format!("😖 I can't find any payment records! But I'm always ready to help you get started with {COMMAND_ADD_PAYMENT}!"))
                     .await?;
+
+                // Logging
+                log::info!(
+                    "View Payments - User {} viewed payments for group {}, but there were no payments recorded.",
+                    sender_id,
+                    chat_id,
+                );
+
                 dialogue.exit().await?;
             }
             Err(err) => {
+                bot.send_message(msg.chat.id, format!("{UNKNOWN_ERROR_MESSAGE}"))
+                    .await?;
+
+                // Logging
                 log::error!(
                     "View Payments - User {} failed to view payments for group {}: {}",
                     sender_id,
                     chat_id,
                     err.to_string()
                 );
-                bot.send_message(msg.chat.id, format!("{UNKNOWN_ERROR_MESSAGE}"))
-                    .await?;
+
+                dialogue.exit().await?;
             }
         }
     }
-    dialogue.exit().await?;
-    log::error!(
-        "View Payments - User not found in msg {}.",
-        msg.id.to_string()
-    );
     Ok(())
 }
 
@@ -312,12 +321,9 @@ pub async fn action_select_payment_edit(
 ) -> HandlerResult {
     let keyboard = get_select_menu(page, &payments);
 
-    bot.send_message(
-        msg.chat.id,
-        "Sure! Which payment would you like to edit? Pick the corresponding serial number below.",
-    )
-    .reply_markup(keyboard)
-    .await?;
+    bot.send_message(msg.chat.id, "🙌 Which payment no. would you like to edit?")
+        .reply_markup(keyboard)
+        .await?;
 
     dialogue
         .update(State::SelectPayment {
@@ -344,7 +350,7 @@ pub async fn action_select_payment_delete(
 
     bot.send_message(
         msg.chat.id,
-        "Sure! Which payment would you like to delete? Pick the corresponding serial number below.",
+        "🙌 Which payment no. would you like to delete?",
     )
     .reply_markup(keyboard)
     .await?;
@@ -414,24 +420,28 @@ pub async fn action_select_payment_number(
                                 }
                             }
                         } else {
+                            dialogue
+                                .update(State::ViewPayments { payments, page })
+                                .await?;
+
+                            // Logging
                             log::error!(
                                 "Select Payment Number - Invalid serial number {} in chat {}",
                                 serial_num,
                                 chat.id
                             );
-                            dialogue
-                                .update(State::ViewPayments { payments, page })
-                                .await?;
                         }
                     } else {
+                        dialogue
+                            .update(State::ViewPayments { payments, page })
+                            .await?;
+
+                        // Logging
                         log::error!(
                             "Select Payment Number - Invalid serial number {} in chat {}",
                             num,
                             chat.id
                         );
-                        dialogue
-                            .update(State::ViewPayments { payments, page })
-                            .await?;
                     }
                 }
             }
