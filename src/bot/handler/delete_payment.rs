@@ -66,7 +66,7 @@ pub async fn block_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn no_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("❌ Please view the payment records first with {COMMAND_VIEW_PAYMENTS}!"),
+        format!("Uh-oh! ❌ Sorry, please {COMMAND_VIEW_PAYMENTS} before deleting them!"),
     )
     .await?;
     Ok(())

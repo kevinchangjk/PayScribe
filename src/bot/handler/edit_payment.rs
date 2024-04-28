@@ -257,7 +257,7 @@ pub async fn block_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn no_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
     bot.send_message(
         msg.chat.id,
-        format!("Uh-oh! ❌ Please view the payment records first with {COMMAND_VIEW_PAYMENTS}!"),
+        format!("Uh-oh! ❌ Sorry, please {COMMAND_VIEW_PAYMENTS} before editing them!"),
     )
     .await?;
     Ok(())
