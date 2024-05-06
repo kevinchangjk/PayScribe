@@ -6,7 +6,7 @@ use super::{
     constants::{
         COMMAND_ADD_PAYMENT, COMMAND_BALANCES, COMMAND_DELETE_PAYMENT, COMMAND_EDIT_PAYMENT,
         COMMAND_HELP, COMMAND_PAY_BACK, COMMAND_SETTINGS, COMMAND_SPENDINGS, COMMAND_VIEW_PAYMENTS,
-        USER_GUIDE_URL,
+        WEBSITE_URL,
     },
     utils::HandlerResult,
 };
@@ -61,11 +61,12 @@ pub async fn action_help(bot: Bot, msg: Message) -> HandlerResult {
     let add_info = &format!("✍️ Ready to start tracking? You can add new payment records with {COMMAND_ADD_PAYMENT}\\! When it comes to splitting the total, you can choose between:\n\\- Dividing it equally\n\\- Entering the exact amount for each person\n\\- Specifying the proportion of the total owed for each person");
     let view_info = &format!("🙈 Use {COMMAND_BALANCES} to peek at who owes what, and {COMMAND_SPENDINGS} to see who's been splurging\\! If you need to edit any records, just start with {COMMAND_VIEW_PAYMENTS}, then try {COMMAND_EDIT_PAYMENT} or {COMMAND_DELETE_PAYMENT}\\!");
     let payback_info = &format!("💸 Once you've paid back your friends, don't forget to jot it down with {COMMAND_PAY_BACK}\\!");
-    let settings_info = &format!("⚙️ Lastly, I've got some group settings you can tweak with {COMMAND_SETTINGS}\\! For all the nitty\\-gritty details on supported time zones, currencies, and more, check out my [User Guide]({USER_GUIDE_URL})\\!");
+    let settings_info = &format!("⚙️ I've also got some group settings you can tweak with {COMMAND_SETTINGS}\\! For all the nitty\\-gritty details on supported time zones, currencies, and more, check out my User Guide on [my website]({WEBSITE_URL})\\!");
+    let feedback_info = &format!("💡 And if you have any feedback for me, please let me know through the feedback form on [my website]({WEBSITE_URL})\\!");
 
     bot.send_message(
         msg.chat.id,
-        format!("{introduction}\n\n{add_info}\n\n{view_info}\n\n{payback_info}\n\n{settings_info}\n\n⭐️ *My Commands* ⭐️\n\n{}", commands),
+        format!("{introduction}\n\n{add_info}\n\n{view_info}\n\n{payback_info}\n\n{settings_info}\n\n{feedback_info}\n\n⭐️ *My Commands* ⭐️\n\n{}", commands),
         )
         .parse_mode(ParseMode::MarkdownV2)
         .await?;
