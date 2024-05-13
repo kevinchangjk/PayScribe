@@ -1,6 +1,8 @@
 use teloxide::{prelude::*, types::ParseMode, utils::command::BotCommands};
 
-use crate::bot::dispatcher::Command;
+use crate::bot::{
+    dispatcher::Command, processor::assert_rate_limit, redis::is_request_limit_exceeded,
+};
 
 use super::{
     constants::{
@@ -8,7 +10,7 @@ use super::{
         COMMAND_HELP, COMMAND_PAY_BACK, COMMAND_SETTINGS, COMMAND_SPENDINGS, COMMAND_VIEW_PAYMENTS,
         WEBSITE_URL,
     },
-    utils::HandlerResult,
+    utils::{assert_handle_request_limit, HandlerResult},
 };
 
 /* Invalid state.
@@ -46,6 +48,10 @@ pub async fn callback_invalid_message(_bot: Bot, _msg: Message) -> HandlerResult
  * Displays a welcome message to the user.
  */
 pub async fn action_start(bot: Bot, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     bot.send_message(msg.chat.id, format!("👋 Hello! I'm PayScribe! 😊\n\nJust type {COMMAND_HELP} to see what I can help you with, and let's dive right into tracking payments together!")).await?;
     Ok(())
 }

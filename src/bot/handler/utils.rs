@@ -3,13 +3,13 @@ use chrono_tz::Tz;
 use regex::Regex;
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage, InMemStorageError},
-    types::{InlineKeyboardButton, InlineKeyboardMarkup},
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, Message},
     RequestError,
 };
 
 use crate::bot::{
     currency::{get_currency_from_code, get_default_currency, Currency, CURRENCY_DEFAULT},
-    processor::{get_chat_setting, ChatSetting, ProcessError},
+    processor::{assert_rate_limit, get_chat_setting, ChatSetting, ProcessError},
     redis::Debt,
     State,
 };
@@ -62,6 +62,24 @@ impl From<InMemStorageError> for BotError {
 impl From<ProcessError> for BotError {
     fn from(process_error: ProcessError) -> BotError {
         BotError::ProcessError(process_error)
+    }
+}
+
+// Checks and asserts the rate limit of 1 request per user per second.
+// Returns true if okay, false if exceeded
+pub fn assert_handle_request_limit(msg: Message) -> bool {
+    let user_id = msg.from().unwrap().id.to_string();
+    let timestamp = msg.date.timestamp();
+    let request_status = assert_rate_limit(&user_id, timestamp);
+    if let Err(_) = request_status {
+        log::error!(
+            "Rate limit exceeded for user: {} in chat: {}",
+            user_id,
+            msg.chat.id
+        );
+        false
+    } else {
+        true
     }
 }
 

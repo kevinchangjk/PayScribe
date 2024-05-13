@@ -11,7 +11,7 @@ use super::{
     },
     connect::{connect, DBError},
     payment::{add_payment, delete_payment, get_payment, update_payment, Payment},
-    request::{delete_request, get_request, set_request},
+    request::{get_request, set_request},
     spending::{get_spending, get_spending_exists, set_spending},
     user::{
         add_user, get_preferred_username, get_user_chats, get_user_exists, set_preferred_username,
@@ -46,6 +46,8 @@ pub enum CrudError {
     NoSuchPaymentError(),
     #[error("Spending computed to be negative")]
     NegativeSpendingError(),
+    #[error("Request limit exceeded")]
+    RequestLimitExceededError(),
 }
 
 // Implement the From trait to convert from RedisError to CrudError
@@ -530,10 +532,9 @@ pub fn retrieve_chat_spendings_currency(
  * Returns a boolean representing this status.
  * Automatically updates the request timestamp if not exceeded.
  */
-pub fn is_request_limit_exceeded(user_id: &str) -> Result<bool, CrudError> {
+pub fn is_request_limit_exceeded(user_id: &str, time_now: i64) -> Result<bool, CrudError> {
     let mut con = connect()?;
 
-    let time_now = chrono::Utc::now().timestamp();
     let timestamp = get_request(&mut con, user_id);
     let mut status = false;
 
@@ -1363,15 +1364,13 @@ mod tests {
         let user_id = "manager_test_user_35";
 
         // Checks that request limit is not exceeded
-        assert!(!is_request_limit_exceeded(user_id).unwrap());
+        assert!(!is_request_limit_exceeded(user_id, 1).unwrap());
 
         // Checks that request limit is exceeded
-        assert!(is_request_limit_exceeded(user_id).unwrap());
-
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        assert!(is_request_limit_exceeded(user_id, 1).unwrap());
 
         // Checks that request limit is not exceeded
-        assert!(!is_request_limit_exceeded(user_id).unwrap());
+        assert!(!is_request_limit_exceeded(user_id, 2).unwrap());
 
         // Deletes request
         let mut con = connect().unwrap();

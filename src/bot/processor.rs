@@ -7,11 +7,11 @@ use super::{
     redis::{
         add_payment_entry, delete_payment_entry, get_chat_balances, get_chat_balances_currency,
         get_chat_payments_details, get_currency_conversion, get_default_currency,
-        get_payment_entry, get_time_zone, get_valid_chat_currencies, retrieve_chat_spendings,
-        retrieve_chat_spendings_currency, set_currency_conversion, set_default_currency,
-        set_time_zone, update_chat, update_chat_balances, update_chat_spendings,
-        update_payment_entry, update_user, CrudError, Debt, Payment, UserBalance, UserPayment,
-        CURRENCY_CODE_DEFAULT,
+        get_payment_entry, get_time_zone, get_valid_chat_currencies, is_request_limit_exceeded,
+        retrieve_chat_spendings, retrieve_chat_spendings_currency, set_currency_conversion,
+        set_default_currency, set_time_zone, update_chat, update_chat_balances,
+        update_chat_spendings, update_payment_entry, update_user, CrudError, Debt, Payment,
+        UserBalance, UserPayment, CURRENCY_CODE_DEFAULT,
     },
 };
 
@@ -935,4 +935,18 @@ pub async fn update_chat_default_currency(
     update_balances(chat_id, changes)?;
 
     Ok(())
+}
+
+/* Asserts that a user has not exceeded the rate limit.
+ */
+pub fn assert_rate_limit(user_id: &str, timestamp: i64) -> Result<(), ProcessError> {
+    let status = is_request_limit_exceeded(user_id, timestamp)?;
+
+    if status {
+        Err(ProcessError::CrudError(
+            CrudError::RequestLimitExceededError(),
+        ))
+    } else {
+        Ok(())
+    }
 }
