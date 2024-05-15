@@ -19,7 +19,7 @@ use crate::bot::{
     State,
 };
 
-use super::utils::StatementOption;
+use super::utils::{assert_handle_request_limit, StatementOption};
 
 /* Utilities */
 
@@ -213,6 +213,10 @@ pub async fn action_view_spendings(
     dialogue: UserDialogue,
     msg: Message,
 ) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     let chat_id = msg.chat.id.to_string();
     let sender_id = msg.from().as_ref().unwrap().id.to_string();
     let is_convert = match get_chat_setting(&chat_id, ChatSetting::CurrencyConversion(None)) {

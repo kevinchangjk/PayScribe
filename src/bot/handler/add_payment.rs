@@ -19,6 +19,8 @@ use crate::bot::{
     processor::add_payment,
 };
 
+use super::utils::assert_handle_request_limit;
+
 /* Utilities */
 #[derive(Clone, Debug)]
 pub struct AddPaymentParams {
@@ -323,6 +325,10 @@ async fn call_processor_add_payment(
  * Does nothing, simply notifies the user.
  */
 pub async fn handle_repeated_add_payment(bot: Bot, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     bot.send_message(
         msg.chat.id,
         format!("🚫 Oops! It seems like you're already in the middle of adding a payment! Please finish or {COMMAND_CANCEL} this before starting another one with me."),
@@ -334,6 +340,10 @@ pub async fn handle_repeated_add_payment(bot: Bot, msg: Message) -> HandlerResul
  * Can be called at any step of the process.
  */
 pub async fn cancel_add_payment(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     bot.send_message(msg.chat.id, CANCEL_MESSAGE).await?;
     dialogue.exit().await?;
     Ok(())
@@ -343,6 +353,10 @@ pub async fn cancel_add_payment(bot: Bot, dialogue: UserDialogue, msg: Message) 
  * Called when user attempts to start another operation in the middle of adding a payment.
  */
 pub async fn block_add_payment(bot: Bot, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     bot.send_message(
         msg.chat.id,
         format!("🚫 Oops! It seems like you're in the middle of adding a payment! Please finish or {COMMAND_CANCEL} this before starting something new with me."),
@@ -355,6 +369,10 @@ pub async fn block_add_payment(bot: Bot, msg: Message) -> HandlerResult {
  * before presenting the compiled information for confirmation with a menu.
  */
 pub async fn action_add_payment(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     bot.send_message(
         msg.chat.id,
         format!(

@@ -21,7 +21,7 @@ use crate::bot::{
 use super::{
     action_delete_payment, action_edit_payment, block_delete_payment, block_edit_payment,
     cancel_delete_payment, cancel_edit_payment, handle_repeated_delete_payment,
-    handle_repeated_edit_payment, SelectPaymentType,
+    handle_repeated_edit_payment, utils::assert_handle_request_limit, SelectPaymentType,
 };
 
 /* Utilities */
@@ -117,6 +117,10 @@ pub async fn handle_repeated_select_payment(
     msg: Message,
     (_payments, _page, function): (Vec<Payment>, usize, SelectPaymentType),
 ) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     match function {
         SelectPaymentType::EditPayment => {
             handle_repeated_edit_payment(bot, msg).await?;
@@ -137,6 +141,10 @@ pub async fn cancel_select_payment(
     msg: Message,
     (_payments, _page, function): (Vec<Payment>, usize, SelectPaymentType),
 ) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     match function {
         SelectPaymentType::EditPayment => {
             cancel_edit_payment(bot, dialogue, msg).await?;
@@ -156,6 +164,10 @@ pub async fn block_select_payment(
     msg: Message,
     (_payments, _page, function): (Vec<Payment>, usize, SelectPaymentType),
 ) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     match function {
         SelectPaymentType::EditPayment => {
             block_edit_payment(bot, msg).await?;
@@ -172,6 +184,10 @@ pub async fn block_select_payment(
  * Then, presents a previous and next page button for the user to navigate the pagination.
  */
 pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     let chat_id = msg.chat.id.to_string();
     let user = msg.from();
     if let Some(user) = user {

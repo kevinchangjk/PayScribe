@@ -16,7 +16,7 @@ use crate::bot::{
     processor::delete_payment,
 };
 
-use super::utils::retrieve_time_zone;
+use super::utils::{assert_handle_request_limit, retrieve_time_zone};
 
 /* Utilities */
 
@@ -64,6 +64,10 @@ pub async fn block_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
  * Called when user attempts to delete payment without first viewing anything.
  */
 pub async fn no_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     bot.send_message(
         msg.chat.id,
         format!("Uh-oh! ❌ Sorry, please {COMMAND_VIEW_PAYMENTS} before deleting them!"),

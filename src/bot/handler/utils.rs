@@ -73,9 +73,10 @@ pub fn assert_handle_request_limit(msg: Message) -> bool {
     let request_status = assert_rate_limit(&user_id, timestamp);
     if let Err(_) = request_status {
         log::error!(
-            "Rate limit exceeded for user: {} in chat: {}",
+            "Rate limit exceeded for user: {} in chat: {}, with message timestamp: {}",
             user_id,
-            msg.chat.id
+            msg.chat.id,
+            timestamp
         );
         false
     } else {

@@ -25,6 +25,8 @@ use crate::bot::{
     processor::edit_payment,
 };
 
+use super::utils::assert_handle_request_limit;
+
 /* Utilities */
 #[derive(Clone, Debug)]
 pub struct EditPaymentParams {
@@ -255,6 +257,10 @@ pub async fn block_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
  * Called when user attempts to edit payment without first viewing anything.
  */
 pub async fn no_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     bot.send_message(
         msg.chat.id,
         format!("Uh-oh! ❌ Sorry, please {COMMAND_VIEW_PAYMENTS} before editing them!"),

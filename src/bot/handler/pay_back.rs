@@ -17,6 +17,8 @@ use crate::bot::{
     processor::add_payment,
 };
 
+use super::utils::assert_handle_request_limit;
+
 /* Utilities */
 #[derive(Clone, Debug)]
 pub struct PayBackParams {
@@ -142,6 +144,10 @@ async fn call_processor_pay_back(
  * Does nothing, simply notifies the user.
  */
 pub async fn handle_repeated_pay_back(bot: Bot, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     bot.send_message(
         msg.chat.id,
         format!("🚫 Oops! It seems like you're already in the middle of paying back! Please finish or {COMMAND_CANCEL} this before starting another one with me."),
@@ -153,6 +159,10 @@ pub async fn handle_repeated_pay_back(bot: Bot, msg: Message) -> HandlerResult {
  * Can be called at any step of the process.
  */
 pub async fn cancel_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     bot.send_message(msg.chat.id, CANCEL_MESSAGE).await?;
     dialogue.exit().await?;
     Ok(())
@@ -162,6 +172,10 @@ pub async fn cancel_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
  * Called when user attempts to start another operation in the middle of adding a payment.
  */
 pub async fn block_pay_back(bot: Bot, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     bot.send_message(
         msg.chat.id,
         format!("🚫 Oops! It seems like you're in the middle of paying back! Please finish or {COMMAND_CANCEL} this before starting something new with me."),
@@ -173,6 +187,10 @@ pub async fn block_pay_back(bot: Bot, msg: Message) -> HandlerResult {
  * Entrypoint to the dialogue sequence.
  */
 pub async fn action_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     let buttons = vec!["Cancel", "Skip", "Set Currency"];
     let keyboard = make_keyboard(buttons, Some(3));
     bot.send_message(

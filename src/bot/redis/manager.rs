@@ -540,7 +540,7 @@ pub fn is_request_limit_exceeded(user_id: &str, time_now: i64) -> Result<bool, C
 
     match timestamp {
         Ok(timestamp) => {
-            if time_now - timestamp < 1 {
+            if time_now <= timestamp {
                 status = true;
             }
         }

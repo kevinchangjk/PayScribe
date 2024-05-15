@@ -941,7 +941,6 @@ pub async fn update_chat_default_currency(
  */
 pub fn assert_rate_limit(user_id: &str, timestamp: i64) -> Result<(), ProcessError> {
     let status = is_request_limit_exceeded(user_id, timestamp)?;
-
     if status {
         Err(ProcessError::CrudError(
             CrudError::RequestLimitExceededError(),

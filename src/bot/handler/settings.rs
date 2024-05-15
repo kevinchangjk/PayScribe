@@ -20,7 +20,7 @@ use crate::bot::{
     processor::{get_chat_setting, set_chat_setting, update_chat_default_currency, ChatSetting},
 };
 
-use super::constants::UNKNOWN_ERROR_MESSAGE;
+use super::{constants::UNKNOWN_ERROR_MESSAGE, utils::assert_handle_request_limit};
 
 /* Utilities */
 const CANCEL_MESSAGE: &str = "Okay! No changes to my settings have been made! 🌟";
@@ -63,6 +63,10 @@ async fn display_settings_menu(
  * Does nothing, simply notifies the user.
  */
 pub async fn handle_repeated_settings(bot: Bot, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     bot.send_message(
         msg.chat.id,
         format!("🚫 Oops! It seems like you're already in the middle of customizing my settings! Please finish or {COMMAND_CANCEL} this before starting another one with me."),
@@ -74,6 +78,10 @@ pub async fn handle_repeated_settings(bot: Bot, msg: Message) -> HandlerResult {
  * Can be called at any step of the process.
  */
 pub async fn cancel_settings(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     bot.send_message(msg.chat.id, CANCEL_MESSAGE).await?;
     dialogue.exit().await?;
     Ok(())
@@ -83,6 +91,10 @@ pub async fn cancel_settings(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
  * Called when user attempts to start another operation in the middle of editing/deleting a payment.
  */
 pub async fn block_settings(bot: Bot, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     bot.send_message(
         msg.chat.id,
         format!("🚫 Oops! It seems like you're in the middle of customizing my settings! Please finish or {COMMAND_CANCEL} this before starting something new with me."),
@@ -94,6 +106,10 @@ pub async fn block_settings(bot: Bot, msg: Message) -> HandlerResult {
  * Bot presents a button menu of setting options.
  */
 pub async fn action_settings(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     let chat_id = msg.chat.id.to_string();
     display_settings_menu(bot, dialogue, chat_id, None).await?;
     Ok(())

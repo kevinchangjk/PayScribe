@@ -13,7 +13,10 @@ use crate::bot::{
     State,
 };
 
-use super::{constants::STATEMENT_INSTRUCTIONS_MESSAGE, utils::make_keyboard};
+use super::{
+    constants::STATEMENT_INSTRUCTIONS_MESSAGE,
+    utils::{assert_handle_request_limit, make_keyboard},
+};
 
 /* Utilities */
 
@@ -168,6 +171,10 @@ async fn handle_balances_with_option(
 /* View the balances for the group.
 */
 pub async fn action_view_balances(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     let chat_id = msg.chat.id.to_string();
     let sender_id = msg.from().as_ref().unwrap().id.to_string();
     let is_convert = match get_chat_setting(&chat_id, ChatSetting::CurrencyConversion(None)) {
