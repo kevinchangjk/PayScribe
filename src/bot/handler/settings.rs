@@ -39,7 +39,7 @@ async fn display_settings_menu(
     let buttons = vec!["🕔", "💵", "↔️", "Cancel"];
     let keyboard = make_keyboard(buttons, Some(2));
     let message = format!(
-        "Of course\\! Let's see, here are the settings you can customize\\. What would you like to view or edit?\n\n{TIME_ZONE_DESCRIPTION}\n{DEFAULT_CURRENCY_DESCRIPTION}\n{CURRENCY_CONVERSION_DESCRIPTION}",
+        "With pleasure\\! Let's see, here are the settings you can customize\\. What would you like to view or edit?\n\n{TIME_ZONE_DESCRIPTION}\n\n{DEFAULT_CURRENCY_DESCRIPTION}\n\n{CURRENCY_CONVERSION_DESCRIPTION}",
         );
     match msg_id {
         Some(id) => {
