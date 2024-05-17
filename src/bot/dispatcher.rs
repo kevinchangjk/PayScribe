@@ -12,7 +12,7 @@ use super::currency::Currency;
  * Bot states, commands, and control flow are defined here.
  */
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub enum State {
     #[default]
     Start,

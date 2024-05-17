@@ -38,7 +38,8 @@ pub const COMMAND_EDIT_PAYMENT: &str = "/editpayment";
 pub const COMMAND_DELETE_PAYMENT: &str = "/deletepayment";
 pub const COMMAND_BALANCES: &str = "/balances";
 pub const COMMAND_SPENDINGS: &str = "/spendings";
-pub const WEBSITE_URL: &str = "https://payscribe.super.site/";
+pub const USER_GUIDE_URL: &str = "https://payscribe.super.site/user-guide";
+pub const FEEDBACK_URL: &str = "https://payscribe.super.site/feedback";
 
 // List of all supported time zones
 pub fn all_time_zones() -> HashMap<String, Tz> {

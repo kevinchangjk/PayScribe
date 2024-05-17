@@ -264,7 +264,7 @@ pub fn make_keyboard(options: Vec<&str>, columns: Option<usize>) -> InlineKeyboa
 // Make debt selection keyboard
 pub fn make_keyboard_debt_selection() -> InlineKeyboardMarkup {
     let buttons = vec!["Equal", "Exact", "Proportion"];
-    make_keyboard(buttons, Some(3))
+    make_keyboard(buttons, Some(1))
 }
 
 // Displays a username with the '@' symbol.

@@ -97,7 +97,7 @@ async fn display_add_overview(
     payment: AddPaymentParams,
 ) -> HandlerResult {
     let buttons = vec!["Cancel", "Edit", "Confirm"];
-    let keyboard = make_keyboard(buttons, Some(3));
+    let keyboard = make_keyboard(buttons, Some(2));
 
     bot.send_message(payment.chat_id.clone(), format!("Here's what I've got so far! 📝\n\n{}Do you want to confirm this entry or would you like to make any changes?", display_add_payment(&payment)))
         .reply_markup(keyboard)

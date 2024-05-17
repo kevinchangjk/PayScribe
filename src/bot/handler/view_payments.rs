@@ -139,20 +139,28 @@ pub async fn cancel_select_payment(
     bot: Bot,
     dialogue: UserDialogue,
     msg: Message,
-    (_payments, _page, function): (Vec<Payment>, usize, SelectPaymentType),
+    state: State,
 ) -> HandlerResult {
     if !assert_handle_request_limit(msg.clone()) {
         return Ok(());
     }
 
-    match function {
-        SelectPaymentType::EditPayment => {
-            cancel_edit_payment(bot, dialogue, msg).await?;
-        }
-        SelectPaymentType::DeletePayment => {
-            cancel_delete_payment(bot, dialogue, msg).await?;
+    if let State::SelectPayment {
+        payments: _,
+        page: _,
+        ref function,
+    } = state
+    {
+        match function {
+            SelectPaymentType::EditPayment => {
+                cancel_edit_payment(bot, dialogue, msg, state).await?;
+            }
+            SelectPaymentType::DeletePayment => {
+                cancel_delete_payment(bot, dialogue, msg, state).await?;
+            }
         }
     }
+
     Ok(())
 }
 
@@ -389,6 +397,7 @@ pub async fn action_select_payment_number(
     bot: Bot,
     dialogue: UserDialogue,
     query: CallbackQuery,
+    state: State,
     (payments, page, function): (Vec<Payment>, usize, SelectPaymentType),
 ) -> HandlerResult {
     if let Some(button) = &query.data {
@@ -397,13 +406,7 @@ pub async fn action_select_payment_number(
         if let Some(Message { id, chat, .. }) = &query.message {
             match button.as_str() {
                 "Cancel" => {
-                    cancel_select_payment(
-                        bot,
-                        dialogue,
-                        query.message.unwrap(),
-                        (payments, page, function),
-                    )
-                    .await?;
+                    cancel_select_payment(bot, dialogue, query.message.unwrap(), state).await?;
                 }
                 num => {
                     let parsing = num.parse::<usize>();

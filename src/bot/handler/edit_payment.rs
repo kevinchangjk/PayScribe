@@ -236,9 +236,48 @@ pub async fn handle_repeated_edit_payment(bot: Bot, msg: Message) -> HandlerResu
 /* Cancels the edit payment operation.
  * Can be called at any step of the process.
  */
-pub async fn cancel_edit_payment(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+pub async fn cancel_edit_payment(
+    bot: Bot,
+    dialogue: UserDialogue,
+    msg: Message,
+    state: State,
+) -> HandlerResult {
     bot.send_message(msg.chat.id, CANCEL_MESSAGE).await?;
-    dialogue.exit().await?;
+
+    match state {
+        State::SelectPayment {
+            payments,
+            page,
+            function: _,
+        }
+        | State::EditPayment {
+            payment: _,
+            edited_payment: _,
+            payments,
+            page,
+        }
+        | State::EditPaymentDebtSelection {
+            payment: _,
+            edited_payment: _,
+            payments,
+            page,
+        }
+        | State::EditPaymentDetails {
+            payment: _,
+            edited_payment: _,
+            edit: _,
+            payments,
+            page,
+        } => {
+            dialogue
+                .update(State::ViewPayments { payments, page })
+                .await?;
+        }
+        _ => {
+            dialogue.exit().await?;
+        }
+    }
+
     Ok(())
 }
 

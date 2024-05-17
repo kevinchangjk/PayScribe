@@ -43,9 +43,30 @@ pub async fn cancel_delete_payment(
     bot: Bot,
     dialogue: UserDialogue,
     msg: Message,
+    state: State,
 ) -> HandlerResult {
     bot.send_message(msg.chat.id, CANCEL_MESSAGE).await?;
-    dialogue.exit().await?;
+
+    match state {
+        State::SelectPayment {
+            payments,
+            page,
+            function: _,
+        }
+        | State::DeletePayment {
+            payment: _,
+            payments,
+            page,
+        } => {
+            dialogue
+                .update(State::ViewPayments { payments, page })
+                .await?;
+        }
+        _ => {
+            dialogue.exit().await?;
+        }
+    }
+
     Ok(())
 }
 

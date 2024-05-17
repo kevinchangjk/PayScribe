@@ -58,7 +58,7 @@ async fn display_pay_back_overview(
     payment: PayBackParams,
 ) -> HandlerResult {
     let buttons = vec!["Cancel", "Edit", "Confirm"];
-    let keyboard = make_keyboard(buttons, Some(3));
+    let keyboard = make_keyboard(buttons, Some(2));
 
     bot.send_message(payment.chat_id.clone(), display_pay_back_entry(&payment))
         .reply_markup(keyboard)
@@ -192,7 +192,7 @@ pub async fn action_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
     }
 
     let buttons = vec!["Cancel", "Skip", "Set Currency"];
-    let keyboard = make_keyboard(buttons, Some(3));
+    let keyboard = make_keyboard(buttons, Some(2));
     bot.send_message(
         msg.chat.id,
         format!("Absolutely! Would you like to set a currency for this payment? You can also choose to skip this step."),
@@ -402,7 +402,7 @@ pub async fn action_pay_back_confirm(
             "Edit" => {
                 if let Some(Message { id, chat, .. }) = query.message {
                     let buttons = vec!["Cancel", "Skip", "Set Currency"];
-                    let keyboard = make_keyboard(buttons, Some(3));
+                    let keyboard = make_keyboard(buttons, Some(2));
                     bot.edit_message_text(
                         chat.id,
                         id,
