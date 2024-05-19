@@ -19,7 +19,7 @@ use crate::bot::{
     processor::add_payment,
 };
 
-use super::utils::assert_handle_request_limit;
+use super::utils::{assert_handle_request_limit, send_bot_message};
 
 /* Utilities */
 #[derive(Clone, Debug)]
@@ -92,14 +92,15 @@ fn display_add_payment(payment: &AddPaymentParams) -> String {
  * Is not a normal endpoint function, just a temporary transition function.
  */
 async fn display_add_overview(
-    bot: Bot,
-    dialogue: UserDialogue,
+    bot: &Bot,
+    dialogue: &UserDialogue,
+    msg: &Message,
     payment: AddPaymentParams,
 ) -> HandlerResult {
     let buttons = vec!["Cancel", "Edit", "Confirm"];
     let keyboard = make_keyboard(buttons, Some(2));
 
-    bot.send_message(payment.chat_id.clone(), format!("Here's what I've got so far! 📝\n\n{}Do you want to confirm this entry or would you like to make any changes?", display_add_payment(&payment)))
+    send_bot_message(&bot, &msg, format!("Here's what I've got so far! 📝\n\n{}Do you want to confirm this entry or would you like to make any changes?", display_add_payment(&payment)))
         .reply_markup(keyboard)
         .await?;
     dialogue.update(State::AddConfirm { payment }).await?;
@@ -158,8 +159,7 @@ async fn handle_debts(
                 payment.total,
             );
             if let Err(err) = debts {
-                bot.send_message(msg.chat.id, format!("{}\n\n{error_msg}", err.to_string()))
-                    .await?;
+                send_bot_message(&bot, &msg, format!("{}\n\n{error_msg}", err.to_string())).await?;
                 return Ok(());
             }
 
@@ -175,10 +175,10 @@ async fn handle_debts(
                 debts: Some(debts?),
             };
 
-            display_add_overview(bot, dialogue, new_payment).await?;
+            display_add_overview(&bot, &dialogue, &msg, new_payment).await?;
         }
         None => {
-            bot.send_message(msg.chat.id, error_msg).await?;
+            send_bot_message(&bot, &msg, error_msg.to_string()).await?;
         }
     }
     Ok(())
@@ -329,8 +329,8 @@ pub async fn handle_repeated_add_payment(bot: Bot, msg: Message) -> HandlerResul
         return Ok(());
     }
 
-    bot.send_message(
-        msg.chat.id,
+    send_bot_message(&bot,
+        &msg,
         format!("🚫 Oops! It seems like you're already in the middle of adding a payment! Please finish or {COMMAND_CANCEL} this before starting another one with me."),
         ).await?;
     Ok(())
@@ -344,7 +344,7 @@ pub async fn cancel_add_payment(bot: Bot, dialogue: UserDialogue, msg: Message) 
         return Ok(());
     }
 
-    bot.send_message(msg.chat.id, CANCEL_MESSAGE).await?;
+    send_bot_message(&bot, &msg, CANCEL_MESSAGE.to_string()).await?;
     dialogue.exit().await?;
     Ok(())
 }
@@ -357,8 +357,9 @@ pub async fn block_add_payment(bot: Bot, msg: Message) -> HandlerResult {
         return Ok(());
     }
 
-    bot.send_message(
-        msg.chat.id,
+    send_bot_message(
+        &bot,
+        &msg,
         format!("🚫 Oops! It seems like you're in the middle of adding a payment! Please finish or {COMMAND_CANCEL} this before starting something new with me."),
         ).await?;
     Ok(())
@@ -373,8 +374,9 @@ pub async fn action_add_payment(bot: Bot, dialogue: UserDialogue, msg: Message) 
         return Ok(());
     }
 
-    bot.send_message(
-        msg.chat.id,
+    send_bot_message(
+        &bot,
+        &msg,
         format!(
             "Absolutely, let's get started! 🙌\n\n📝 What's the description for this new payment?"
         ),
@@ -400,7 +402,7 @@ pub async fn action_add_description(
                     let username = parse_username(username);
 
                     if let Err(err) = &username {
-                        bot.send_message(msg.chat.id, UNKNOWN_ERROR_MESSAGE).await?;
+                        send_bot_message(&bot, &msg, UNKNOWN_ERROR_MESSAGE.to_string()).await?;
 
                         // Logging
                         log::error!(
@@ -421,8 +423,9 @@ pub async fn action_add_description(
                         total: None,
                         debts: None,
                     };
-                    bot.send_message(
-                        msg.chat.id,
+                    send_bot_message(
+                        &bot,
+                        &msg,
                         format!(
                             "{}Awesome! What's the Telegram username of the one who paid?",
                             display_add_payment(&payment)
@@ -434,8 +437,7 @@ pub async fn action_add_description(
             }
         }
         None => {
-            bot.send_message(msg.chat.id, format!("{NO_TEXT_MESSAGE}"))
-                .await?;
+            send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}")).await?;
         }
     }
     Ok(())
@@ -455,8 +457,7 @@ pub async fn action_add_creditor(
             let text = parse_username(text);
 
             if let Err(err) = text {
-                bot.send_message(msg.chat.id, format!("{}", err.to_string()))
-                    .await?;
+                send_bot_message(&bot, &msg, err.to_string()).await?;
                 return Ok(());
             }
 
@@ -471,8 +472,9 @@ pub async fn action_add_creditor(
                 total: None,
                 debts: None,
             };
-            bot.send_message(
-                msg.chat.id,
+            send_bot_message(
+                &bot,
+                &msg,
                 format!(
                     "{}Nice! How much was the total amount?\n\n{TOTAL_INSTRUCTIONS_MESSAGE}",
                     display_add_payment(&new_payment)
@@ -486,8 +488,7 @@ pub async fn action_add_creditor(
                 .await?;
         }
         None => {
-            bot.send_message(msg.chat.id, format!("{NO_TEXT_MESSAGE}"))
-                .await?;
+            send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}")).await?;
         }
     }
     Ok(())
@@ -518,8 +519,9 @@ pub async fn action_add_total(
                         total: Some(total),
                         debts: None,
                     };
-                    bot.send_message(
-                        msg.chat.id,
+                    send_bot_message(
+                        &bot,
+                        &msg,
                         format!(
                             "{}Fantastic! How are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
                             display_add_payment(&new_payment)
@@ -534,8 +536,9 @@ pub async fn action_add_total(
                         .await?;
                 }
                 Err(err) => {
-                    bot.send_message(
-                        msg.chat.id,
+                    send_bot_message(
+                        &bot,
+                        &msg,
                         format!("{}\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string()),
                     )
                     .await?;
@@ -544,8 +547,7 @@ pub async fn action_add_total(
             }
         }
         None => {
-            bot.send_message(msg.chat.id, format!("{NO_TEXT_MESSAGE}"))
-                .await?;
+            send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}")).await?;
         }
     }
     Ok(())
@@ -689,12 +691,14 @@ pub async fn action_add_edit_menu(
     if let Some(button) = &query.data {
         bot.answer_callback_query(query.id.to_string()).await?;
 
-        if let Some(Message { id, chat, .. }) = query.message {
+        if let Some(msg) = query.message {
             let payment_clone = payment.clone();
+            let chat_id = msg.chat.id;
+            let id = msg.id;
             match button.as_str() {
                 "Description" => {
                     bot.edit_message_text(
-                        chat.id,
+                        chat_id,
                         id,
                         format!(
                             "Current description: {}\n\nWhat should the description be?",
@@ -711,7 +715,7 @@ pub async fn action_add_edit_menu(
                 }
                 "Payer" => {
                     bot.edit_message_text(
-                        chat.id,
+                        chat_id,
                         id,
                         format!(
                             "Current payer: {}\n\nWho should the payer be?",
@@ -728,7 +732,7 @@ pub async fn action_add_edit_menu(
                 }
                 "Total" => {
                     bot.edit_message_text(
-                        chat.id,
+                        chat_id,
                         id,
                         format!(
                             "Current total: {}\n\nWhat should the total be?\n\n{TOTAL_INSTRUCTIONS_MESSAGE}",
@@ -745,7 +749,7 @@ pub async fn action_add_edit_menu(
                 }
                 "Split" => {
                     bot.edit_message_text(
-                        chat.id,
+                        chat_id,
                         id,
                         format!(
                             "Current split:\n{}\nHow should we split this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
@@ -756,7 +760,7 @@ pub async fn action_add_edit_menu(
                     dialogue.update(State::AddDebtSelection { payment }).await?;
                 }
                 "Back" => {
-                    display_add_overview(bot, dialogue, payment).await?;
+                    display_add_overview(&bot, &dialogue, &msg, payment).await?;
                 }
                 _ => {
                     log::error!("Add Payment Edit Menu - Invalid button for user {} in chat {} with payment {:?}: {}",
@@ -793,13 +797,13 @@ pub async fn action_add_edit(
                     total: payment.total,
                     debts: payment.debts,
                 };
-                display_add_overview(bot, dialogue, new_payment).await?;
+                display_add_overview(&bot, &dialogue, &msg, new_payment).await?;
             }
             AddPaymentEdit::Creditor => {
                 let username = parse_username(text);
 
                 if let Err(err) = username {
-                    bot.send_message(msg.chat.id, err.to_string()).await?;
+                    send_bot_message(&bot, &msg, err.to_string()).await?;
                     return Ok(());
                 }
 
@@ -814,7 +818,7 @@ pub async fn action_add_edit(
                     total: payment.total,
                     debts: payment.debts,
                 };
-                display_add_overview(bot, dialogue, new_payment).await?;
+                display_add_overview(&bot, &dialogue, &msg, new_payment).await?;
             }
             AddPaymentEdit::Total => {
                 let currency_amount = parse_currency_amount(text);
@@ -831,8 +835,8 @@ pub async fn action_add_edit(
                             total: Some(total),
                             debts: payment.debts,
                         };
-                        bot.send_message(
-                            msg.chat.id,
+                        send_bot_message(&bot,
+                            &msg,
                             format!("Fantastic! How are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",),
                             ).reply_markup(make_keyboard_debt_selection())
                             .await?;
@@ -843,8 +847,9 @@ pub async fn action_add_edit(
                             .await?;
                     }
                     Err(err) => {
-                        bot.send_message(
-                            msg.chat.id,
+                        send_bot_message(
+                            &bot,
+                            &msg,
                             format!("{}\n\n{TOTAL_INSTRUCTIONS_MESSAGE}", err.to_string()),
                         )
                         .await?;
@@ -863,8 +868,7 @@ pub async fn action_add_edit(
             }
         },
         None => {
-            bot.send_message(msg.chat.id, format!("{NO_TEXT_MESSAGE}"))
-                .await?;
+            send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}")).await?;
         }
     }
 

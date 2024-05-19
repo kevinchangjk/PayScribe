@@ -23,7 +23,7 @@ pub async fn invalid_state(_bot: Bot, msg: Message) -> HandlerResult {
     if is_service_msg {
         Ok(())
     } else {
-        // bot.send_message(msg.chat.id, format!("Sorry, I'm not intelligent enough to process that! 🤖\nPlease refer to {COMMAND_HELP} on how to use me!")).await?;
+        // send_bot_message(&bot, &msg, format!("Sorry, I'm not intelligent enough to process that! 🤖\nPlease refer to {COMMAND_HELP} on how to use me!")).await?;
         Ok(())
     }
 }
@@ -33,8 +33,9 @@ pub async fn invalid_state(_bot: Bot, msg: Message) -> HandlerResult {
  */
 pub async fn callback_invalid_message(_bot: Bot, _msg: Message) -> HandlerResult {
     /*
-    bot.send_message(
-        msg.chat.id,
+    send_bot_message(
+        &bot,
+        &msg
         "Hey, you don't have to text me...\nJust click on any of the buttons above 👆 to continue!",
     )
     .await?;

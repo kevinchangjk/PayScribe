@@ -8,8 +8,8 @@ use crate::bot::{
     handler::{
         constants::{STATEMENT_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE},
         utils::{
-            display_amount, display_username, get_currency, make_keyboard, HandlerResult,
-            UserDialogue,
+            display_amount, display_username, get_currency, make_keyboard, send_bot_message,
+            HandlerResult, UserDialogue,
         },
     },
     processor::{
@@ -61,6 +61,7 @@ fn display_spendings(spending_data: &SpendingData) -> String {
 async fn handle_spendings_with_option(
     bot: Bot,
     dialogue: UserDialogue,
+    msg: Message,
     chat_id: String,
     sender_id: String,
     option: StatementOption,
@@ -157,8 +158,9 @@ async fn handle_spendings_with_option(
                     .await?;
                 }
                 None => {
-                    bot.send_message(
-                        chat_id.clone(),
+                    send_bot_message(
+                        &bot,
+                        &msg,
                         format!(
                             "{}\n\n{}\n{}",
                             header,
@@ -190,8 +192,7 @@ async fn handle_spendings_with_option(
                         .await?;
                 }
                 None => {
-                    bot.send_message(chat_id.clone(), UNKNOWN_ERROR_MESSAGE)
-                        .await?;
+                    send_bot_message(&bot, &msg, UNKNOWN_ERROR_MESSAGE.to_string()).await?;
                 }
             }
             log::error!(
@@ -234,7 +235,7 @@ pub async fn action_view_spendings(
         StatementOption::Currency(default_currency.clone())
     };
 
-    handle_spendings_with_option(bot, dialogue, chat_id, sender_id, option, None).await?;
+    handle_spendings_with_option(bot, dialogue, msg, chat_id, sender_id, option, None).await?;
 
     Ok(())
 }
@@ -251,14 +252,16 @@ pub async fn action_spendings_menu(
         bot.answer_callback_query(query.id.to_string()).await?;
         let sender_id = query.from.id.to_string();
 
-        if let Some(Message { id, chat, .. }) = query.message {
-            let chat_id = chat.id.to_string();
+        if let Some(msg) = query.message {
+            let chat_id = msg.chat.id.to_string();
+            let id = msg.id;
             match button.as_str() {
                 _ if button.as_str().starts_with("Convert To ") => {
                     let option = StatementOption::ConvertCurrency;
                     handle_spendings_with_option(
                         bot,
                         dialogue,
+                        msg,
                         chat_id,
                         sender_id,
                         option,
@@ -271,6 +274,7 @@ pub async fn action_spendings_menu(
                     handle_spendings_with_option(
                         bot,
                         dialogue,
+                        msg,
                         chat_id,
                         sender_id,
                         option,
@@ -283,6 +287,7 @@ pub async fn action_spendings_menu(
                     handle_spendings_with_option(
                         bot,
                         dialogue,
+                        msg,
                         chat_id,
                         sender_id,
                         option,

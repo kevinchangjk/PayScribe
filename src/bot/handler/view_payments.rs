@@ -10,8 +10,8 @@ use crate::bot::{
     handler::{
         constants::{COMMAND_ADD_PAYMENT, UNKNOWN_ERROR_MESSAGE},
         utils::{
-            display_payment, get_currency, make_keyboard, retrieve_time_zone, HandlerResult,
-            UserDialogue,
+            display_payment, get_currency, make_keyboard, retrieve_time_zone, send_bot_message,
+            HandlerResult, UserDialogue,
         },
     },
     processor::{view_payments, ProcessError},
@@ -208,8 +208,9 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
                     .into_iter()
                     .map(|payment| unfold_payment(payment))
                     .collect();
-                bot.send_message(
-                    msg.chat.id,
+                send_bot_message(
+                    &bot,
+                    &msg,
                     format!(
                         "{HEADER_MESSAGE_FRONT}{}{HEADER_MESSAGE_BACK}{}",
                         &payments.len(),
@@ -232,7 +233,7 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
                     .await?;
             }
             Err(ProcessError::CrudError(CrudError::NoPaymentsError())) => {
-                bot.send_message(msg.chat.id, format!("😖 I can't find any payment records! But I'm always ready to help you get started with {COMMAND_ADD_PAYMENT}!"))
+                send_bot_message(&bot, &msg, format!("😖 I can't find any payment records! But I'm always ready to help you get started with {COMMAND_ADD_PAYMENT}!"))
                     .await?;
 
                 // Logging
@@ -245,8 +246,7 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
                 dialogue.exit().await?;
             }
             Err(err) => {
-                bot.send_message(msg.chat.id, format!("{UNKNOWN_ERROR_MESSAGE}"))
-                    .await?;
+                send_bot_message(&bot, &msg, format!("{UNKNOWN_ERROR_MESSAGE}")).await?;
 
                 // Logging
                 log::error!(
@@ -345,9 +345,13 @@ pub async fn action_select_payment_edit(
 ) -> HandlerResult {
     let keyboard = get_select_menu(page, &payments);
 
-    bot.send_message(msg.chat.id, "🙌 Which payment no. would you like to edit?")
-        .reply_markup(keyboard)
-        .await?;
+    send_bot_message(
+        &bot,
+        &msg,
+        "🙌 Which payment no. would you like to edit?".to_string(),
+    )
+    .reply_markup(keyboard)
+    .await?;
 
     dialogue
         .update(State::SelectPayment {
@@ -372,9 +376,10 @@ pub async fn action_select_payment_delete(
 ) -> HandlerResult {
     let keyboard = get_select_menu(page, &payments);
 
-    bot.send_message(
-        msg.chat.id,
-        "🙌 Which payment no. would you like to delete?",
+    send_bot_message(
+        &bot,
+        &msg,
+        "🙌 Which payment no. would you like to delete?".to_string(),
     )
     .reply_markup(keyboard)
     .await?;
@@ -403,7 +408,9 @@ pub async fn action_select_payment_number(
     if let Some(button) = &query.data {
         bot.answer_callback_query(query.id.to_string()).await?;
 
-        if let Some(Message { id, chat, .. }) = &query.message {
+        if let Some(msg) = &query.message {
+            let chat_id = msg.chat.id.to_string();
+            let id = msg.id;
             match button.as_str() {
                 "Cancel" => {
                     cancel_select_payment(bot, dialogue, query.message.unwrap(), state).await?;
@@ -419,8 +426,8 @@ pub async fn action_select_payment_number(
                                     action_edit_payment(
                                         bot,
                                         dialogue,
-                                        *id,
-                                        chat.id.to_string(),
+                                        msg,
+                                        id,
                                         (payments, page),
                                         index,
                                     )
@@ -430,8 +437,8 @@ pub async fn action_select_payment_number(
                                     action_delete_payment(
                                         bot,
                                         dialogue,
-                                        *id,
-                                        chat.id.to_string(),
+                                        msg,
+                                        id,
                                         (payments, page),
                                         index,
                                     )
@@ -447,7 +454,7 @@ pub async fn action_select_payment_number(
                             log::error!(
                                 "Select Payment Number - Invalid serial number {} in chat {}",
                                 serial_num,
-                                chat.id
+                                chat_id,
                             );
                         }
                     } else {
@@ -459,7 +466,7 @@ pub async fn action_select_payment_number(
                         log::error!(
                             "Select Payment Number - Invalid serial number {} in chat {}",
                             num,
-                            chat.id
+                            chat_id,
                         );
                     }
                 }
