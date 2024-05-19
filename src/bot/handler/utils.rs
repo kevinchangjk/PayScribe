@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use chrono::{DateTime, Local, NaiveDateTime};
 use chrono_tz::Tz;
 use regex::Regex;
@@ -385,7 +387,7 @@ pub fn parse_currency_amount(text: &str) -> Result<(i64, Currency), BotError> {
 
 // Parse and process a string to retrieve a list of debts, for split by equal amount.
 pub fn process_debts_equal(text: &str, total: Option<i64>) -> Result<Vec<(String, i64)>, BotError> {
-    let users = text.split_whitespace().collect::<Vec<&str>>();
+    let mut users = text.split_whitespace().collect::<Vec<&str>>();
     if users.len() == 0 {
         return Err(BotError::UserError(
             "Uh-oh! ❌ Please give me at least one username!".to_string(),
@@ -401,11 +403,25 @@ pub fn process_debts_equal(text: &str, total: Option<i64>) -> Result<Vec<(String
         }
     };
 
+    let mut accounted_users: HashSet<String> = HashSet::new();
+    let mut i = 0;
+    while i < users.len() {
+        let user = users[i];
+        if accounted_users.contains(&user.to_lowercase()) {
+            users.remove(i);
+        } else {
+            accounted_users.insert(user.to_lowercase());
+            i += 1;
+        }
+    }
+
     let amount = (total as f64 / users.len() as f64).round() as i64;
     let diff = total - amount * users.len() as i64;
+
     let mut debts: Vec<(String, i64)> = Vec::new();
     for user in &users {
-        let debt = (parse_username(user)?, amount);
+        let username = parse_username(user)?;
+        let debt = (username.clone(), amount);
         debts.push(debt);
     }
 
