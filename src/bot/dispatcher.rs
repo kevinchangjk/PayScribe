@@ -100,9 +100,9 @@ pub enum State {
 #[derive(BotCommands, Clone)]
 #[command(rename_rule = "lowercase")]
 pub enum Command {
-    #[command(description = "Starts me\\!")]
+    #[command(description = "Start me\\!")]
     Start,
-    #[command(description = "Shows this message")]
+    #[command(description = "Show this message")]
     Help,
     #[command(description = "Add a new payment")]
     AddPayment,
@@ -120,7 +120,7 @@ pub enum Command {
     Spendings,
     #[command(description = "View and edit my settings for everyone")]
     Settings,
-    #[command(description = "Cancels whatever I'm doing")]
+    #[command(description = "Cancel whatever I'm doing")]
     Cancel,
 }
 

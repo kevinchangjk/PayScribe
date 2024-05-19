@@ -30,7 +30,6 @@ pub const STATEMENT_INSTRUCTIONS_MESSAGE: &str =
     "⭐️ I can also present the other currencies/formats below!";
 pub const COMMAND_HELP: &str = "/help";
 pub const COMMAND_CANCEL: &str = "/cancel";
-pub const COMMAND_SETTINGS: &str = "/settings";
 pub const COMMAND_ADD_PAYMENT: &str = "/addpayment";
 pub const COMMAND_PAY_BACK: &str = "/payback";
 pub const COMMAND_VIEW_PAYMENTS: &str = "/viewpayments";
