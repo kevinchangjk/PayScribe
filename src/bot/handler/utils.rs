@@ -518,12 +518,28 @@ pub fn process_debts_ratio(text: &str, total: Option<i64>) -> Result<Vec<(String
         ));
     }
 
-    for i in (0..items.len()).step_by(2) {
-        let username = parse_username(items[i])?;
-        let ratio = parse_float(items[i + 1])?;
+    let mut users: Vec<String> = Vec::new();
+    let mut ratios: Vec<f64> = Vec::new();
 
-        sum += ratio;
-        debts_ratioed.push((username, ratio));
+    for i in (0..items.len()).step_by(2) {
+        let pos = users
+            .iter()
+            .position(|u| u.to_lowercase() == items[i].to_lowercase());
+        match pos {
+            Some(pos) => {
+                ratios[pos] += parse_float(items[i + 1])?;
+            }
+            None => {
+                users.push(items[i].to_string());
+                ratios.push(parse_float(items[i + 1])?);
+            }
+        }
+    }
+
+    for i in 0..users.len() {
+        let username = parse_username(&users[i])?;
+        sum += ratios[i];
+        debts_ratioed.push((username, ratios[i]));
     }
 
     let total = match total {
