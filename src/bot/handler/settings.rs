@@ -253,7 +253,7 @@ pub async fn action_time_zone_menu(
                         msg.chat.id,
                         msg.id,
                         format!(
-                            "🕔 Time Zone: {}\n\nWhat time zone would you like to set? {TIME_ZONE_INSTRUCTIONS_MESSAGE}",
+                            "🕔 Time Zone: {}\n\nWhat time zone would you like to set?\n\n{TIME_ZONE_INSTRUCTIONS_MESSAGE}",
                             time_zone
                             ),
                             )

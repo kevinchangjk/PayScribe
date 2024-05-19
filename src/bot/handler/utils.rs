@@ -3,6 +3,9 @@ use chrono_tz::Tz;
 use regex::Regex;
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage, InMemStorageError},
+    payloads::SendMessage,
+    prelude::*,
+    requests::JsonRequest,
     types::{InlineKeyboardButton, InlineKeyboardMarkup, Message},
     RequestError,
 };
@@ -81,6 +84,18 @@ pub fn assert_handle_request_limit(msg: Message) -> bool {
         false
     } else {
         true
+    }
+}
+
+// Wrapper function to send bot message to specific thread, if available
+// Only replaces bot::send_message, as bot::edit_message_text edits specific msg ID
+pub fn send_bot_message(bot: &Bot, msg: &Message, text: String) -> JsonRequest<SendMessage> {
+    let thread_id = msg.thread_id;
+    match thread_id {
+        Some(thread_id) => bot
+            .send_message(msg.chat.id, text)
+            .message_thread_id(thread_id),
+        None => bot.send_message(msg.chat.id, text),
     }
 }
 

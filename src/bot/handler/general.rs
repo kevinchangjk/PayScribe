@@ -8,7 +8,7 @@ use super::{
         COMMAND_HELP, COMMAND_PAY_BACK, COMMAND_SETTINGS, COMMAND_SPENDINGS, COMMAND_VIEW_PAYMENTS,
         FEEDBACK_URL, USER_GUIDE_URL,
     },
-    utils::{assert_handle_request_limit, HandlerResult},
+    utils::{assert_handle_request_limit, send_bot_message, HandlerResult},
 };
 
 /* Invalid state.
@@ -50,7 +50,7 @@ pub async fn action_start(bot: Bot, msg: Message) -> HandlerResult {
         return Ok(());
     }
 
-    bot.send_message(msg.chat.id, format!("👋 Hello! I'm PayScribe! 😊\n\nJust type {COMMAND_HELP} to see what I can help you with, and let's dive right into tracking payments together!")).await?;
+    send_bot_message(&bot, &msg, format!("👋 Hello! I'm PayScribe! 😊\n\nJust type {COMMAND_HELP} to see what I can help you with, and let's dive right into tracking payments together!")).await?;
     Ok(())
 }
 
@@ -72,12 +72,14 @@ pub async fn action_help(bot: Bot, msg: Message) -> HandlerResult {
     let settings_info = &format!("⚙️ I've also got some group settings you can tweak with {COMMAND_SETTINGS}\\! For all the nitty\\-gritty details on supported time zones, currencies, and more, check out my [User Guide]({USER_GUIDE_URL})\\!");
     let feedback_info = &format!("💡 And if you have any feedback for me, I'd love to hear it through the feedback form over [here]({FEEDBACK_URL})\\!");
 
-    bot.send_message(
-        msg.chat.id,
+    send_bot_message(
+        &bot,
+        &msg,
         format!("{introduction}\n\n{add_info}\n\n{view_info}\n\n{payback_info}\n\n{settings_info}\n\n{feedback_info}\n\n⭐️ *My Commands* ⭐️\n\n{}", commands),
         )
         .parse_mode(ParseMode::MarkdownV2)
         .await?;
+
     Ok(())
 }
 
@@ -89,9 +91,10 @@ pub async fn action_cancel(bot: Bot, msg: Message) -> HandlerResult {
         return Ok(());
     }
 
-    bot.send_message(
-        msg.chat.id,
-        "I'm not doing anything... 👀\nThere's nothing to cancel!",
+    send_bot_message(
+        &bot,
+        &msg,
+        format!("I'm not doing anything... 👀\nThere's nothing to cancel!"),
     )
     .await?;
     Ok(())
