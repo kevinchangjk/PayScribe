@@ -14,7 +14,9 @@ use teloxide::{
 
 use crate::bot::{
     currency::{get_currency_from_code, get_default_currency, Currency, CURRENCY_DEFAULT},
-    processor::{assert_rate_limit, get_chat_setting, ChatSetting, ProcessError},
+    processor::{
+        assert_rate_limit, get_chat_setting, is_username_equal, ChatSetting, ProcessError,
+    },
     redis::Debt,
     State,
 };
@@ -522,9 +524,8 @@ pub fn process_debts_ratio(text: &str, total: Option<i64>) -> Result<Vec<(String
     let mut ratios: Vec<f64> = Vec::new();
 
     for i in (0..items.len()).step_by(2) {
-        let pos = users
-            .iter()
-            .position(|u| u.to_lowercase() == items[i].to_lowercase());
+        let curr = parse_username(items[i])?;
+        let pos = users.iter().position(|u| is_username_equal(u, &curr));
         match pos {
             Some(pos) => {
                 ratios[pos] += parse_float(items[i + 1])?;
@@ -537,9 +538,9 @@ pub fn process_debts_ratio(text: &str, total: Option<i64>) -> Result<Vec<(String
     }
 
     for i in 0..users.len() {
-        let username = parse_username(&users[i])?;
+        let username = &users[i];
         sum += ratios[i];
-        debts_ratioed.push((username, ratios[i]));
+        debts_ratioed.push((username.to_string(), ratios[i]));
     }
 
     let total = match total {
@@ -597,7 +598,7 @@ pub fn parse_debts_payback(
     for i in (0..items.len()).step_by(2) {
         let username = parse_username(items[i])?;
         let amount = parse_amount(items[i + 1], currency.1)?;
-        if username.to_lowercase() == sender.to_lowercase() {
+        if is_username_equal(&username, sender) {
             return Err(BotError::UserError(
                 "Uh-oh! ❌ You can't pay back yourself!".to_string(),
             ));

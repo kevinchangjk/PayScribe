@@ -129,47 +129,52 @@ async fn call_processor_edit_payment(
     page: usize,
     query: CallbackQuery,
 ) -> HandlerResult {
-    if let Some(Message { id, chat, .. }) = query.message {
-        let chat_id = chat.id.to_string();
+    if let Some(msg) = query.message {
+        let id = msg.id;
+        let chat_id = msg.chat.id.to_string();
         let edited_clone = edited_payment.clone();
-        let edited = edit_payment(
-            &chat_id,
-            &payment.payment_id,
-            edited_payment.description.as_deref(),
-            edited_payment.creditor.as_deref(),
-            edited_payment.currency.clone().unzip().0.as_deref(),
-            edited_payment.total.as_ref(),
-            edited_payment.debts,
-        )
-        .await;
+        let user = msg.from();
+        if let Some(user) = user {
+            let edited = edit_payment(
+                &chat_id,
+                user.clone().username.unwrap_or("".to_string()),
+                user.id.to_string(),
+                &payment.payment_id,
+                edited_payment.description.as_deref(),
+                edited_payment.creditor.as_deref(),
+                edited_payment.currency.clone().unzip().0.as_deref(),
+                edited_payment.total.as_ref(),
+                edited_payment.debts,
+            )
+            .await;
 
-        match edited {
-            Ok(balances) => {
-                let edit_overview = display_edit_payment(payment.clone(), edited_clone);
-                match balances {
-                    Some(balances) => {
-                        bot.edit_message_text(
-                            chat_id.clone(),
-                            id,
-                            format!(
-                                "🎉 Yay! I've edited the payment! 🎉\n\n{}\n{}{}",
-                                edit_overview,
-                                display_balance_header(
-                                    &chat_id,
-                                    edited_payment
-                                        .currency
-                                        .unzip()
-                                        .0
-                                        .as_deref()
-                                        .unwrap_or(&payment.currency.0)
+            match edited {
+                Ok(balances) => {
+                    let edit_overview = display_edit_payment(payment.clone(), edited_clone);
+                    match balances {
+                        Some(balances) => {
+                            bot.edit_message_text(
+                                chat_id.clone(),
+                                id,
+                                format!(
+                                    "🎉 Yay! I've edited the payment! 🎉\n\n{}\n{}{}",
+                                    edit_overview,
+                                    display_balance_header(
+                                        &chat_id,
+                                        edited_payment
+                                            .currency
+                                            .unzip()
+                                            .0
+                                            .as_deref()
+                                            .unwrap_or(&payment.currency.0)
+                                    ),
+                                    display_balances(&balances)
                                 ),
-                                display_balances(&balances)
-                            ),
-                        )
-                        .await?;
-                    }
-                    None => {
-                        bot.edit_message_text(
+                            )
+                            .await?;
+                        }
+                        None => {
+                            bot.edit_message_text(
                             chat_id.clone(),
                             id,
                             format!(
@@ -178,24 +183,24 @@ async fn call_processor_edit_payment(
                                 ),
                                 )
                             .await?;
+                        }
                     }
+
+                    // Logging
+                    log::info!(
+                        "Edit Payment Submission - payment edited for chat {} with payment {}",
+                        chat_id,
+                        edit_overview
+                    );
+
+                    dialogue
+                        .update(State::ViewPayments { payments, page })
+                        .await?;
                 }
-
-                // Logging
-                log::info!(
-                    "Edit Payment Submission - payment edited for chat {} with payment {}",
-                    chat_id,
-                    edit_overview
-                );
-
-                dialogue
-                    .update(State::ViewPayments { payments, page })
-                    .await?;
-            }
-            Err(err) => {
-                let time_zone = retrieve_time_zone(&chat_id);
-                bot.edit_message_text(
-                    chat.id,
+                Err(err) => {
+                    let time_zone = retrieve_time_zone(&chat_id);
+                    bot.edit_message_text(
+                    chat_id.clone(),
                     id,
                     format!(
                         "⁉️ Oh no! Something went wrong! 🥺 I'm sorry, but I can't edit the payment right now. Please try again later!\n\n"
@@ -203,17 +208,18 @@ async fn call_processor_edit_payment(
                 )
                 .await?;
 
-                // Logging
-                log::error!(
+                    // Logging
+                    log::error!(
                     "Edit Payment Submission - Processor failed to edit payment for chat {} with payment {}: {}",
                     chat_id,
                     display_payment(&payment, 1, time_zone),
                     err.to_string()
                     );
 
-                dialogue
-                    .update(State::ViewPayments { payments, page })
-                    .await?;
+                    dialogue
+                        .update(State::ViewPayments { payments, page })
+                        .await?;
+                }
             }
         }
     }

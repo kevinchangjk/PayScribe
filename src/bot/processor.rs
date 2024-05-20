@@ -57,6 +57,10 @@ impl From<CrudError> for ProcessError {
 }
 
 /* Utility functions */
+pub fn is_username_equal(first: &str, second: &str) -> bool {
+    first.to_lowercase() == second.to_lowercase()
+}
+
 fn auto_update_user(
     chat_id: &str,
     sender_id: &str,
@@ -89,6 +93,51 @@ async fn update_balances_debts(
     Ok(debts)
 }
 
+// Updates users and chat given payment details
+fn update_users_chat(
+    chat_id: &str,
+    sender_username: &str,
+    sender_id: &str,
+    creditor: Option<&str>,
+    debts: Option<Vec<(String, i64)>>,
+) -> Result<(), ProcessError> {
+    let mut all_users = vec![];
+
+    if let Some(creditor) = creditor {
+        all_users.push(creditor.to_string());
+    }
+
+    if let Some(debts) = debts {
+        for (user, _) in debts.iter() {
+            if is_username_equal(user, creditor.unwrap_or("")) {
+                continue;
+            }
+            all_users.push(user.to_string());
+        }
+    }
+
+    // Update all users included in payment
+    let mut is_sender_included = false;
+    for user in all_users.iter() {
+        if is_username_equal(user, sender_username) {
+            is_sender_included = true;
+            continue;
+        }
+        update_user(user, chat_id, None)?;
+    }
+
+    // Add message sender to the list of users
+    update_user(sender_username, chat_id, Some(sender_id))?;
+    if !is_sender_included {
+        all_users.push(sender_username.to_string());
+    }
+
+    // Update chat
+    update_chat(&chat_id, all_users)?;
+
+    Ok(())
+}
+
 /* Retrieves all valid currencies for a chat.
  * Valid currencies are currencies with some payments.
  */
@@ -113,33 +162,14 @@ pub async fn add_payment(
     total: i64,
     debts: Vec<(String, i64)>,
 ) -> Result<Vec<Debt>, ProcessError> {
-    let mut all_users = vec![creditor.to_string()];
-
-    for (user, _) in debts.iter() {
-        if user == &creditor {
-            continue;
-        }
-        all_users.push(user.to_string());
-    }
-
-    // Update all users included in payment
-    let mut is_sender_included = false;
-    for user in all_users.iter() {
-        if user == &sender_username {
-            is_sender_included = true;
-            continue;
-        }
-        update_user(user, &chat_id, None)?;
-    }
-
-    // Add message sender to the list of users
-    update_user(&sender_username, &chat_id, Some(&sender_id))?;
-    if !is_sender_included {
-        all_users.push(sender_username);
-    }
-
-    // Update chat
-    update_chat(&chat_id, all_users)?;
+    // Update users and chat
+    update_users_chat(
+        &chat_id,
+        &sender_username,
+        &sender_id,
+        Some(creditor),
+        Some(debts.clone()),
+    )?;
 
     // Add payment entry
     let payment = Payment {
@@ -211,6 +241,8 @@ pub fn view_payments(
  */
 pub async fn edit_payment(
     chat_id: &str,
+    sender_username: String,
+    sender_id: String,
     payment_id: &str,
     description: Option<&str>,
     creditor: Option<&str>,
@@ -220,6 +252,15 @@ pub async fn edit_payment(
 ) -> Result<Option<Vec<Debt>>, ProcessError> {
     // Get current payment entry
     let current_payment = get_payment_entry(payment_id)?;
+
+    // Update users and chat
+    update_users_chat(
+        &chat_id,
+        &sender_username,
+        &sender_id,
+        creditor,
+        debts.clone(),
+    )?;
 
     // Edit payment entry
     update_payment_entry(
