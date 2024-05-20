@@ -420,10 +420,19 @@ fn retrieve_debts_by_currency(chat_id: &str, currency: &str) -> Result<Vec<Debt>
         ChatSetting::DefaultCurrency(Some(curr)) => curr,
         _ => CURRENCY_CODE_DEFAULT.to_string(),
     };
-    if default_currency == currency && currency != CURRENCY_CODE_DEFAULT {
-        return retrieve_debts_by_default_currency(chat_id, currency);
+
+    // If currency is NIL, which is not default currency.
+    if currency == CURRENCY_CODE_DEFAULT && default_currency != CURRENCY_CODE_DEFAULT {
+        return retrieve_debts_by_default_currency(chat_id);
     }
 
+    // If currency is default currency, which is not NIL.
+    if default_currency == currency && currency != CURRENCY_CODE_DEFAULT {
+        return retrieve_debts_by_default_currency(chat_id);
+    }
+
+    // If currency is not NIL, and is not default currency.
+    // Also, if currency is NIL, and NIL is default currency.
     let balances = get_chat_balances_currency(chat_id, currency)?;
     let debts = optimize_debts(balances);
 
@@ -433,11 +442,12 @@ fn retrieve_debts_by_currency(chat_id: &str, currency: &str) -> Result<Vec<Debt>
 /* View debts of a group chat for the default currency.
  * Retrieves all balances, optimizes debts, and returns.
  */
-fn retrieve_debts_by_default_currency(
-    chat_id: &str,
-    currency: &str,
-) -> Result<Vec<Debt>, ProcessError> {
-    let mut balances_curr = get_chat_balances_currency(chat_id, currency)?;
+fn retrieve_debts_by_default_currency(chat_id: &str) -> Result<Vec<Debt>, ProcessError> {
+    let currency = match get_chat_setting(chat_id, ChatSetting::DefaultCurrency(None))? {
+        ChatSetting::DefaultCurrency(Some(curr)) => curr,
+        _ => CURRENCY_CODE_DEFAULT.to_string(),
+    };
+    let mut balances_curr = get_chat_balances_currency(chat_id, &currency)?;
     let balances_nil = get_chat_balances_currency(chat_id, CURRENCY_CODE_DEFAULT)?;
 
     for balance in balances_nil {
