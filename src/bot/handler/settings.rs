@@ -400,7 +400,7 @@ pub async fn action_default_currency_menu(
                             chat_id,
                             msg.id,
                             format!(
-                                "{currency_info}\n\nWhat would you like to set as the default currency? {CURRENCY_INSTRUCTIONS_MESSAGE}",
+                                "{currency_info}\n\nWhat would you like to set as the default currency?\n\n{CURRENCY_INSTRUCTIONS_MESSAGE}",
                                 ))
                             .await?;
                         dialogue.update(State::SettingsDefaultCurrency).await?;

@@ -597,7 +597,7 @@ pub fn parse_debts_payback(
     for i in (0..items.len()).step_by(2) {
         let username = parse_username(items[i])?;
         let amount = parse_amount(items[i + 1], currency.1)?;
-        if username == sender {
+        if username.to_lowercase() == sender.to_lowercase() {
             return Err(BotError::UserError(
                 "Uh-oh! ❌ You can't pay back yourself!".to_string(),
             ));

@@ -461,7 +461,7 @@ pub async fn action_edit_payment_confirm(
                         format!(
                             "Current split:\n{}\nHow should we split this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
                             display_debts(&edited_payment.debts.clone().unwrap_or(payment.debts.clone()), edited_payment.currency.clone().unwrap_or(payment.currency.clone()).1)
-                            ),
+                            )
                             ).reply_markup(make_keyboard_debt_selection())
                         .await?;
                     dialogue
