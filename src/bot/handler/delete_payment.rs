@@ -170,9 +170,9 @@ pub async fn action_delete_payment_confirm(
                                 chat_id.clone(),
                                 id,
                                 format!(
-                                    "🎉 Yay! I've deleted the payment! 🎉\n\n{}{}",
+                                    "🎉 I've deleted the payment! 🎉\n\n{}{}",
+                                    display_balance_header(&chat_id, &payment.currency.0),
                                     display_balances(&balances),
-                                    display_balance_header(&chat_id, &payment.currency.0)
                                 ),
                             )
                             .await?;

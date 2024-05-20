@@ -157,7 +157,7 @@ async fn call_processor_edit_payment(
                                 chat_id.clone(),
                                 id,
                                 format!(
-                                    "🎉 Yay! I've edited the payment! 🎉\n\n{}\n{}{}",
+                                    "🎉 I've edited the payment! 🎉\n\n{}\n{}{}",
                                     edit_overview,
                                     display_balance_header(
                                         &chat_id,
@@ -178,7 +178,7 @@ async fn call_processor_edit_payment(
                             chat_id.clone(),
                             id,
                             format!(
-                                "🎉 Yay! I've edited the payment! 🎉\n\n{}\nThere are no changes to the balances! 🥳",
+                                "🎉 I've edited the payment! 🎉\n\n{}\nThere are no changes to the balances! 🥳",
                                 edit_overview
                                 ),
                                 )

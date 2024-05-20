@@ -223,7 +223,7 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
     }
 
     if debts.is_empty() {
-        "Yay! No outstanding balances! 🥳".to_string()
+        "No outstanding balances! 🥳".to_string()
     } else {
         message
     }
