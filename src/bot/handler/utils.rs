@@ -427,8 +427,10 @@ pub fn process_debts_equal(text: &str, total: Option<i64>) -> Result<Vec<(String
         debts.push(debt);
     }
 
-    // Distribute the difference in amount to the first user (<= smallest denomination)
-    debts[0].1 += diff;
+    // Distribute the difference in amount to as many users as required through smallest denomination
+    for i in 0..(diff).abs() {
+        debts[i as usize].1 += if diff > 0 { 1 } else { -1 };
+    }
 
     Ok(debts)
 }
@@ -559,9 +561,11 @@ pub fn process_debts_ratio(text: &str, total: Option<i64>) -> Result<Vec<(String
         exact_sum += amount;
     }
 
-    // Distribute the difference in amount to the first user (<= smallest denomination)
+    // Distribute the difference in amount to as many users as required through smallest denomination
     let diff = total - exact_sum;
-    debts[0].1 += diff;
+    for i in 0..(diff).abs() {
+        debts[i as usize].1 += if diff > 0 { 1 } else { -1 };
+    }
 
     Ok(debts)
 }
