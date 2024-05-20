@@ -17,6 +17,8 @@ use crate::bot::{
     processor::add_payment,
 };
 
+use super::utils::{assert_handle_request_limit, send_bot_message};
+
 /* Utilities */
 #[derive(Clone, Debug)]
 pub struct PayBackParams {
@@ -38,11 +40,11 @@ fn display_pay_back_entry(payment: &PayBackParams) -> String {
     if actual_currency.0 == CURRENCY_DEFAULT.0 {
         currency_info = "".to_string();
     } else {
-        currency_info = format!("in {} ", actual_currency.0);
+        currency_info = format!(" in {} ", actual_currency.0);
     }
 
     format!(
-        "You've paid {}:\n{}",
+        "You've paid{}:\n{}",
         currency_info,
         display_debts(&payment.debts, actual_currency.1)
     )
@@ -51,14 +53,15 @@ fn display_pay_back_entry(payment: &PayBackParams) -> String {
 /* Displays an overview of the pay back entry, with a keyboard button menu.
 */
 async fn display_pay_back_overview(
-    bot: Bot,
-    dialogue: UserDialogue,
+    bot: &Bot,
+    msg: &Message,
+    dialogue: &UserDialogue,
     payment: PayBackParams,
 ) -> HandlerResult {
     let buttons = vec!["Cancel", "Edit", "Confirm"];
-    let keyboard = make_keyboard(buttons, Some(3));
+    let keyboard = make_keyboard(buttons, Some(2));
 
-    bot.send_message(payment.chat_id.clone(), display_pay_back_entry(&payment))
+    send_bot_message(&bot, &msg, display_pay_back_entry(&payment))
         .reply_markup(keyboard)
         .await?;
     dialogue.update(State::PayBackConfirm { payment }).await?;
@@ -142,8 +145,13 @@ async fn call_processor_pay_back(
  * Does nothing, simply notifies the user.
  */
 pub async fn handle_repeated_pay_back(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(
-        msg.chat.id,
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
+    send_bot_message(
+        &bot,
+        &msg,
         format!("🚫 Oops! It seems like you're already in the middle of paying back! Please finish or {COMMAND_CANCEL} this before starting another one with me."),
         ).await?;
     Ok(())
@@ -153,7 +161,11 @@ pub async fn handle_repeated_pay_back(bot: Bot, msg: Message) -> HandlerResult {
  * Can be called at any step of the process.
  */
 pub async fn cancel_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, CANCEL_MESSAGE).await?;
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
+    send_bot_message(&bot, &msg, CANCEL_MESSAGE.to_string()).await?;
     dialogue.exit().await?;
     Ok(())
 }
@@ -162,8 +174,13 @@ pub async fn cancel_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
  * Called when user attempts to start another operation in the middle of adding a payment.
  */
 pub async fn block_pay_back(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(
-        msg.chat.id,
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
+    send_bot_message(
+        &bot,
+        &msg,
         format!("🚫 Oops! It seems like you're in the middle of paying back! Please finish or {COMMAND_CANCEL} this before starting something new with me."),
         ).await?;
     Ok(())
@@ -173,10 +190,15 @@ pub async fn block_pay_back(bot: Bot, msg: Message) -> HandlerResult {
  * Entrypoint to the dialogue sequence.
  */
 pub async fn action_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     let buttons = vec!["Cancel", "Skip", "Set Currency"];
-    let keyboard = make_keyboard(buttons, Some(3));
-    bot.send_message(
-        msg.chat.id,
+    let keyboard = make_keyboard(buttons, Some(2));
+    send_bot_message(
+        &bot,
+        &msg,
         format!("Absolutely! Would you like to set a currency for this payment? You can also choose to skip this step."),
         )
         .reply_markup(keyboard)
@@ -264,8 +286,9 @@ pub async fn action_pay_back_currency(
             let currency = get_currency(&currency_code);
             match currency {
                 Ok(currency) => {
-                    bot.send_message(
-                        msg.chat.id,
+                    send_bot_message(
+                        &bot,
+                        &msg,
                         format!(
                             "{}, awesome! Who and how much did you pay back?\n\n{PAY_BACK_INSTRUCTIONS_MESSAGE}",
                             currency_code
@@ -274,8 +297,9 @@ pub async fn action_pay_back_currency(
                     dialogue.update(State::PayBackDebts { currency }).await?;
                 }
                 Err(err) => {
-                    bot.send_message(
-                        msg.chat.id,
+                    send_bot_message(
+                        &bot,
+                        &msg,
                         format!(
                             "{}\n\n⭐️ If you're unsure of the currency code, you can always check out my User Guide with {COMMAND_HELP}.",
                             err.to_string()
@@ -286,8 +310,7 @@ pub async fn action_pay_back_currency(
             }
         }
         None => {
-            bot.send_message(msg.chat.id, format!("{NO_TEXT_MESSAGE}"))
-                .await?;
+            send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}")).await?;
         }
     }
     Ok(())
@@ -309,7 +332,7 @@ pub async fn action_pay_back_debts(
                 if let Some(username) = &user.username {
                     let username = parse_username(username);
                     if let Err(err) = &username {
-                        bot.send_message(msg.chat.id, UNKNOWN_ERROR_MESSAGE).await?;
+                        send_bot_message(&bot, &msg, UNKNOWN_ERROR_MESSAGE.to_string()).await?;
 
                         // Logging
                         log::error!(
@@ -329,8 +352,9 @@ pub async fn action_pay_back_debts(
 
                     let debts = parse_debts_payback(text, actual_currency.clone(), &username);
                     if let Err(err) = debts {
-                        bot.send_message(
-                            chat_id,
+                        send_bot_message(
+                            &bot,
+                            &msg,
                             format!("{}\n\n{PAY_BACK_INSTRUCTIONS_MESSAGE}", err.to_string()),
                         )
                         .await?;
@@ -348,13 +372,12 @@ pub async fn action_pay_back_debts(
                         total,
                         debts,
                     };
-                    display_pay_back_overview(bot, dialogue, payment).await?;
+                    display_pay_back_overview(&bot, &msg, &dialogue, payment).await?;
                 }
             }
         }
         None => {
-            bot.send_message(chat_id, format!("{NO_TEXT_MESSAGE}"))
-                .await?;
+            send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}")).await?;
         }
     }
     Ok(())
@@ -384,7 +407,7 @@ pub async fn action_pay_back_confirm(
             "Edit" => {
                 if let Some(Message { id, chat, .. }) = query.message {
                     let buttons = vec!["Cancel", "Skip", "Set Currency"];
-                    let keyboard = make_keyboard(buttons, Some(3));
+                    let keyboard = make_keyboard(buttons, Some(2));
                     bot.edit_message_text(
                         chat.id,
                         id,

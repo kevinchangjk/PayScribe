@@ -7,11 +7,11 @@ use super::{
     redis::{
         add_payment_entry, delete_payment_entry, get_chat_balances, get_chat_balances_currency,
         get_chat_payments_details, get_currency_conversion, get_default_currency,
-        get_payment_entry, get_time_zone, get_valid_chat_currencies, retrieve_chat_spendings,
-        retrieve_chat_spendings_currency, set_currency_conversion, set_default_currency,
-        set_time_zone, update_chat, update_chat_balances, update_chat_spendings,
-        update_payment_entry, update_user, CrudError, Debt, Payment, UserBalance, UserPayment,
-        CURRENCY_CODE_DEFAULT,
+        get_payment_entry, get_time_zone, get_valid_chat_currencies, is_request_limit_exceeded,
+        retrieve_chat_spendings, retrieve_chat_spendings_currency, set_currency_conversion,
+        set_default_currency, set_time_zone, update_chat, update_chat_balances,
+        update_chat_spendings, update_payment_entry, update_user, CrudError, Debt, Payment,
+        UserBalance, UserPayment, CURRENCY_CODE_DEFAULT,
     },
 };
 
@@ -57,6 +57,10 @@ impl From<CrudError> for ProcessError {
 }
 
 /* Utility functions */
+pub fn is_username_equal(first: &str, second: &str) -> bool {
+    first.to_lowercase() == second.to_lowercase()
+}
+
 fn auto_update_user(
     chat_id: &str,
     sender_id: &str,
@@ -89,6 +93,51 @@ async fn update_balances_debts(
     Ok(debts)
 }
 
+// Updates users and chat given payment details
+fn update_users_chat(
+    chat_id: &str,
+    sender_username: &str,
+    sender_id: &str,
+    creditor: Option<&str>,
+    debts: Option<Vec<(String, i64)>>,
+) -> Result<(), ProcessError> {
+    let mut all_users = vec![];
+
+    if let Some(creditor) = creditor {
+        all_users.push(creditor.to_string());
+    }
+
+    if let Some(debts) = debts {
+        for (user, _) in debts.iter() {
+            if is_username_equal(user, creditor.unwrap_or("")) {
+                continue;
+            }
+            all_users.push(user.to_string());
+        }
+    }
+
+    // Update all users included in payment
+    let mut is_sender_included = false;
+    for user in all_users.iter() {
+        if is_username_equal(user, sender_username) {
+            is_sender_included = true;
+            continue;
+        }
+        update_user(user, chat_id, None)?;
+    }
+
+    // Add message sender to the list of users
+    update_user(sender_username, chat_id, Some(sender_id))?;
+    if !is_sender_included {
+        all_users.push(sender_username.to_string());
+    }
+
+    // Update chat
+    update_chat(&chat_id, all_users)?;
+
+    Ok(())
+}
+
 /* Retrieves all valid currencies for a chat.
  * Valid currencies are currencies with some payments.
  */
@@ -113,33 +162,14 @@ pub async fn add_payment(
     total: i64,
     debts: Vec<(String, i64)>,
 ) -> Result<Vec<Debt>, ProcessError> {
-    let mut all_users = vec![creditor.to_string()];
-
-    for (user, _) in debts.iter() {
-        if user == &creditor {
-            continue;
-        }
-        all_users.push(user.to_string());
-    }
-
-    // Update all users included in payment
-    let mut is_sender_included = false;
-    for user in all_users.iter() {
-        if user == &sender_username {
-            is_sender_included = true;
-            continue;
-        }
-        update_user(user, &chat_id, None)?;
-    }
-
-    // Add message sender to the list of users
-    update_user(&sender_username, &chat_id, Some(&sender_id))?;
-    if !is_sender_included {
-        all_users.push(sender_username);
-    }
-
-    // Update chat
-    update_chat(&chat_id, all_users)?;
+    // Update users and chat
+    update_users_chat(
+        &chat_id,
+        &sender_username,
+        &sender_id,
+        Some(creditor),
+        Some(debts.clone()),
+    )?;
 
     // Add payment entry
     let payment = Payment {
@@ -211,6 +241,8 @@ pub fn view_payments(
  */
 pub async fn edit_payment(
     chat_id: &str,
+    sender_username: String,
+    sender_id: String,
     payment_id: &str,
     description: Option<&str>,
     creditor: Option<&str>,
@@ -220,6 +252,15 @@ pub async fn edit_payment(
 ) -> Result<Option<Vec<Debt>>, ProcessError> {
     // Get current payment entry
     let current_payment = get_payment_entry(payment_id)?;
+
+    // Update users and chat
+    update_users_chat(
+        &chat_id,
+        &sender_username,
+        &sender_id,
+        creditor,
+        debts.clone(),
+    )?;
 
     // Edit payment entry
     update_payment_entry(
@@ -379,10 +420,19 @@ fn retrieve_debts_by_currency(chat_id: &str, currency: &str) -> Result<Vec<Debt>
         ChatSetting::DefaultCurrency(Some(curr)) => curr,
         _ => CURRENCY_CODE_DEFAULT.to_string(),
     };
-    if default_currency == currency && currency != CURRENCY_CODE_DEFAULT {
-        return retrieve_debts_by_default_currency(chat_id, currency);
+
+    // If currency is NIL, which is not default currency.
+    if currency == CURRENCY_CODE_DEFAULT && default_currency != CURRENCY_CODE_DEFAULT {
+        return retrieve_debts_by_default_currency(chat_id);
     }
 
+    // If currency is default currency, which is not NIL.
+    if default_currency == currency && currency != CURRENCY_CODE_DEFAULT {
+        return retrieve_debts_by_default_currency(chat_id);
+    }
+
+    // If currency is not NIL, and is not default currency.
+    // Also, if currency is NIL, and NIL is default currency.
     let balances = get_chat_balances_currency(chat_id, currency)?;
     let debts = optimize_debts(balances);
 
@@ -392,11 +442,12 @@ fn retrieve_debts_by_currency(chat_id: &str, currency: &str) -> Result<Vec<Debt>
 /* View debts of a group chat for the default currency.
  * Retrieves all balances, optimizes debts, and returns.
  */
-fn retrieve_debts_by_default_currency(
-    chat_id: &str,
-    currency: &str,
-) -> Result<Vec<Debt>, ProcessError> {
-    let mut balances_curr = get_chat_balances_currency(chat_id, currency)?;
+fn retrieve_debts_by_default_currency(chat_id: &str) -> Result<Vec<Debt>, ProcessError> {
+    let currency = match get_chat_setting(chat_id, ChatSetting::DefaultCurrency(None))? {
+        ChatSetting::DefaultCurrency(Some(curr)) => curr,
+        _ => CURRENCY_CODE_DEFAULT.to_string(),
+    };
+    let mut balances_curr = get_chat_balances_currency(chat_id, &currency)?;
     let balances_nil = get_chat_balances_currency(chat_id, CURRENCY_CODE_DEFAULT)?;
 
     for balance in balances_nil {
@@ -935,4 +986,17 @@ pub async fn update_chat_default_currency(
     update_balances(chat_id, changes)?;
 
     Ok(())
+}
+
+/* Asserts that a user has not exceeded the rate limit.
+ */
+pub fn assert_rate_limit(user_id: &str, timestamp: i64) -> Result<(), ProcessError> {
+    let status = is_request_limit_exceeded(user_id, timestamp)?;
+    if status {
+        Err(ProcessError::CrudError(
+            CrudError::RequestLimitExceededError(),
+        ))
+    } else {
+        Ok(())
+    }
 }

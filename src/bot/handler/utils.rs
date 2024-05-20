@@ -1,15 +1,22 @@
+use std::collections::HashSet;
+
 use chrono::{DateTime, Local, NaiveDateTime};
 use chrono_tz::Tz;
 use regex::Regex;
 use teloxide::{
     dispatching::dialogue::{Dialogue, InMemStorage, InMemStorageError},
-    types::{InlineKeyboardButton, InlineKeyboardMarkup},
+    payloads::SendMessage,
+    prelude::*,
+    requests::JsonRequest,
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, Message},
     RequestError,
 };
 
 use crate::bot::{
     currency::{get_currency_from_code, get_default_currency, Currency, CURRENCY_DEFAULT},
-    processor::{get_chat_setting, ChatSetting, ProcessError},
+    processor::{
+        assert_rate_limit, get_chat_setting, is_username_equal, ChatSetting, ProcessError,
+    },
     redis::Debt,
     State,
 };
@@ -62,6 +69,37 @@ impl From<InMemStorageError> for BotError {
 impl From<ProcessError> for BotError {
     fn from(process_error: ProcessError) -> BotError {
         BotError::ProcessError(process_error)
+    }
+}
+
+// Checks and asserts the rate limit of 1 request per user per second.
+// Returns true if okay, false if exceeded
+pub fn assert_handle_request_limit(msg: Message) -> bool {
+    let user_id = msg.from().unwrap().id.to_string();
+    let timestamp = msg.date.timestamp();
+    let request_status = assert_rate_limit(&user_id, timestamp);
+    if let Err(_) = request_status {
+        log::error!(
+            "Rate limit exceeded for user: {} in chat: {}, with message timestamp: {}",
+            user_id,
+            msg.chat.id,
+            timestamp
+        );
+        false
+    } else {
+        true
+    }
+}
+
+// Wrapper function to send bot message to specific thread, if available
+// Only replaces bot::send_message, as bot::edit_message_text edits specific msg ID
+pub fn send_bot_message(bot: &Bot, msg: &Message, text: String) -> JsonRequest<SendMessage> {
+    let thread_id = msg.thread_id;
+    match thread_id {
+        Some(thread_id) => bot
+            .send_message(msg.chat.id, text)
+            .message_thread_id(thread_id),
+        None => bot.send_message(msg.chat.id, text),
     }
 }
 
@@ -185,7 +223,7 @@ pub fn display_balances(debts: &Vec<Debt>) -> String {
     }
 
     if debts.is_empty() {
-        "Yay! No outstanding balances! 🥳".to_string()
+        "No outstanding balances! 🥳".to_string()
     } else {
         message
     }
@@ -245,7 +283,7 @@ pub fn make_keyboard(options: Vec<&str>, columns: Option<usize>) -> InlineKeyboa
 // Make debt selection keyboard
 pub fn make_keyboard_debt_selection() -> InlineKeyboardMarkup {
     let buttons = vec!["Equal", "Exact", "Proportion"];
-    make_keyboard(buttons, Some(3))
+    make_keyboard(buttons, Some(1))
 }
 
 // Displays a username with the '@' symbol.
@@ -351,7 +389,7 @@ pub fn parse_currency_amount(text: &str) -> Result<(i64, Currency), BotError> {
 
 // Parse and process a string to retrieve a list of debts, for split by equal amount.
 pub fn process_debts_equal(text: &str, total: Option<i64>) -> Result<Vec<(String, i64)>, BotError> {
-    let users = text.split_whitespace().collect::<Vec<&str>>();
+    let mut users = text.split_whitespace().collect::<Vec<&str>>();
     if users.len() == 0 {
         return Err(BotError::UserError(
             "Uh-oh! ❌ Please give me at least one username!".to_string(),
@@ -367,16 +405,32 @@ pub fn process_debts_equal(text: &str, total: Option<i64>) -> Result<Vec<(String
         }
     };
 
+    let mut accounted_users: HashSet<String> = HashSet::new();
+    let mut i = 0;
+    while i < users.len() {
+        let user = users[i];
+        if accounted_users.contains(&user.to_lowercase()) {
+            users.remove(i);
+        } else {
+            accounted_users.insert(user.to_lowercase());
+            i += 1;
+        }
+    }
+
     let amount = (total as f64 / users.len() as f64).round() as i64;
     let diff = total - amount * users.len() as i64;
+
     let mut debts: Vec<(String, i64)> = Vec::new();
     for user in &users {
-        let debt = (parse_username(user)?, amount);
+        let username = parse_username(user)?;
+        let debt = (username.clone(), amount);
         debts.push(debt);
     }
 
-    // Distribute the difference in amount to the first user (<= smallest denomination)
-    debts[0].1 += diff;
+    // Distribute the difference in amount to as many users as required through smallest denomination
+    for i in 0..(diff).abs() {
+        debts[i as usize].1 += if diff > 0 { 1 } else { -1 };
+    }
 
     Ok(debts)
 }
@@ -468,12 +522,27 @@ pub fn process_debts_ratio(text: &str, total: Option<i64>) -> Result<Vec<(String
         ));
     }
 
-    for i in (0..items.len()).step_by(2) {
-        let username = parse_username(items[i])?;
-        let ratio = parse_float(items[i + 1])?;
+    let mut users: Vec<String> = Vec::new();
+    let mut ratios: Vec<f64> = Vec::new();
 
-        sum += ratio;
-        debts_ratioed.push((username, ratio));
+    for i in (0..items.len()).step_by(2) {
+        let curr = parse_username(items[i])?;
+        let pos = users.iter().position(|u| is_username_equal(u, &curr));
+        match pos {
+            Some(pos) => {
+                ratios[pos] += parse_float(items[i + 1])?;
+            }
+            None => {
+                users.push(items[i].to_string());
+                ratios.push(parse_float(items[i + 1])?);
+            }
+        }
+    }
+
+    for i in 0..users.len() {
+        let username = &users[i];
+        sum += ratios[i];
+        debts_ratioed.push((username.to_string(), ratios[i]));
     }
 
     let total = match total {
@@ -492,9 +561,11 @@ pub fn process_debts_ratio(text: &str, total: Option<i64>) -> Result<Vec<(String
         exact_sum += amount;
     }
 
-    // Distribute the difference in amount to the first user (<= smallest denomination)
+    // Distribute the difference in amount to as many users as required through smallest denomination
     let diff = total - exact_sum;
-    debts[0].1 += diff;
+    for i in 0..(diff).abs() {
+        debts[i as usize].1 += if diff > 0 { 1 } else { -1 };
+    }
 
     Ok(debts)
 }
@@ -531,7 +602,7 @@ pub fn parse_debts_payback(
     for i in (0..items.len()).step_by(2) {
         let username = parse_username(items[i])?;
         let amount = parse_amount(items[i + 1], currency.1)?;
-        if username == sender {
+        if is_username_equal(&username, sender) {
             return Err(BotError::UserError(
                 "Uh-oh! ❌ You can't pay back yourself!".to_string(),
             ));

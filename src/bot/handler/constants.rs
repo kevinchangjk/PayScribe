@@ -27,10 +27,9 @@ pub const DEBT_RATIO_INSTRUCTIONS_MESSAGE: &str =
 pub const PAY_BACK_INSTRUCTIONS_MESSAGE: &str =
 "Enter the Telegram usernames and exact amounts like this: \n\n@username__1 amount1\n@username__2 amount2\n@username__3 amount3\n...\n\n";
 pub const STATEMENT_INSTRUCTIONS_MESSAGE: &str =
-    "⭐️ I can also present in the other currencies/formats below!";
+    "⭐️ I can also present the other currencies/formats below!";
 pub const COMMAND_HELP: &str = "/help";
 pub const COMMAND_CANCEL: &str = "/cancel";
-pub const COMMAND_SETTINGS: &str = "/settings";
 pub const COMMAND_ADD_PAYMENT: &str = "/addpayment";
 pub const COMMAND_PAY_BACK: &str = "/payback";
 pub const COMMAND_VIEW_PAYMENTS: &str = "/viewpayments";
@@ -38,7 +37,8 @@ pub const COMMAND_EDIT_PAYMENT: &str = "/editpayment";
 pub const COMMAND_DELETE_PAYMENT: &str = "/deletepayment";
 pub const COMMAND_BALANCES: &str = "/balances";
 pub const COMMAND_SPENDINGS: &str = "/spendings";
-pub const USER_GUIDE_URL: &str = "https://github.com/kevinchangjk/PayScribe/wiki/User-Guide";
+pub const USER_GUIDE_URL: &str = "https://payscribe.super.site/user-guide";
+pub const FEEDBACK_URL: &str = "https://payscribe.super.site/feedback";
 
 // List of all supported time zones
 pub fn all_time_zones() -> HashMap<String, Tz> {

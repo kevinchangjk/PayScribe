@@ -2,7 +2,7 @@
 pub use self::manager::{
     add_payment_entry, delete_payment_entry, get_chat_balances, get_chat_balances_currency,
     get_chat_payments_details, get_currency_conversion, get_default_currency, get_payment_entry,
-    get_time_zone, get_valid_chat_currencies, retrieve_chat_spendings,
+    get_time_zone, get_valid_chat_currencies, is_request_limit_exceeded, retrieve_chat_spendings,
     retrieve_chat_spendings_currency, set_currency_conversion, set_default_currency, set_time_zone,
     update_chat, update_chat_balances, update_chat_spendings, update_payment_entry, update_user,
 };
@@ -18,5 +18,6 @@ mod chat;
 mod connect;
 mod manager;
 mod payment;
+mod request;
 mod spending;
 mod user;

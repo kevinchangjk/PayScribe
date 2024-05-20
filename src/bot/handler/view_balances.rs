@@ -7,24 +7,28 @@ use crate::bot::{
     currency::CURRENCY_DEFAULT,
     handler::{
         constants::UNKNOWN_ERROR_MESSAGE,
-        utils::{display_balances, HandlerResult, StatementOption, UserDialogue},
+        utils::{display_balances, send_bot_message, HandlerResult, StatementOption, UserDialogue},
     },
     processor::{get_chat_setting, retrieve_debts, retrieve_valid_currencies, ChatSetting},
     State,
 };
 
-use super::{constants::STATEMENT_INSTRUCTIONS_MESSAGE, utils::make_keyboard};
+use super::{
+    constants::STATEMENT_INSTRUCTIONS_MESSAGE,
+    utils::{assert_handle_request_limit, make_keyboard},
+};
 
 /* Utilities */
 
 async fn handle_balances_with_option(
     bot: Bot,
     dialogue: UserDialogue,
-    chat_id: String,
+    msg: Message,
     sender_id: String,
     option: StatementOption,
     id: Option<MessageId>,
 ) -> HandlerResult {
+    let chat_id = msg.chat.id.to_string();
     let balances_data = retrieve_debts(&chat_id, option.clone()).await;
 
     match balances_data {
@@ -116,8 +120,9 @@ async fn handle_balances_with_option(
                     .await?;
                 }
                 None => {
-                    bot.send_message(
-                        chat_id.clone(),
+                    send_bot_message(
+                        &bot,
+                        &msg,
                         format!(
                             "{}\n\n{}\n{}",
                             header,
@@ -149,8 +154,7 @@ async fn handle_balances_with_option(
                         .await?;
                 }
                 None => {
-                    bot.send_message(chat_id.clone(), UNKNOWN_ERROR_MESSAGE)
-                        .await?;
+                    send_bot_message(&bot, &msg, UNKNOWN_ERROR_MESSAGE.to_string()).await?;
                 }
             }
             log::error!(
@@ -168,6 +172,10 @@ async fn handle_balances_with_option(
 /* View the balances for the group.
 */
 pub async fn action_view_balances(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
     let chat_id = msg.chat.id.to_string();
     let sender_id = msg.from().as_ref().unwrap().id.to_string();
     let is_convert = match get_chat_setting(&chat_id, ChatSetting::CurrencyConversion(None)) {
@@ -185,7 +193,7 @@ pub async fn action_view_balances(bot: Bot, dialogue: UserDialogue, msg: Message
         StatementOption::Currency(default_currency.clone())
     };
 
-    handle_balances_with_option(bot, dialogue, chat_id, sender_id, option, None).await?;
+    handle_balances_with_option(bot, dialogue, msg, sender_id, option, None).await?;
 
     Ok(())
 }
@@ -202,44 +210,24 @@ pub async fn action_balances_menu(
         bot.answer_callback_query(query.id.to_string()).await?;
         let sender_id = query.from.id.to_string();
 
-        if let Some(Message { id, chat, .. }) = query.message {
-            let chat_id = chat.id.to_string();
+        if let Some(msg) = query.message {
+            let id = msg.id;
+            let chat_id = msg.chat.id.to_string();
             match button.as_str() {
                 _ if button.as_str().starts_with("Convert To ") => {
                     let option = StatementOption::ConvertCurrency;
-                    handle_balances_with_option(
-                        bot,
-                        dialogue,
-                        chat_id,
-                        sender_id,
-                        option,
-                        Some(id),
-                    )
-                    .await?;
+                    handle_balances_with_option(bot, dialogue, msg, sender_id, option, Some(id))
+                        .await?;
                 }
                 _ if button.as_str() == "No Currency" => {
                     let option = StatementOption::Currency(CURRENCY_DEFAULT.0.to_string());
-                    handle_balances_with_option(
-                        bot,
-                        dialogue,
-                        chat_id,
-                        sender_id,
-                        option,
-                        Some(id),
-                    )
-                    .await?;
+                    handle_balances_with_option(bot, dialogue, msg, sender_id, option, Some(id))
+                        .await?;
                 }
                 _ if button.as_str().len() == 3 => {
                     let option = StatementOption::Currency(button.as_str().to_string());
-                    handle_balances_with_option(
-                        bot,
-                        dialogue,
-                        chat_id,
-                        sender_id,
-                        option,
-                        Some(id),
-                    )
-                    .await?;
+                    handle_balances_with_option(bot, dialogue, msg, sender_id, option, Some(id))
+                        .await?;
                 }
                 _ => {
                     log::error!(

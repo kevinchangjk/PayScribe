@@ -11,6 +11,7 @@ use super::{
     },
     connect::{connect, DBError},
     payment::{add_payment, delete_payment, get_payment, update_payment, Payment},
+    request::{get_request, set_request},
     spending::{get_spending, get_spending_exists, set_spending},
     user::{
         add_user, get_preferred_username, get_user_chats, get_user_exists, set_preferred_username,
@@ -45,6 +46,8 @@ pub enum CrudError {
     NoSuchPaymentError(),
     #[error("Spending computed to be negative")]
     NegativeSpendingError(),
+    #[error("Request limit exceeded")]
+    RequestLimitExceededError(),
 }
 
 // Implement the From trait to convert from RedisError to CrudError
@@ -525,11 +528,41 @@ pub fn retrieve_chat_spendings_currency(
     Ok(spendings)
 }
 
+/* Checks if a user has exceeded the request limit.
+ * Returns a boolean representing this status.
+ * Automatically updates the request timestamp if not exceeded.
+ */
+pub fn is_request_limit_exceeded(user_id: &str, time_now: i64) -> Result<bool, CrudError> {
+    let mut con = connect()?;
+
+    let timestamp = get_request(&mut con, user_id);
+    let mut status = false;
+
+    match timestamp {
+        Ok(timestamp) => {
+            if time_now <= timestamp {
+                status = true;
+            }
+        }
+        Err(_) => {
+            // By default, assume okay and proceed with request
+        }
+    }
+
+    if !status {
+        // Updates request timestamp if not exceeded
+        set_request(&mut con, user_id, time_now)?;
+    }
+
+    Ok(status)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::bot::redis::{
         balance::delete_balance,
         chat::{delete_chat, delete_chat_currencies, delete_chat_settings, get_chat_users},
+        request::delete_request,
         spending::delete_spending,
         user::{delete_preferred_username, delete_user, get_preferred_username, get_user_chats},
     };
@@ -1211,7 +1244,7 @@ mod tests {
     }
 
     #[test]
-    fn tset_update_retrieve_chat_spendings() {
+    fn test_update_retrieve_chat_spendings() {
         let mut con = connect().unwrap();
 
         let chat_id = "manager_12345678992";
@@ -1324,5 +1357,23 @@ mod tests {
         delete_chat(&mut con, chat_id).unwrap();
         delete_chat_currencies(&mut con, chat_id).unwrap();
         delete_chat_settings(&mut con, chat_id).unwrap();
+    }
+
+    #[test]
+    fn test_request_limit() {
+        let user_id = "manager_test_user_35";
+
+        // Checks that request limit is not exceeded
+        assert!(!is_request_limit_exceeded(user_id, 1).unwrap());
+
+        // Checks that request limit is exceeded
+        assert!(is_request_limit_exceeded(user_id, 1).unwrap());
+
+        // Checks that request limit is not exceeded
+        assert!(!is_request_limit_exceeded(user_id, 2).unwrap());
+
+        // Deletes request
+        let mut con = connect().unwrap();
+        delete_request(&mut con, user_id).unwrap();
     }
 }

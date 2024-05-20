@@ -4,11 +4,11 @@ use payscribe::bot::run_dispatcher;
 pub async fn main() {
     dotenv::dotenv().ok();
     pretty_env_logger::init();
-    log::info!("Starting PayScribe bot...");
+    log::info!("Main - Starting PayScribe bot...");
 
     let bot = teloxide::Bot::from_env();
 
-    log::info!("PayScribe bot started successfully!");
+    log::info!("Main - PayScribe bot started successfully!");
 
     run_dispatcher(bot).await;
 }

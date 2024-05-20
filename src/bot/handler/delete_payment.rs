@@ -9,14 +9,14 @@ use crate::bot::{
         constants::{COMMAND_CANCEL, COMMAND_VIEW_PAYMENTS},
         utils::{
             display_balance_header, display_balances, display_payment, make_keyboard,
-            HandlerResult, UserDialogue,
+            send_bot_message, HandlerResult, UserDialogue,
         },
         Payment,
     },
     processor::delete_payment,
 };
 
-use super::utils::retrieve_time_zone;
+use super::utils::{assert_handle_request_limit, retrieve_time_zone};
 
 /* Utilities */
 
@@ -29,8 +29,9 @@ const CANCEL_MESSAGE: &str =
  * Does nothing, simply notifies the user.
  */
 pub async fn handle_repeated_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(
-        msg.chat.id,
+    send_bot_message(
+        &bot,
+        &msg,
         format!("🚫 Oops! It seems like you're already in the middle of deleting a payment! Please finish or {COMMAND_CANCEL} this before starting another one with me."),
         ).await?;
     Ok(())
@@ -43,9 +44,30 @@ pub async fn cancel_delete_payment(
     bot: Bot,
     dialogue: UserDialogue,
     msg: Message,
+    state: State,
 ) -> HandlerResult {
-    bot.send_message(msg.chat.id, CANCEL_MESSAGE).await?;
-    dialogue.exit().await?;
+    send_bot_message(&bot, &msg, CANCEL_MESSAGE.to_string()).await?;
+
+    match state {
+        State::SelectPayment {
+            payments,
+            page,
+            function: _,
+        }
+        | State::DeletePayment {
+            payment: _,
+            payments,
+            page,
+        } => {
+            dialogue
+                .update(State::ViewPayments { payments, page })
+                .await?;
+        }
+        _ => {
+            dialogue.exit().await?;
+        }
+    }
+
     Ok(())
 }
 
@@ -53,8 +75,9 @@ pub async fn cancel_delete_payment(
  * Called when user attempts to start another operation in the middle of deleting a payment.
  */
 pub async fn block_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(
-        msg.chat.id,
+    send_bot_message(
+        &bot,
+        &msg,
         format!("🚫 Oops! It seems like you're in the middle of deleting a payment! Please finish or {COMMAND_CANCEL} this before starting something new with me."),
         ).await?;
     Ok(())
@@ -64,8 +87,13 @@ pub async fn block_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
  * Called when user attempts to delete payment without first viewing anything.
  */
 pub async fn no_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(
-        msg.chat.id,
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
+    send_bot_message(
+        &bot,
+        &msg,
         format!("Uh-oh! ❌ Sorry, please {COMMAND_VIEW_PAYMENTS} before deleting them!"),
     )
     .await?;
@@ -79,13 +107,14 @@ pub async fn no_delete_payment(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn action_delete_payment(
     bot: Bot,
     dialogue: UserDialogue,
+    msg: &Message,
     msg_id: MessageId,
-    chat_id: String,
     (payments, page): (Vec<Payment>, usize),
     index: usize,
 ) -> HandlerResult {
     let payment = payments[index].clone();
     let keyboard = make_keyboard(vec!["Cancel", "Confirm"], Some(2));
+    let chat_id = msg.chat.id.to_string();
     let time_zone = retrieve_time_zone(&chat_id);
 
     bot.edit_message_text(
@@ -141,9 +170,9 @@ pub async fn action_delete_payment_confirm(
                                 chat_id.clone(),
                                 id,
                                 format!(
-                                    "🎉 Yay! I've deleted the payment! 🎉\n\n{}{}",
+                                    "🎉 I've deleted the payment! 🎉\n\n{}{}",
+                                    display_balance_header(&chat_id, &payment.currency.0),
                                     display_balances(&balances),
-                                    display_balance_header(&chat_id, &payment.currency.0)
                                 ),
                             )
                             .await?;
