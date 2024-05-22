@@ -348,7 +348,7 @@ pub async fn action_select_payment_edit(
     send_bot_message(
         &bot,
         &msg,
-        "🙌 Which payment no. would you like to edit?".to_string(),
+        "✏️ Which payment no. would you like to edit?".to_string(),
     )
     .reply_markup(keyboard)
     .await?;
@@ -379,7 +379,7 @@ pub async fn action_select_payment_delete(
     send_bot_message(
         &bot,
         &msg,
-        "🙌 Which payment no. would you like to delete?".to_string(),
+        "🗑 Which payment no. would you like to delete?".to_string(),
     )
     .reply_markup(keyboard)
     .await?;

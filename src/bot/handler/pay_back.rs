@@ -199,7 +199,7 @@ pub async fn action_pay_back(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
     send_bot_message(
         &bot,
         &msg,
-        format!("Absolutely! Would you like to set a currency for this payment? You can also choose to skip this step."),
+        format!("Absolutely! 🙌 Would you like to set a currency for this payment? You can also choose to skip this step."),
         )
         .reply_markup(keyboard)
         .await?;
@@ -412,7 +412,7 @@ pub async fn action_pay_back_confirm(
                         chat.id,
                         id,
                         format!(
-                            "Absolutely! Would you like to set a currency for this payment? You can also choose to skip this step."
+                            "Absolutely! 🙌 Would you like to set a currency for this payment? You can also choose to skip this step."
                             ),
                             )
                         .reply_markup(keyboard)

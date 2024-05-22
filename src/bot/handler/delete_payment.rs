@@ -121,7 +121,7 @@ pub async fn action_delete_payment(
         chat_id,
         msg_id,
         format!(
-            "Do you really, really, want to delete this payment? I won't be able to undo this... 🫢\n\n{}",
+            "Do you really, really, want to 🗑 delete this payment? I won't be able to undo this... 🫢\n\n{}",
             display_payment(&payment, index + 1, time_zone)
         ),
     )

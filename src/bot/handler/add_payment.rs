@@ -378,7 +378,7 @@ pub async fn action_add_payment(bot: Bot, dialogue: UserDialogue, msg: Message) 
         &bot,
         &msg,
         format!(
-            "Absolutely, let's get started! 🙌\n\nWhat's the description for this new payment?"
+            "Absolutely, 🙌 let's get started! \n\nWhat's the description for this new payment?"
         ),
     )
     .await?;
