@@ -222,10 +222,10 @@ pub async fn action_view_payments(bot: Bot, dialogue: UserDialogue, msg: Message
 
                 // Logging
                 log::info!(
-                    "View Payments - User {} viewed payments for group {}, found: {}",
+                    "View Payments - User {} viewed payments for group {}, found {} payments",
                     sender_id,
                     chat_id,
-                    display_payments_paged(&payments, 0, &chat_id)
+                    &payments.len()
                 );
 
                 dialogue
