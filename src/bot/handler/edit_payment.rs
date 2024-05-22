@@ -156,9 +156,14 @@ async fn call_processor_edit_payment(
                             bot.edit_message_text(
                                 chat_id.clone(),
                                 id,
+                                format!("🎉 I've edited the payment! 🎉\n\n{}", edit_overview,),
+                            )
+                            .await?;
+                            send_bot_message(
+                                &bot,
+                                &msg,
                                 format!(
-                                    "🎉 I've edited the payment! 🎉\n\n{}\n{}{}",
-                                    edit_overview,
+                                    "{}{}",
                                     display_balance_header(
                                         &chat_id,
                                         edited_payment

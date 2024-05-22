@@ -74,7 +74,9 @@ async fn call_processor_pay_back(
     payment: PayBackParams,
     query: CallbackQuery,
 ) -> HandlerResult {
-    if let Some(Message { id, chat, .. }) = query.message {
+    if let Some(msg) = query.message {
+        let id = msg.id;
+        let chat_id = msg.chat.id;
         let payment_clone = payment.clone();
         let payment_overview = display_pay_back_entry(&payment);
         let description = format!("{} paid back!", display_username(&payment.sender_username));
@@ -95,7 +97,7 @@ async fn call_processor_pay_back(
         match updated_balances {
             Err(err) => {
                 bot.edit_message_text(
-                    chat.id,
+                    chat_id,
                     id,
                     format!(
                         "⁉️ Oh no! Something went wrong! 🥺 I'm sorry, but I can't add the payment right now. Please try again later!\n\n"
@@ -114,12 +116,17 @@ async fn call_processor_pay_back(
             }
             Ok(balances) => {
                 bot.edit_message_text(
-                    chat.id,
+                    chat_id,
                     id,
+                    format!("🎉 Yay! I've added the payment! 🎉\n\n{}", payment_overview,),
+                )
+                .await?;
+                send_bot_message(
+                    &bot,
+                    &msg,
                     format!(
-                        "🎉 Yay! I've added the payment! 🎉\n\n{}\n{}{}",
-                        payment_overview,
-                        display_balance_header(&chat.id.to_string(), &payment.currency.0),
+                        "{}{}",
+                        display_balance_header(&chat_id.to_string(), &payment.currency.0),
                         display_balances(&balances)
                     ),
                 )

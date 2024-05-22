@@ -192,7 +192,9 @@ async fn call_processor_add_payment(
     payment: AddPaymentParams,
     query: CallbackQuery,
 ) -> HandlerResult {
-    if let Some(Message { id, chat, .. }) = query.message {
+    if let Some(msg) = query.message {
+        let id = msg.id;
+        let chat_id = msg.chat.id;
         let payment_clone = payment.clone();
         let description = match payment.description {
             Some(desc) => desc,
@@ -201,7 +203,7 @@ async fn call_processor_add_payment(
                     "Add Payment Submission - Description not found for payment: {:?}",
                     payment_clone
                 );
-                bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
+                bot.edit_message_text(chat_id, id, UNKNOWN_ERROR_MESSAGE)
                     .await?;
                 dialogue.exit().await?;
                 return Ok(());
@@ -214,7 +216,7 @@ async fn call_processor_add_payment(
                     "Add Payment Submission - Creditor not found for payment: {:?}",
                     payment_clone
                 );
-                bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
+                bot.edit_message_text(chat_id, id, UNKNOWN_ERROR_MESSAGE)
                     .await?;
                 dialogue.exit().await?;
                 return Ok(());
@@ -227,7 +229,7 @@ async fn call_processor_add_payment(
                     "Add Payment Submission - Currency not found for payment: {:?}",
                     payment_clone
                 );
-                bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
+                bot.edit_message_text(chat_id, id, UNKNOWN_ERROR_MESSAGE)
                     .await?;
                 dialogue.exit().await?;
                 return Ok(());
@@ -240,7 +242,7 @@ async fn call_processor_add_payment(
                     "Add Payment Submission - Total not found for payment: {:?}",
                     payment_clone
                 );
-                bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
+                bot.edit_message_text(chat_id, id, UNKNOWN_ERROR_MESSAGE)
                     .await?;
                 dialogue.exit().await?;
                 return Ok(());
@@ -253,7 +255,7 @@ async fn call_processor_add_payment(
                     "Add Payment Submission - Debts not found for payment: {:?}",
                     payment_clone
                 );
-                bot.edit_message_text(chat.id, id, UNKNOWN_ERROR_MESSAGE)
+                bot.edit_message_text(chat_id, id, UNKNOWN_ERROR_MESSAGE)
                     .await?;
                 dialogue.exit().await?;
                 return Ok(());
@@ -275,11 +277,16 @@ async fn call_processor_add_payment(
         match updated_balances {
             Ok(balances) => {
                 bot.edit_message_text(
-                    chat.id,
+                    chat_id,
                     id,
+                    format!("🎉 Yay! I've added the payment! 🎉\n\n{}", payment_overview,),
+                )
+                .await?;
+                send_bot_message(
+                    &bot,
+                    &msg,
                     format!(
-                        "🎉 Yay! I've added the payment! 🎉\n\n{}{}{}",
-                        payment_overview,
+                        "{}{}",
                         display_balance_header(&payment.chat_id, &currency.0),
                         display_balances(&balances)
                     ),
@@ -296,7 +303,7 @@ async fn call_processor_add_payment(
             }
             Err(err) => {
                 bot.edit_message_text(
-                    chat.id,
+                    chat_id,
                     id,
                     format!(
                         "⁉️ Oh no! Something went wrong! 🥺 I'm sorry, but I can't add the payment right now. Please try again later!\n\n"

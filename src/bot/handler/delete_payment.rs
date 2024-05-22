@@ -149,8 +149,9 @@ pub async fn action_delete_payment_confirm(
     if let Some(button) = &query.data {
         bot.answer_callback_query(query.id.to_string()).await?;
 
-        if let Some(Message { id, chat, .. }) = query.message {
-            let chat_id = chat.id.to_string();
+        if let Some(msg) = query.message {
+            let id = msg.id;
+            let chat_id = msg.chat.id.to_string();
             let time_zone = retrieve_time_zone(&chat_id);
             match button.as_str() {
                 "Cancel" => {
@@ -169,8 +170,14 @@ pub async fn action_delete_payment_confirm(
                             bot.edit_message_text(
                                 chat_id.clone(),
                                 id,
+                                format!("🎉 I've deleted the payment! 🎉\n\n",),
+                            )
+                            .await?;
+                            send_bot_message(
+                                &bot,
+                                &msg,
                                 format!(
-                                    "🎉 I've deleted the payment! 🎉\n\n{}{}",
+                                    "{}{}",
                                     display_balance_header(&chat_id, &payment.currency.0),
                                     display_balances(&balances),
                                 ),
