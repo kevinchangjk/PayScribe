@@ -15,7 +15,8 @@ use teloxide::{
 use crate::bot::{
     currency::{get_currency_from_code, get_default_currency, Currency, CURRENCY_DEFAULT},
     processor::{
-        assert_rate_limit, get_chat_setting, is_username_equal, ChatSetting, ProcessError,
+        assert_rate_limit, get_chat_setting, is_username_equal, retrieve_valid_currencies,
+        ChatSetting, ProcessError,
     },
     redis::Debt,
     State,
@@ -129,6 +130,64 @@ pub fn get_chat_default_currency(chat_id: &str) -> Currency {
         _ => {}
     }
     get_default_currency()
+}
+
+// Processes and retrieves appropriate valid currencies for balances and spendings.
+pub fn process_valid_currencies(
+    chat_id: &str,
+    sender_id: &str,
+    option: StatementOption,
+    default_currency: String,
+) -> Vec<String> {
+    let mut valid_currencies = match retrieve_valid_currencies(&chat_id) {
+        Ok(currencies) => currencies,
+        Err(_) => {
+            log::error!(
+                "View Spendings - User {} failed to retrieve valid currencies for group {}",
+                sender_id,
+                chat_id
+            );
+            vec![]
+        }
+    };
+
+    valid_currencies.retain(|x| x != CURRENCY_DEFAULT.0 && x != &default_currency);
+
+    if let StatementOption::Currency(ref curr) = option {
+        valid_currencies.retain(|x| x != curr);
+    }
+
+    // Add back default currency button if not NIL, and currently not default
+    if default_currency != CURRENCY_DEFAULT.0 {
+        if let StatementOption::Currency(ref curr) = option {
+            if curr != &default_currency {
+                valid_currencies.push(default_currency.clone());
+            }
+        } else if valid_currencies.len() > 0 {
+            // Adds back default currency on convert, only if there are also other
+            // currencies. Else, the converted is already equal to the default.
+            valid_currencies.push(default_currency.clone());
+        }
+    }
+
+    // Special buttons
+    let conversion_button = format!("Convert To {default_currency}");
+    // Add conversion button only if not currently on convert, and have default currency
+    if option != StatementOption::ConvertCurrency
+        && default_currency != CURRENCY_DEFAULT.0
+        && valid_currencies.len() > 0
+    {
+        valid_currencies.push(conversion_button);
+        // Add no currency button if no default currency, and not currently NIL
+    } else if default_currency == CURRENCY_DEFAULT.0 {
+        if let StatementOption::Currency(ref curr) = option {
+            if curr != CURRENCY_DEFAULT.0 {
+                valid_currencies.push("No Currency".to_string());
+            }
+        }
+    }
+
+    valid_currencies
 }
 
 // Converts an amount from base value to actual representation in currency.
