@@ -10,6 +10,8 @@ const USERNAME_KEY: &str = "username";
  */
 
 /* User CRUD Operations
+ * NOTE: Currently, not really being used.
+ *
  * User represents a user, most likely in a group chat on Telegram.
  * User comprises a list of chats they are using PayScribe in.
  * Has add, exists, get, update, and delete operations.
