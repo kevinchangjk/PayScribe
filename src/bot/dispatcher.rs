@@ -515,8 +515,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::Balances].endpoint(action_view_balances))
                 .branch(case![Command::PayBack].endpoint(action_pay_back))
                 .branch(case![Command::ViewPayments].endpoint(action_view_payments))
-                .branch(case![Command::EditPayment].endpoint(action_select_payment_edit))
-                .branch(case![Command::DeletePayment].endpoint(action_select_payment_delete))
+                .branch(case![Command::EditPayment].endpoint(no_edit_payment))
+                .branch(case![Command::DeletePayment].endpoint(no_delete_payment))
                 .branch(case![Command::Settings].endpoint(action_settings))
                 .branch(case![Command::Spendings].endpoint(action_view_spendings)),
         )
@@ -529,8 +529,8 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::Balances].endpoint(action_view_balances))
                 .branch(case![Command::PayBack].endpoint(action_pay_back))
                 .branch(case![Command::ViewPayments].endpoint(action_view_payments))
-                .branch(case![Command::EditPayment].endpoint(action_select_payment_edit))
-                .branch(case![Command::DeletePayment].endpoint(action_select_payment_delete))
+                .branch(case![Command::EditPayment].endpoint(no_edit_payment))
+                .branch(case![Command::DeletePayment].endpoint(no_delete_payment))
                 .branch(case![Command::Settings].endpoint(action_settings))
                 .branch(case![Command::Spendings].endpoint(action_view_spendings)),
         );
