@@ -466,14 +466,14 @@ mod tests {
 
         assert!(set_chat_erase_messages(&mut con, chat_id, erase_messages).is_ok());
         assert_eq!(
-            get_chat_currency_conversion(&mut con, chat_id).unwrap(),
+            get_chat_erase_messages(&mut con, chat_id).unwrap(),
             erase_messages
         );
 
         let second_erase_messages = false;
         assert!(set_chat_erase_messages(&mut con, chat_id, second_erase_messages).is_ok());
         assert_eq!(
-            get_chat_currency_conversion(&mut con, chat_id).unwrap(),
+            get_chat_erase_messages(&mut con, chat_id).unwrap(),
             second_erase_messages
         );
 
