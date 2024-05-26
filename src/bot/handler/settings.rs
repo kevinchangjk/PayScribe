@@ -143,7 +143,7 @@ pub async fn handle_repeated_settings(
         format!("🚫 Oops! It seems like you're already in the middle of customizing my settings! Please finish or {COMMAND_CANCEL} this before starting another one with me."),
         ).await?.id;
 
-    repeat_state(dialogue, state, new_message).await;
+    repeat_state(dialogue, state, new_message).await?;
 
     Ok(())
 }
@@ -199,7 +199,7 @@ pub async fn block_settings(
         format!("🚫 Oops! It seems like you're in the middle of customizing my settings! Please finish or {COMMAND_CANCEL} this before starting something new with me."),
         ).await?.id;
 
-    repeat_state(dialogue, state, new_message).await;
+    repeat_state(dialogue, state, new_message).await?;
 
     Ok(())
 }
@@ -446,7 +446,7 @@ pub async fn action_settings_time_zone(
             let new_message = send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}"))
                 .await?
                 .id;
-            repeat_state(dialogue, state, new_message).await;
+            repeat_state(dialogue, state, new_message).await?;
         }
     }
     Ok(())
@@ -600,7 +600,7 @@ pub async fn action_settings_default_currency(
                     )
                     .await?
                     .id;
-                    repeat_state(dialogue, state, new_message).await;
+                    repeat_state(dialogue, state, new_message).await?;
                 }
             }
         }
@@ -608,7 +608,7 @@ pub async fn action_settings_default_currency(
             let new_message = send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}"))
                 .await?
                 .id;
-            repeat_state(dialogue, state, new_message).await;
+            repeat_state(dialogue, state, new_message).await?;
         }
     }
     Ok(())

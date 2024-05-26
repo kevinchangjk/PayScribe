@@ -436,7 +436,7 @@ pub async fn action_pay_back_debts(
     dialogue: UserDialogue,
     state: State,
     msg: Message,
-    (mut messages, currency): (Vec<MessageId>, Currency),
+    (messages, currency): (Vec<MessageId>, Currency),
 ) -> HandlerResult {
     let chat_id = msg.chat.id.to_string();
     match msg.text() {
