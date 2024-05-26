@@ -381,6 +381,7 @@ pub async fn action_pay_back_currency_menu(
 pub async fn action_pay_back_currency(
     bot: Bot,
     dialogue: UserDialogue,
+    state: State,
     msg: Message,
     mut messages: Vec<MessageId>,
 ) -> HandlerResult {
@@ -413,8 +414,7 @@ pub async fn action_pay_back_currency(
                         ),
                     )
                     .await?.id;
-                    messages.push(new_message);
-                    dialogue.update(State::PayBackCurrency { messages }).await?;
+                    repeat_state(dialogue, state, new_message).await?;
                 }
             }
         }
@@ -422,8 +422,7 @@ pub async fn action_pay_back_currency(
             let new_message = send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}"))
                 .await?
                 .id;
-            messages.push(new_message);
-            dialogue.update(State::PayBackCurrency { messages }).await?;
+            repeat_state(dialogue, state, new_message).await?;
         }
     }
     Ok(())
@@ -435,6 +434,7 @@ pub async fn action_pay_back_currency(
 pub async fn action_pay_back_debts(
     bot: Bot,
     dialogue: UserDialogue,
+    state: State,
     msg: Message,
     (mut messages, currency): (Vec<MessageId>, Currency),
 ) -> HandlerResult {
@@ -457,10 +457,7 @@ pub async fn action_pay_back_debts(
                             err.to_string()
                         );
 
-                        messages.push(new_message);
-                        dialogue
-                            .update(State::PayBackDebts { messages, currency })
-                            .await?;
+                        repeat_state(dialogue, state, new_message).await?;
                         return Ok(());
                     }
                     let username = username?;
@@ -482,10 +479,7 @@ pub async fn action_pay_back_debts(
                         .await?
                         .id;
 
-                        messages.push(new_message);
-                        dialogue
-                            .update(State::PayBackDebts { messages, currency })
-                            .await?;
+                        repeat_state(dialogue, state, new_message).await?;
                         return Ok(());
                     }
 
@@ -508,10 +502,7 @@ pub async fn action_pay_back_debts(
             let new_message = send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}"))
                 .await?
                 .id;
-            messages.push(new_message);
-            dialogue
-                .update(State::PayBackDebts { messages, currency })
-                .await?;
+            repeat_state(dialogue, state, new_message).await?;
         }
     }
     Ok(())

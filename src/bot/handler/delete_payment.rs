@@ -235,7 +235,7 @@ pub async fn action_delete_payment_confirm(
                             send_bot_message(
                                 &bot,
                                 &msg,
-                                format!("🎉 Yay! Payment Deleted! 🎉\n\n",),
+                                format!("🎉 Yay! Payment deleted! 🎉\n\n",),
                             )
                             .await?;
                             send_bot_message(

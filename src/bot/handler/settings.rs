@@ -222,6 +222,7 @@ pub async fn action_settings(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
 pub async fn action_settings_menu(
     bot: Bot,
     dialogue: UserDialogue,
+    state: State,
     query: CallbackQuery,
     messages: Vec<MessageId>,
 ) -> HandlerResult {
@@ -322,7 +323,7 @@ pub async fn action_settings_menu(
                     }
                 }
                 "Cancel" => {
-                    cancel_settings(bot, dialogue, msg).await?;
+                    cancel_settings(bot, dialogue, state, msg).await?;
                 }
                 _ => {
                     if let Some(user) = msg.from() {
@@ -436,7 +437,8 @@ pub async fn action_settings_time_zone(
                     complete_settings(&bot, dialogue, &chat_id, messages).await?;
                 }
                 Err(err) => {
-                    send_bot_message(&bot, &msg, err.to_string()).await?;
+                    let new_message = send_bot_message(&bot, &msg, err.to_string()).await?.id;
+                    repeat_state(dialogue, state, new_message).await?;
                 }
             }
         }
@@ -591,12 +593,14 @@ pub async fn action_settings_default_currency(
                     complete_settings(&bot, dialogue, &chat_id, messages).await?;
                 }
                 Err(err) => {
-                    send_bot_message(
+                    let new_message = send_bot_message(
                         &bot,
                         &msg,
                         format!("{}\n\n{CURRENCY_INSTRUCTIONS_MESSAGE}", err),
                     )
-                    .await?;
+                    .await?
+                    .id;
+                    repeat_state(dialogue, state, new_message).await;
                 }
             }
         }

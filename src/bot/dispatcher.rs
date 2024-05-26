@@ -37,10 +37,6 @@ pub enum State {
         payment: AddPaymentParams,
         debts_format: AddDebtsFormat,
     },
-    AddOverview {
-        messages: Vec<MessageId>,
-        payment: AddPaymentParams,
-    },
     AddConfirm {
         messages: Vec<MessageId>,
         payment: AddPaymentParams,

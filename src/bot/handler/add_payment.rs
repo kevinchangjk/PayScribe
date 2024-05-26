@@ -1,4 +1,8 @@
-use teloxide::{payloads::SendMessageSetters, prelude::*, types::Message};
+use teloxide::{
+    payloads::SendMessageSetters,
+    prelude::*,
+    types::{Message, MessageId},
+};
 
 use crate::bot::{
     currency::Currency,
@@ -19,7 +23,7 @@ use crate::bot::{
     processor::add_payment,
 };
 
-use super::utils::{assert_handle_request_limit, send_bot_message};
+use super::utils::{assert_handle_request_limit, delete_bot_messages, send_bot_message};
 
 /* Utilities */
 #[derive(Clone, Debug)]
@@ -54,6 +58,116 @@ pub enum AddDebtsFormat {
 
 const CANCEL_MESSAGE: &str =
     "Okay! I've cancelled adding the payment. No changes have been made! 🌟";
+
+// Controls the state for misc handler actions that return to same state.
+async fn repeat_state(
+    dialogue: UserDialogue,
+    state: State,
+    new_message: MessageId,
+) -> HandlerResult {
+    match state {
+        State::AddDescription { mut messages } => {
+            messages.push(new_message);
+            dialogue.update(State::AddDescription { messages }).await?;
+        }
+        State::AddCreditor {
+            mut messages,
+            payment,
+        } => {
+            messages.push(new_message);
+            dialogue
+                .update(State::AddCreditor { messages, payment })
+                .await?;
+        }
+        State::AddTotal {
+            mut messages,
+            payment,
+        } => {
+            messages.push(new_message);
+            dialogue
+                .update(State::AddTotal { messages, payment })
+                .await?;
+        }
+        State::AddDebtSelection {
+            mut messages,
+            payment,
+        } => {
+            messages.push(new_message);
+            dialogue
+                .update(State::AddDebtSelection { messages, payment })
+                .await?;
+        }
+        State::AddDebt {
+            mut messages,
+            payment,
+            debts_format,
+        } => {
+            messages.push(new_message);
+            dialogue
+                .update(State::AddDebt {
+                    messages,
+                    payment,
+                    debts_format,
+                })
+                .await?;
+        }
+        State::AddConfirm {
+            mut messages,
+            payment,
+        } => {
+            messages.push(new_message);
+            dialogue
+                .update(State::AddConfirm { messages, payment })
+                .await?;
+        }
+        State::AddEditMenu {
+            mut messages,
+            payment,
+        } => {
+            messages.push(new_message);
+            dialogue
+                .update(State::AddEditMenu { messages, payment })
+                .await?;
+        }
+        State::AddEdit {
+            mut messages,
+            payment,
+            edit,
+        } => {
+            messages.push(new_message);
+            dialogue
+                .update(State::AddEdit {
+                    messages,
+                    payment,
+                    edit,
+                })
+                .await?;
+        }
+        State::AddEditDebtsMenu {
+            mut messages,
+            payment,
+        } => {
+            messages.push(new_message);
+            dialogue
+                .update(State::AddEditDebtsMenu { messages, payment })
+                .await?;
+        }
+        _ => (),
+    }
+    Ok(())
+}
+
+// Controls the dialogue for ending an add payment operation.
+async fn complete_add_payment(
+    bot: &Bot,
+    dialogue: UserDialogue,
+    chat_id: &str,
+    messages: Vec<MessageId>,
+) -> HandlerResult {
+    delete_bot_messages(&bot, chat_id, messages).await?;
+    dialogue.exit().await?;
+    Ok(())
+}
 
 /* Displays a payment entry (being added) in String format.
 */
@@ -95,15 +209,19 @@ async fn display_add_overview(
     bot: &Bot,
     dialogue: &UserDialogue,
     msg: &Message,
+    mut messages: Vec<MessageId>,
     payment: AddPaymentParams,
 ) -> HandlerResult {
     let buttons = vec!["Cancel", "Edit", "Confirm"];
     let keyboard = make_keyboard(buttons, Some(2));
 
-    send_bot_message(&bot, &msg, format!("Here's what I've got so far! 📝\n\n{}Do you want to confirm this entry or would you like to make any changes?", display_add_payment(&payment)))
+    let new_message = send_bot_message(&bot, &msg, format!("Here's what I've got so far! 📝\n\n{}Do you want to confirm this entry or would you like to make any changes?", display_add_payment(&payment)))
         .reply_markup(keyboard)
+        .await?.id;
+    messages.push(new_message);
+    dialogue
+        .update(State::AddConfirm { messages, payment })
         .await?;
-    dialogue.update(State::AddConfirm { payment }).await?;
     Ok(())
 }
 
@@ -113,8 +231,9 @@ async fn display_add_overview(
 async fn display_add_edit_menu(
     bot: Bot,
     dialogue: UserDialogue,
-    payment: AddPaymentParams,
     query: CallbackQuery,
+    messages: Vec<MessageId>,
+    payment: AddPaymentParams,
 ) -> HandlerResult {
     let buttons = vec!["Description", "Payer", "Total", "Split", "Back"];
     let keyboard = make_keyboard(buttons, Some(2));
@@ -130,7 +249,9 @@ async fn display_add_edit_menu(
         )
         .reply_markup(keyboard)
         .await?;
-        dialogue.update(State::AddEditMenu { payment }).await?;
+        dialogue
+            .update(State::AddEditMenu { messages, payment })
+            .await?;
     }
     Ok(())
 }
@@ -140,7 +261,9 @@ async fn display_add_edit_menu(
 async fn handle_debts(
     bot: Bot,
     dialogue: UserDialogue,
+    state: State,
     msg: Message,
+    messages: Vec<MessageId>,
     payment: AddPaymentParams,
     debts_format: AddDebtsFormat,
 ) -> HandlerResult {
@@ -159,7 +282,11 @@ async fn handle_debts(
                 payment.total,
             );
             if let Err(err) = debts {
-                send_bot_message(&bot, &msg, format!("{}\n\n{error_msg}", err.to_string())).await?;
+                let new_message =
+                    send_bot_message(&bot, &msg, format!("{}\n\n{error_msg}", err.to_string()))
+                        .await?
+                        .id;
+                repeat_state(dialogue, state, new_message).await?;
                 return Ok(());
             }
 
@@ -175,10 +302,13 @@ async fn handle_debts(
                 debts: Some(debts?),
             };
 
-            display_add_overview(&bot, &dialogue, &msg, new_payment).await?;
+            display_add_overview(&bot, &dialogue, &msg, messages, new_payment).await?;
         }
         None => {
-            send_bot_message(&bot, &msg, error_msg.to_string()).await?;
+            let new_message = send_bot_message(&bot, &msg, error_msg.to_string())
+                .await?
+                .id;
+            repeat_state(dialogue, state, new_message).await?;
         }
     }
     Ok(())
@@ -189,11 +319,11 @@ async fn handle_debts(
 async fn call_processor_add_payment(
     bot: Bot,
     dialogue: UserDialogue,
+    messages: Vec<MessageId>,
     payment: AddPaymentParams,
     query: CallbackQuery,
 ) -> HandlerResult {
     if let Some(msg) = query.message {
-        let id = msg.id;
         let chat_id = msg.chat.id;
         let payment_clone = payment.clone();
         let description = match payment.description {
@@ -203,9 +333,8 @@ async fn call_processor_add_payment(
                     "Add Payment Submission - Description not found for payment: {:?}",
                     payment_clone
                 );
-                bot.edit_message_text(chat_id, id, UNKNOWN_ERROR_MESSAGE)
-                    .await?;
-                dialogue.exit().await?;
+                send_bot_message(&bot, &msg, UNKNOWN_ERROR_MESSAGE.to_string()).await?;
+                complete_add_payment(&bot, dialogue, &chat_id.to_string(), messages).await?;
                 return Ok(());
             }
         };
@@ -216,9 +345,8 @@ async fn call_processor_add_payment(
                     "Add Payment Submission - Creditor not found for payment: {:?}",
                     payment_clone
                 );
-                bot.edit_message_text(chat_id, id, UNKNOWN_ERROR_MESSAGE)
-                    .await?;
-                dialogue.exit().await?;
+                send_bot_message(&bot, &msg, UNKNOWN_ERROR_MESSAGE.to_string()).await?;
+                complete_add_payment(&bot, dialogue, &chat_id.to_string(), messages).await?;
                 return Ok(());
             }
         };
@@ -229,9 +357,8 @@ async fn call_processor_add_payment(
                     "Add Payment Submission - Currency not found for payment: {:?}",
                     payment_clone
                 );
-                bot.edit_message_text(chat_id, id, UNKNOWN_ERROR_MESSAGE)
-                    .await?;
-                dialogue.exit().await?;
+                send_bot_message(&bot, &msg, UNKNOWN_ERROR_MESSAGE.to_string()).await?;
+                complete_add_payment(&bot, dialogue, &chat_id.to_string(), messages).await?;
                 return Ok(());
             }
         };
@@ -242,9 +369,8 @@ async fn call_processor_add_payment(
                     "Add Payment Submission - Total not found for payment: {:?}",
                     payment_clone
                 );
-                bot.edit_message_text(chat_id, id, UNKNOWN_ERROR_MESSAGE)
-                    .await?;
-                dialogue.exit().await?;
+                send_bot_message(&bot, &msg, UNKNOWN_ERROR_MESSAGE.to_string()).await?;
+                complete_add_payment(&bot, dialogue, &chat_id.to_string(), messages).await?;
                 return Ok(());
             }
         };
@@ -255,9 +381,8 @@ async fn call_processor_add_payment(
                     "Add Payment Submission - Debts not found for payment: {:?}",
                     payment_clone
                 );
-                bot.edit_message_text(chat_id, id, UNKNOWN_ERROR_MESSAGE)
-                    .await?;
-                dialogue.exit().await?;
+                send_bot_message(&bot, &msg, UNKNOWN_ERROR_MESSAGE.to_string()).await?;
+                complete_add_payment(&bot, dialogue, &chat_id.to_string(), messages).await?;
                 return Ok(());
             }
         };
@@ -276,10 +401,10 @@ async fn call_processor_add_payment(
         .await;
         match updated_balances {
             Ok(balances) => {
-                bot.edit_message_text(
-                    chat_id,
-                    id,
-                    format!("🎉 Yay! I've added the payment! 🎉\n\n{}", payment_overview,),
+                send_bot_message(
+                    &bot,
+                    &msg,
+                    format!("🎉 Yay! Payment added! 🎉\n\n{}", payment_overview,),
                 )
                 .await?;
                 send_bot_message(
@@ -302,9 +427,9 @@ async fn call_processor_add_payment(
                     );
             }
             Err(err) => {
-                bot.edit_message_text(
-                    chat_id,
-                    id,
+                send_bot_message(
+                    &bot,
+                    &msg,
                     format!(
                         "⁉️ Oh no! Something went wrong! 🥺 I'm sorry, but I can't add the payment right now. Please try again later!\n\n"
                     ),
@@ -321,7 +446,7 @@ async fn call_processor_add_payment(
                     );
             }
         }
-        dialogue.exit().await?;
+        complete_add_payment(&bot, dialogue, &chat_id.to_string(), messages).await?;
     }
     Ok(())
 }

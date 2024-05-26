@@ -286,10 +286,7 @@ async fn call_processor_edit_payment(
                         chat_id,
                         edit_overview
                     );
-
-                    delete_bot_messages(&bot, &chat_id, messages).await?;
-                    dialogue
-                        .update(State::ViewPayments { payments, page })
+                    complete_edit_payment(&bot, dialogue, &chat_id, messages, payments, page)
                         .await?;
                 }
                 Err(err) => {
@@ -310,10 +307,7 @@ async fn call_processor_edit_payment(
                         display_payment(&payment, 1, time_zone),
                         err.to_string()
                     );
-
-                    delete_bot_messages(&bot, &chat_id, messages).await?;
-                    dialogue
-                        .update(State::ViewPayments { payments, page })
+                    complete_edit_payment(&bot, dialogue, &chat_id, messages, payments, page)
                         .await?;
                 }
             }
@@ -724,6 +718,7 @@ pub async fn action_edit_payment_debts(
 pub async fn action_edit_payment_edit(
     bot: Bot,
     dialogue: UserDialogue,
+    state: State,
     msg: Message,
     (mut messages, payment, edited_payment, edit, payments, page): (
         Vec<MessageId>,
@@ -761,17 +756,7 @@ pub async fn action_edit_payment_edit(
                 let username = parse_username(text);
                 if let Err(err) = username {
                     let new_message = send_bot_message(&bot, &msg, err.to_string()).await?.id;
-                    messages.push(new_message);
-                    dialogue
-                        .update(State::EditPaymentDetails {
-                            messages,
-                            payment,
-                            edited_payment,
-                            edit,
-                            payments,
-                            page,
-                        })
-                        .await?;
+                    repeat_state(dialogue, state, new_message).await?;
                     return Ok(());
                 }
                 let new_edited_payment = EditPaymentParams {
@@ -835,17 +820,7 @@ pub async fn action_edit_payment_edit(
                         )
                         .await?
                         .id;
-                        messages.push(new_message);
-                        dialogue
-                            .update(State::EditPaymentDetails {
-                                messages,
-                                payment,
-                                edited_payment,
-                                edit,
-                                payments,
-                                page,
-                            })
-                            .await?;
+                        repeat_state(dialogue, state, new_message).await?;
                         return Ok(());
                     }
                 }
@@ -887,17 +862,7 @@ pub async fn action_edit_payment_edit(
                             )
                             .await?
                             .id;
-                            messages.push(new_message);
-                            dialogue
-                                .update(State::EditPaymentDetails {
-                                    messages,
-                                    payment,
-                                    edited_payment,
-                                    edit,
-                                    payments,
-                                    page,
-                                })
-                                .await?;
+                            repeat_state(dialogue, state, new_message).await?;
                             return Ok(());
                         }
 
@@ -923,13 +888,19 @@ pub async fn action_edit_payment_edit(
                         .await?;
                     }
                     None => {
-                        send_bot_message(&bot, &msg, format!("{error_msg}")).await?;
+                        let new_message = send_bot_message(&bot, &msg, format!("{error_msg}"))
+                            .await?
+                            .id;
+                        repeat_state(dialogue, state, new_message).await?;
                     }
                 }
             }
         },
         None => {
-            send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}")).await?;
+            let new_message = send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}"))
+                .await?
+                .id;
+            repeat_state(dialogue, state, new_message).await?;
         }
     }
 
