@@ -13,8 +13,8 @@ use crate::bot::{
             TIME_ZONE_INSTRUCTIONS_MESSAGE,
         },
         utils::{
-            get_currency, make_keyboard, parse_time_zone, retrieve_time_zone, HandlerResult,
-            UserDialogue,
+            get_currency, is_erase_messages, make_keyboard, parse_time_zone, retrieve_time_zone,
+            HandlerResult, UserDialogue,
         },
     },
     processor::{get_chat_setting, set_chat_setting, update_chat_default_currency, ChatSetting},
@@ -31,6 +31,8 @@ const TIME_ZONE_DESCRIPTION: &str = "*🕔 Time Zone* — Time zone for displayi
 const DEFAULT_CURRENCY_DESCRIPTION: &str = "💵 *Default Currency* — Currency used if left blank";
 const CURRENCY_CONVERSION_DESCRIPTION: &str =
     "↔️ *Currency Conversion* — Convert currencies when calculating balances and spendings";
+const ERASE_MESSAGES_DESCRIPTION: &str =
+    "🚮 *Erase Messages* — Keep only the final updates and automatically delete my other messages";
 
 // Controls the state for misc handler actions that return to same state.
 async fn repeat_state(
@@ -73,6 +75,12 @@ async fn repeat_state(
                 .update(State::SettingsCurrencyConversion { messages })
                 .await?;
         }
+        State::SettingsEraseMessages { mut messages } => {
+            messages.push(new_message);
+            dialogue
+                .update(State::SettingsEraseMessages { messages })
+                .await?;
+        }
         _ => (),
     }
     Ok(())
@@ -85,7 +93,9 @@ async fn complete_settings(
     chat_id: &str,
     messages: Vec<MessageId>,
 ) -> HandlerResult {
-    delete_bot_messages(&bot, chat_id, messages).await?;
+    if is_erase_messages(chat_id) {
+        delete_bot_messages(&bot, chat_id, messages).await?;
+    }
     dialogue.exit().await?;
     Ok(())
 }
@@ -98,11 +108,13 @@ async fn display_settings_menu(
     msg_id: Option<MessageId>,
     mut messages: Vec<MessageId>,
 ) -> HandlerResult {
-    let buttons = vec!["🕔", "💵", "↔️", "Cancel"];
+    let buttons = vec!["💵", "↔️", "🚮", "🕔", "Cancel"];
+
     let keyboard = make_keyboard(buttons, Some(2));
     let message = format!(
-        "With pleasure\\! 😉 Let's see, here are the ⚙️ settings you can customize\\. What would you like to view or edit?\n\n{TIME_ZONE_DESCRIPTION}\n\n{DEFAULT_CURRENCY_DESCRIPTION}\n\n{CURRENCY_CONVERSION_DESCRIPTION}",
+        "With pleasure\\! 😉 Let's see, here are the ⚙️ settings you can customize\\. What would you like to view or edit?\n\n{DEFAULT_CURRENCY_DESCRIPTION}\n\n{CURRENCY_CONVERSION_DESCRIPTION}\n\n{ERASE_MESSAGES_DESCRIPTION}\n\n{TIME_ZONE_DESCRIPTION}",
         );
+
     match msg_id {
         Some(id) => {
             bot.edit_message_text(msg.chat.id, id, message)
@@ -319,6 +331,36 @@ pub async fn action_settings_menu(
                         .await?;
                         dialogue
                             .update(State::SettingsCurrencyConversion { messages })
+                            .await?;
+                    }
+                }
+                "🚮" => {
+                    let setting = get_chat_setting(&chat_id, ChatSetting::EraseMessages(None))?;
+                    if let ChatSetting::EraseMessages(Some(convert)) = setting {
+                        let status: &str;
+                        let prompt: &str;
+                        let buttons: Vec<&str>;
+                        if convert {
+                            status = "ENABLED ✅";
+                            buttons = vec!["Back", "Turn Off"];
+                            prompt = "Would you like to turn off automatic message erasing for this chat?";
+                        } else {
+                            status = "DISABLED ❌";
+                            buttons = vec!["Back", "Turn On"];
+                            prompt = "Would you like to turn on automatic message erasing for this chat?";
+                        }
+
+                        let keyboard = make_keyboard(buttons.clone(), Some(buttons.len()));
+
+                        bot.edit_message_text(
+                            chat_id,
+                            msg.id,
+                            format!("🚮 Erase Messages is currently {status}.\n\n{prompt}",),
+                        )
+                        .reply_markup(keyboard)
+                        .await?;
+                        dialogue
+                            .update(State::SettingsEraseMessages { messages })
                             .await?;
                     }
                 }
@@ -686,6 +728,101 @@ pub async fn action_settings_currency_conversion(
                             // Logging
                             log::error!(
                                 "Settings Currency Conversion - Error setting currency conversion for chat {}: {}",
+                                chat_id,
+                                err.to_string()
+                                );
+                        }
+                    }
+                    complete_settings(&bot, dialogue, &chat_id, messages).await?;
+                }
+                _ => {
+                    if let Some(user) = msg.from() {
+                        log::error!(
+                            "Settings Menu - Invalid button for user {} in chat {}: {}",
+                            user.id,
+                            msg.chat.id,
+                            button
+                        );
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/* Sets whether erase messages is enabled for the chat.
+ * Bot receives a callback query, and calls processor.
+ */
+pub async fn action_settings_erase_messages(
+    bot: Bot,
+    dialogue: UserDialogue,
+    query: CallbackQuery,
+    messages: Vec<MessageId>,
+) -> HandlerResult {
+    if let Some(button) = &query.data {
+        bot.answer_callback_query(query.id.to_string()).await?;
+        if let Some(msg) = query.message {
+            let chat_id = msg.chat.id.to_string();
+            match button.as_str() {
+                "Back" => {
+                    display_settings_menu(&bot, &dialogue, &msg, Some(msg.id), messages).await?;
+                }
+                "Turn On" => {
+                    let setting = ChatSetting::EraseMessages(Some(true));
+                    let process = set_chat_setting(&chat_id, setting).await;
+                    match process {
+                        Ok(_) => {
+                            send_bot_message(
+                                &bot,
+                                &msg,
+                                "You got it! I've turned on 🚮 Erase Messages!".to_string(),
+                            )
+                            .await?;
+
+                            // Logging
+                            log::info!(
+                                "Settings Erase Messages - Erase Messages enabled for chat {}",
+                                chat_id
+                            );
+                        }
+                        Err(err) => {
+                            send_bot_message(&bot, &msg, UNKNOWN_ERROR_MESSAGE.to_string()).await?;
+
+                            // Logging
+                            log::error!(
+                                "Settings Erase Messages - Error setting message erasure for chat {}: {}",
+                                chat_id,
+                                err.to_string()
+                                );
+                        }
+                    }
+                    complete_settings(&bot, dialogue, &chat_id, messages).await?;
+                }
+                "Turn Off" => {
+                    let setting = ChatSetting::EraseMessages(Some(false));
+                    let process = set_chat_setting(&chat_id, setting).await;
+                    match process {
+                        Ok(_) => {
+                            send_bot_message(
+                                &bot,
+                                &msg,
+                                "You got it! I've turned off 🚮 Erase Messages!".to_string(),
+                            )
+                            .await?;
+
+                            // Logging
+                            log::info!(
+                                "Settings Erase Messages - Erase Messages disabled for chat {}",
+                                chat_id
+                            );
+                        }
+                        Err(err) => {
+                            send_bot_message(&bot, &msg, UNKNOWN_ERROR_MESSAGE.to_string()).await?;
+
+                            // Logging
+                            log::error!(
+                                "Settings Erase Messages - Error setting message erasure for chat {}: {}",
                                 chat_id,
                                 err.to_string()
                                 );

@@ -24,8 +24,9 @@ pub use self::pay_back::{
 };
 pub use self::settings::{
     action_default_currency_menu, action_settings, action_settings_currency_conversion,
-    action_settings_default_currency, action_settings_menu, action_settings_time_zone,
-    action_time_zone_menu, block_settings, cancel_settings, handle_repeated_settings,
+    action_settings_default_currency, action_settings_erase_messages, action_settings_menu,
+    action_settings_time_zone, action_time_zone_menu, block_settings, cancel_settings,
+    handle_repeated_settings,
 };
 pub use self::spendings::{action_spendings_menu, action_view_spendings};
 pub use self::utils::{SelectPaymentType, StatementOption};

@@ -16,7 +16,9 @@ use crate::bot::{
     processor::delete_payment,
 };
 
-use super::utils::{assert_handle_request_limit, delete_bot_messages, retrieve_time_zone};
+use super::utils::{
+    assert_handle_request_limit, delete_bot_messages, is_erase_messages, retrieve_time_zone,
+};
 
 /* Utilities */
 
@@ -63,7 +65,9 @@ async fn complete_delete_payment(
     payments: Vec<Payment>,
     page: usize,
 ) -> HandlerResult {
-    delete_bot_messages(&bot, chat_id, messages).await?;
+    if is_erase_messages(chat_id) {
+        delete_bot_messages(&bot, chat_id, messages).await?;
+    }
     dialogue
         .update(State::ViewPayments { payments, page })
         .await?;
@@ -123,9 +127,7 @@ pub async fn cancel_delete_payment(
             )
             .await?;
         }
-        _ => {
-            dialogue.exit().await?;
-        }
+        _ => (),
     }
 
     Ok(())
@@ -211,6 +213,7 @@ pub async fn action_delete_payment(
 pub async fn action_delete_payment_confirm(
     bot: Bot,
     dialogue: UserDialogue,
+    state: State,
     (messages, payment, payments, page): (Vec<MessageId>, Payment, Vec<Payment>, usize),
     query: CallbackQuery,
 ) -> HandlerResult {
@@ -222,9 +225,7 @@ pub async fn action_delete_payment_confirm(
             let time_zone = retrieve_time_zone(&chat_id);
             match button.as_str() {
                 "Cancel" => {
-                    send_bot_message(&bot, &msg, format!("{CANCEL_MESSAGE}")).await?;
-                    complete_delete_payment(&bot, dialogue, &chat_id, messages, payments, page)
-                        .await?;
+                    cancel_delete_payment(bot, dialogue, state, msg).await?;
                 }
                 "Confirm" => {
                     let payment_id = &payment.payment_id;
@@ -272,6 +273,11 @@ pub async fn action_delete_payment_confirm(
                                 )
                                 .await?;
 
+                            complete_delete_payment(
+                                &bot, dialogue, &chat_id, messages, payments, page,
+                            )
+                            .await?;
+
                             // Logging
                             log::error!(
                                 "Delete Payment Submission - Processor failed to delete payment for chat {} with payment {}: {}",
@@ -279,11 +285,6 @@ pub async fn action_delete_payment_confirm(
                                 display_payment(&payment, 1, time_zone),
                                 err.to_string()
                                 );
-
-                            complete_delete_payment(
-                                &bot, dialogue, &chat_id, messages, payments, page,
-                            )
-                            .await?;
                         }
                     }
                 }

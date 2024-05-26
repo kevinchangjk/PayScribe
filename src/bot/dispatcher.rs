@@ -126,6 +126,9 @@ pub enum State {
     SettingsCurrencyConversion {
         messages: Vec<MessageId>,
     },
+    SettingsEraseMessages {
+        messages: Vec<MessageId>,
+    },
 }
 
 #[derive(BotCommands, Clone)]
@@ -548,6 +551,20 @@ pub async fn run_dispatcher(bot: Bot) {
                 .branch(case![Command::Spendings].endpoint(block_settings)),
         )
         .branch(
+            case![State::SettingsEraseMessages { messages }]
+                .branch(case![Command::Start].endpoint(action_start))
+                .branch(case![Command::Help].endpoint(action_help))
+                .branch(case![Command::Cancel].endpoint(cancel_settings))
+                .branch(case![Command::AddPayment].endpoint(block_settings))
+                .branch(case![Command::Balances].endpoint(block_settings))
+                .branch(case![Command::PayBack].endpoint(block_settings))
+                .branch(case![Command::ViewPayments].endpoint(block_settings))
+                .branch(case![Command::EditPayment].endpoint(block_settings))
+                .branch(case![Command::DeletePayment].endpoint(block_settings))
+                .branch(case![Command::Settings].endpoint(handle_repeated_settings))
+                .branch(case![Command::Spendings].endpoint(block_settings)),
+        )
+        .branch(
             case![State::BalancesMenu]
                 .branch(case![Command::Start].endpoint(action_start))
                 .branch(case![Command::Help].endpoint(action_help))
@@ -675,6 +692,7 @@ pub async fn run_dispatcher(bot: Bot) {
             case![State::SettingsCurrencyConversion { messages }]
                 .endpoint(callback_invalid_message),
         )
+        .branch(case![State::SettingsEraseMessages { messages }].endpoint(callback_invalid_message))
         .branch(case![State::ViewPayments { payments, page }].endpoint(invalid_state))
         .branch(case![State::BalancesMenu].endpoint(invalid_state))
         .branch(case![State::SpendingsMenu].endpoint(invalid_state))
@@ -747,6 +765,10 @@ pub async fn run_dispatcher(bot: Bot) {
         .branch(
             case![State::SettingsCurrencyConversion { messages }]
                 .endpoint(action_settings_currency_conversion),
+        )
+        .branch(
+            case![State::SettingsEraseMessages { messages }]
+                .endpoint(action_settings_erase_messages),
         );
 
     let schema = dialogue::enter::<Update, InMemStorage<State>, State, _>()

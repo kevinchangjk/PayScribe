@@ -25,7 +25,7 @@ use crate::bot::{
     processor::edit_payment,
 };
 
-use super::utils::{assert_handle_request_limit, delete_bot_messages};
+use super::utils::{assert_handle_request_limit, delete_bot_messages, is_erase_messages};
 
 /* Utilities */
 #[derive(Clone, Debug)]
@@ -117,7 +117,9 @@ async fn complete_edit_payment(
     payments: Vec<Payment>,
     page: usize,
 ) -> HandlerResult {
-    delete_bot_messages(&bot, chat_id, messages).await?;
+    if is_erase_messages(chat_id) {
+        delete_bot_messages(&bot, chat_id, messages).await?;
+    }
     dialogue
         .update(State::ViewPayments { payments, page })
         .await?;
@@ -279,6 +281,8 @@ async fn call_processor_edit_payment(
                             .await?;
                         }
                     }
+                    complete_edit_payment(&bot, dialogue, &chat_id, messages, payments, page)
+                        .await?;
 
                     // Logging
                     log::info!(
@@ -286,8 +290,6 @@ async fn call_processor_edit_payment(
                         chat_id,
                         edit_overview
                     );
-                    complete_edit_payment(&bot, dialogue, &chat_id, messages, payments, page)
-                        .await?;
                 }
                 Err(err) => {
                     let time_zone = retrieve_time_zone(&chat_id);
@@ -300,6 +302,9 @@ async fn call_processor_edit_payment(
                     )
                     .await?;
 
+                    complete_edit_payment(&bot, dialogue, &chat_id, messages, payments, page)
+                        .await?;
+
                     // Logging
                     log::error!(
                         "Edit Payment Submission - Processor failed to edit payment for chat {} with payment {}: {}",
@@ -307,8 +312,6 @@ async fn call_processor_edit_payment(
                         display_payment(&payment, 1, time_zone),
                         err.to_string()
                     );
-                    complete_edit_payment(&bot, dialogue, &chat_id, messages, payments, page)
-                        .await?;
                 }
             }
         }
@@ -388,9 +391,7 @@ pub async fn cancel_edit_payment(
             )
             .await?;
         }
-        _ => {
-            dialogue.exit().await?;
-        }
+        _ => (),
     }
 
     Ok(())

@@ -19,6 +19,7 @@ const CHAT_SETTING_KEY: &str = "chat_setting";
 const SETTING_TIME_ZONE: &str = "time_zone";
 const SETTING_DEFAULT_CURRENCY: &str = "default_currency";
 const SETTING_CURRENCY_CONVERSION: &str = "currency_conversion";
+const SETTING_ERASE_MESSAGES: &str = "erase_messages";
 
 // Constants
 pub const CURRENCY_CODE_DEFAULT: &str = "NIL";
@@ -171,6 +172,19 @@ pub fn set_chat_currency_conversion(
     )
 }
 
+// Sets erase messages for a chat
+pub fn set_chat_erase_messages(
+    con: &mut Connection,
+    chat_id: &str,
+    erase_messages: bool,
+) -> RedisResult<()> {
+    con.hset(
+        format!("{CHAT_SETTING_KEY}:{chat_id}"),
+        SETTING_ERASE_MESSAGES,
+        erase_messages,
+    )
+}
+
 // Gets time zone for a chat
 pub fn get_chat_time_zone(con: &mut Connection, chat_id: &str) -> RedisResult<String> {
     con.hget(format!("{CHAT_SETTING_KEY}:{chat_id}"), SETTING_TIME_ZONE)
@@ -189,6 +203,14 @@ pub fn get_chat_currency_conversion(con: &mut Connection, chat_id: &str) -> Redi
     con.hget(
         format!("{CHAT_SETTING_KEY}:{chat_id}"),
         SETTING_CURRENCY_CONVERSION,
+    )
+}
+
+// Gets erase messages for a chat
+pub fn get_chat_erase_messages(con: &mut Connection, chat_id: &str) -> RedisResult<bool> {
+    con.hget(
+        format!("{CHAT_SETTING_KEY}:{chat_id}"),
+        SETTING_ERASE_MESSAGES,
     )
 }
 
@@ -430,6 +452,29 @@ mod tests {
         assert_eq!(
             get_chat_currency_conversion(&mut con, chat_id).unwrap(),
             second_currency_conversion
+        );
+
+        assert!(delete_chat_settings(&mut con, chat_id).is_ok());
+    }
+
+    #[test]
+    fn test_set_get_chat_erase_messages() {
+        let mut con = connect().unwrap();
+
+        let chat_id = "12345678903";
+        let erase_messages = true;
+
+        assert!(set_chat_erase_messages(&mut con, chat_id, erase_messages).is_ok());
+        assert_eq!(
+            get_chat_currency_conversion(&mut con, chat_id).unwrap(),
+            erase_messages
+        );
+
+        let second_erase_messages = false;
+        assert!(set_chat_erase_messages(&mut con, chat_id, second_erase_messages).is_ok());
+        assert_eq!(
+            get_chat_currency_conversion(&mut con, chat_id).unwrap(),
+            second_erase_messages
         );
 
         assert!(delete_chat_settings(&mut con, chat_id).is_ok());

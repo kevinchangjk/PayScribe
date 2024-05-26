@@ -116,6 +116,16 @@ pub async fn delete_bot_messages(
     Ok(())
 }
 
+// Checks if Erase Messages setting is enabled
+pub fn is_erase_messages(chat_id: &str) -> bool {
+    let erase = get_chat_setting(chat_id, ChatSetting::EraseMessages(None));
+    if let Ok(ChatSetting::EraseMessages(Some(true))) = erase {
+        true
+    } else {
+        false
+    }
+}
+
 // Retrieves the currency given a currency code.
 pub fn get_currency(code: &str) -> Result<Currency, BotError> {
     let currency = get_currency_from_code(code);

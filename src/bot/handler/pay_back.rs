@@ -21,7 +21,9 @@ use crate::bot::{
     processor::add_payment,
 };
 
-use super::utils::{assert_handle_request_limit, delete_bot_messages, send_bot_message};
+use super::utils::{
+    assert_handle_request_limit, delete_bot_messages, is_erase_messages, send_bot_message,
+};
 
 /* Utilities */
 #[derive(Clone, Debug)]
@@ -85,7 +87,9 @@ async fn complete_pay_back(
     chat_id: &str,
     messages: Vec<MessageId>,
 ) -> HandlerResult {
-    delete_bot_messages(&bot, chat_id, messages).await?;
+    if is_erase_messages(chat_id) {
+        delete_bot_messages(&bot, chat_id, messages).await?;
+    }
     dialogue.exit().await?;
     Ok(())
 }
