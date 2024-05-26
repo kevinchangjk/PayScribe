@@ -76,20 +76,22 @@ impl From<ProcessError> for BotError {
 // Checks and asserts the rate limit of 1 request per user per second.
 // Returns true if okay, false if exceeded
 pub fn assert_handle_request_limit(msg: Message) -> bool {
-    let user_id = msg.from().unwrap().id.to_string();
-    let timestamp = msg.date.timestamp();
-    let request_status = assert_rate_limit(&user_id, timestamp);
-    if let Err(_) = request_status {
-        log::error!(
-            "Rate limit exceeded for user: {} in chat: {}, with message timestamp: {}",
-            user_id,
-            msg.chat.id,
-            timestamp
-        );
-        false
-    } else {
-        true
+    if let Some(user) = msg.from() {
+        let user_id = user.id.to_string();
+        let timestamp = msg.date.timestamp();
+        let request_status = assert_rate_limit(&user_id, timestamp);
+        if let Err(_) = request_status {
+            log::error!(
+                "Rate limit exceeded for user: {} in chat: {}, with message timestamp: {}",
+                user_id,
+                msg.chat.id,
+                timestamp
+            );
+            return false;
+        }
     }
+
+    true
 }
 
 // Wrapper function to send bot message to specific thread, if available

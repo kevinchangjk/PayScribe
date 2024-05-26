@@ -16,11 +16,20 @@ use super::{
  * addressed to it.
  * Currently, simply does not respond to anything. Reduces spam.
  */
-pub async fn invalid_state(_bot: Bot, msg: Message) -> HandlerResult {
+pub async fn invalid_state(bot: Bot, msg: Message) -> HandlerResult {
     // Checks if msg is a service message, ignores it if so
     let is_service_msg = msg.from().is_none();
 
     if is_service_msg {
+        // Check if the message is SPECIFICALLY about the bot itself being added to a group
+        let new_members = msg.new_chat_members();
+        if let Some(new_members) = new_members {
+            let bot_id = bot.get_me().send().await?.id;
+            if new_members.iter().any(|member| member.id == bot_id) {
+                action_start(bot, msg).await?;
+            }
+        }
+
         Ok(())
     } else {
         // send_bot_message(&bot, &msg, format!("Sorry, I'm not intelligent enough to process that! 🤖\nPlease refer to {COMMAND_HELP} on how to use me!")).await?;
