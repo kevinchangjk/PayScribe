@@ -1,7 +1,7 @@
 use teloxide::{
     payloads::SendMessageSetters,
     prelude::*,
-    types::{InlineKeyboardMarkup, Message},
+    types::{InlineKeyboardMarkup, Message, MessageId},
 };
 
 use crate::bot::{
@@ -114,8 +114,15 @@ fn get_select_menu(page: usize, payments: &Vec<Payment>) -> InlineKeyboardMarkup
  */
 pub async fn handle_repeated_select_payment(
     bot: Bot,
+    dialogue: UserDialogue,
+    state: State,
     msg: Message,
-    (_payments, _page, function): (Vec<Payment>, usize, SelectPaymentType),
+    (_messages, _payments, _page, function): (
+        Vec<MessageId>,
+        Vec<Payment>,
+        usize,
+        SelectPaymentType,
+    ),
 ) -> HandlerResult {
     if !assert_handle_request_limit(msg.clone()) {
         return Ok(());
@@ -123,10 +130,10 @@ pub async fn handle_repeated_select_payment(
 
     match function {
         SelectPaymentType::EditPayment => {
-            handle_repeated_edit_payment(bot, msg).await?;
+            handle_repeated_edit_payment(bot, dialogue, state, msg).await?;
         }
         SelectPaymentType::DeletePayment => {
-            handle_repeated_delete_payment(bot, msg).await?;
+            handle_repeated_delete_payment(bot, dialogue, state, msg).await?;
         }
     }
     Ok(())
@@ -138,25 +145,20 @@ pub async fn handle_repeated_select_payment(
 pub async fn cancel_select_payment(
     bot: Bot,
     dialogue: UserDialogue,
-    msg: Message,
     state: State,
+    msg: Message,
 ) -> HandlerResult {
     if !assert_handle_request_limit(msg.clone()) {
         return Ok(());
     }
 
-    if let State::SelectPayment {
-        payments: _,
-        page: _,
-        ref function,
-    } = state
-    {
+    if let State::SelectPayment { ref function, .. } = state {
         match function {
             SelectPaymentType::EditPayment => {
-                cancel_edit_payment(bot, dialogue, msg, state).await?;
+                cancel_edit_payment(bot, dialogue, state, msg).await?;
             }
             SelectPaymentType::DeletePayment => {
-                cancel_delete_payment(bot, dialogue, msg, state).await?;
+                cancel_delete_payment(bot, dialogue, state, msg).await?;
             }
         }
     }
@@ -169,8 +171,15 @@ pub async fn cancel_select_payment(
  */
 pub async fn block_select_payment(
     bot: Bot,
+    dialogue: UserDialogue,
+    state: State,
     msg: Message,
-    (_payments, _page, function): (Vec<Payment>, usize, SelectPaymentType),
+    (_messages, _payments, _page, function): (
+        Vec<MessageId>,
+        Vec<Payment>,
+        usize,
+        SelectPaymentType,
+    ),
 ) -> HandlerResult {
     if !assert_handle_request_limit(msg.clone()) {
         return Ok(());
@@ -178,10 +187,10 @@ pub async fn block_select_payment(
 
     match function {
         SelectPaymentType::EditPayment => {
-            block_edit_payment(bot, msg).await?;
+            block_edit_payment(bot, dialogue, state, msg).await?;
         }
         SelectPaymentType::DeletePayment => {
-            block_delete_payment(bot, msg).await?;
+            block_delete_payment(bot, dialogue, state, msg).await?;
         }
     }
     Ok(())
@@ -345,16 +354,18 @@ pub async fn action_select_payment_edit(
 ) -> HandlerResult {
     let keyboard = get_select_menu(page, &payments);
 
-    send_bot_message(
+    let new_message = send_bot_message(
         &bot,
         &msg,
         "✏️ Which payment no. would you like to edit?".to_string(),
     )
     .reply_markup(keyboard)
-    .await?;
+    .await?
+    .id;
 
     dialogue
         .update(State::SelectPayment {
+            messages: vec![new_message],
             payments,
             page,
             function: SelectPaymentType::EditPayment,
@@ -376,16 +387,18 @@ pub async fn action_select_payment_delete(
 ) -> HandlerResult {
     let keyboard = get_select_menu(page, &payments);
 
-    send_bot_message(
+    let new_message = send_bot_message(
         &bot,
         &msg,
         "🗑 Which payment no. would you like to delete?".to_string(),
     )
     .reply_markup(keyboard)
-    .await?;
+    .await?
+    .id;
 
     dialogue
         .update(State::SelectPayment {
+            messages: vec![new_message],
             payments,
             page,
             function: SelectPaymentType::DeletePayment,
@@ -403,7 +416,7 @@ pub async fn action_select_payment_number(
     dialogue: UserDialogue,
     query: CallbackQuery,
     state: State,
-    (payments, page, function): (Vec<Payment>, usize, SelectPaymentType),
+    (messages, payments, page, function): (Vec<MessageId>, Vec<Payment>, usize, SelectPaymentType),
 ) -> HandlerResult {
     if let Some(button) = &query.data {
         bot.answer_callback_query(query.id.to_string()).await?;
@@ -413,7 +426,7 @@ pub async fn action_select_payment_number(
             let id = msg.id;
             match button.as_str() {
                 "Cancel" => {
-                    cancel_select_payment(bot, dialogue, query.message.unwrap(), state).await?;
+                    cancel_select_payment(bot, dialogue, state, query.message.unwrap()).await?;
                 }
                 num => {
                     let parsing = num.parse::<usize>();
@@ -428,7 +441,7 @@ pub async fn action_select_payment_number(
                                         dialogue,
                                         msg,
                                         id,
-                                        (payments, page),
+                                        (messages, payments, page),
                                         index,
                                     )
                                     .await?;
@@ -439,7 +452,7 @@ pub async fn action_select_payment_number(
                                         dialogue,
                                         msg,
                                         id,
-                                        (payments, page),
+                                        (messages, payments, page),
                                         index,
                                     )
                                     .await?;

@@ -77,6 +77,7 @@ pub enum State {
         page: usize,
     },
     SelectPayment {
+        messages: Vec<MessageId>,
         payments: Vec<Payment>,
         page: usize,
         function: SelectPaymentType,
@@ -369,6 +370,7 @@ pub async fn run_dispatcher(bot: Bot) {
         )
         .branch(
             case![State::SelectPayment {
+                messages,
                 payments,
                 page,
                 function
@@ -631,6 +633,7 @@ pub async fn run_dispatcher(bot: Bot) {
         )
         .branch(
             case![State::SelectPayment {
+                messages,
                 payments,
                 page,
                 function
@@ -701,6 +704,7 @@ pub async fn run_dispatcher(bot: Bot) {
         .branch(case![State::ViewPayments { payments, page }].endpoint(action_view_more))
         .branch(
             case![State::SelectPayment {
+                messages,
                 payments,
                 page,
                 function
