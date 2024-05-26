@@ -78,6 +78,18 @@ async fn repeat_state(
     Ok(())
 }
 
+// Controls the dialogue for ending a settings operation.
+async fn complete_settings(
+    bot: &Bot,
+    dialogue: UserDialogue,
+    chat_id: &str,
+    messages: Vec<MessageId>,
+) -> HandlerResult {
+    delete_bot_messages(&bot, chat_id, messages).await?;
+    dialogue.exit().await?;
+    Ok(())
+}
+
 // Displays the first settings menu.
 async fn display_settings_menu(
     bot: &Bot,
@@ -139,7 +151,12 @@ pub async fn handle_repeated_settings(
 /* Cancels the edit/delete payment operation.
  * Can be called at any step of the process.
  */
-pub async fn cancel_settings(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
+pub async fn cancel_settings(
+    bot: Bot,
+    dialogue: UserDialogue,
+    state: State,
+    msg: Message,
+) -> HandlerResult {
     if !assert_handle_request_limit(msg.clone()) {
         return Ok(());
     }
@@ -148,22 +165,17 @@ pub async fn cancel_settings(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
         .await?
         .id;
 
-    let state = dialogue.get().await;
-    if let Ok(Some(state)) = state {
-        match state {
-            State::SettingsMenu { messages }
-            | State::SettingsTimeZoneMenu { messages }
-            | State::SettingsTimeZone { messages }
-            | State::SettingsDefaultCurrencyMenu { messages }
-            | State::SettingsDefaultCurrency { messages }
-            | State::SettingsCurrencyConversion { messages } => {
-                delete_bot_messages(&bot, &msg.chat.id.to_string(), messages).await;
-            }
-            _ => (),
+    match state {
+        State::SettingsMenu { messages }
+        | State::SettingsTimeZoneMenu { messages }
+        | State::SettingsTimeZone { messages }
+        | State::SettingsDefaultCurrencyMenu { messages }
+        | State::SettingsDefaultCurrency { messages }
+        | State::SettingsCurrencyConversion { messages } => {
+            complete_settings(&bot, dialogue, &msg.chat.id.to_string(), messages).await?;
         }
+        _ => (),
     }
-
-    dialogue.exit().await?;
 
     Ok(())
 }
@@ -421,8 +433,7 @@ pub async fn action_settings_time_zone(
                             );
                         }
                     }
-                    delete_bot_messages(&bot, &chat_id, messages).await?;
-                    dialogue.exit().await?;
+                    complete_settings(&bot, dialogue, &chat_id, messages).await?;
                 }
                 Err(err) => {
                     send_bot_message(&bot, &msg, err.to_string()).await?;
@@ -481,8 +492,7 @@ pub async fn action_default_currency_menu(
                                 );
                         }
                     }
-                    delete_bot_messages(&bot, &chat_id, messages).await?;
-                    dialogue.exit().await?;
+                    complete_settings(&bot, dialogue, &chat_id, messages).await?;
 
                     // Logging
                     log::info!(
@@ -578,8 +588,7 @@ pub async fn action_settings_default_currency(
                                 );
                         }
                     }
-                    delete_bot_messages(&bot, &chat_id, messages).await?;
-                    dialogue.exit().await?;
+                    complete_settings(&bot, dialogue, &chat_id, messages).await?;
                 }
                 Err(err) => {
                     send_bot_message(
@@ -647,8 +656,7 @@ pub async fn action_settings_currency_conversion(
                                 );
                         }
                     }
-                    delete_bot_messages(&bot, &chat_id, messages).await?;
-                    dialogue.exit().await?;
+                    complete_settings(&bot, dialogue, &chat_id, messages).await?;
                 }
                 "Turn Off" => {
                     let setting = ChatSetting::CurrencyConversion(Some(false));
@@ -679,8 +687,7 @@ pub async fn action_settings_currency_conversion(
                                 );
                         }
                     }
-                    delete_bot_messages(&bot, &chat_id, messages).await?;
-                    dialogue.exit().await?;
+                    complete_settings(&bot, dialogue, &chat_id, messages).await?;
                 }
                 _ => {
                     if let Some(user) = msg.from() {
