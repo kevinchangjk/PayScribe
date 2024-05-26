@@ -22,7 +22,7 @@ use crate::bot::{
 
 use super::{
     constants::UNKNOWN_ERROR_MESSAGE,
-    utils::{assert_handle_request_limit, send_bot_message},
+    utils::{assert_handle_request_limit, delete_bot_messages, send_bot_message},
 };
 
 /* Utilities */
@@ -32,12 +32,45 @@ const DEFAULT_CURRENCY_DESCRIPTION: &str = "💵 *Default Currency* — Currency
 const CURRENCY_CONVERSION_DESCRIPTION: &str =
     "↔️ *Currency Conversion* — Convert currencies when calculating balances and spendings";
 
+// Controls the state for misc handler actions that return to same state.
+async fn repeat_state(dialogue: UserDialogue, new_message: MessageId) {
+    let state = dialogue.get().await;
+    match state {
+        Ok(Some(State::SettingsMenu { mut messages })) => {
+            messages.push(new_message);
+            dialogue.update(State::SettingsMenu { messages });
+        }
+        Ok(Some(State::SettingsTimeZoneMenu { mut messages })) => {
+            messages.push(new_message);
+            dialogue.update(State::SettingsTimeZoneMenu { messages });
+        }
+        Ok(Some(State::SettingsTimeZone { mut messages })) => {
+            messages.push(new_message);
+            dialogue.update(State::SettingsTimeZone { messages });
+        }
+        Ok(Some(State::SettingsDefaultCurrencyMenu { mut messages })) => {
+            messages.push(new_message);
+            dialogue.update(State::SettingsDefaultCurrencyMenu { messages });
+        }
+        Ok(Some(State::SettingsDefaultCurrency { mut messages })) => {
+            messages.push(new_message);
+            dialogue.update(State::SettingsDefaultCurrency { messages });
+        }
+        Ok(Some(State::SettingsCurrencyConversion { mut messages })) => {
+            messages.push(new_message);
+            dialogue.update(State::SettingsCurrencyConversion { messages });
+        }
+        _ => (),
+    }
+}
+
 // Displays the first settings menu.
 async fn display_settings_menu(
     bot: &Bot,
     dialogue: &UserDialogue,
     msg: &Message,
     msg_id: Option<MessageId>,
+    mut messages: Vec<MessageId>,
 ) -> HandlerResult {
     let buttons = vec!["🕔", "💵", "↔️", "Cancel"];
     let keyboard = make_keyboard(buttons, Some(2));
@@ -50,31 +83,41 @@ async fn display_settings_menu(
                 .parse_mode(ParseMode::MarkdownV2)
                 .reply_markup(keyboard)
                 .await?;
+            dialogue.update(State::SettingsMenu { messages }).await?;
         }
         None => {
-            send_bot_message(&bot, &msg, message)
+            let new_message = send_bot_message(&bot, &msg, message)
                 .parse_mode(ParseMode::MarkdownV2)
                 .reply_markup(keyboard)
-                .await?;
+                .await?
+                .id;
+            messages.push(new_message);
+            dialogue.update(State::SettingsMenu { messages }).await?;
         }
     }
-    dialogue.update(State::SettingsMenu).await?;
     Ok(())
 }
 
 /* Handles a repeated call to edit/delete payment entry.
  * Does nothing, simply notifies the user.
  */
-pub async fn handle_repeated_settings(bot: Bot, msg: Message) -> HandlerResult {
+pub async fn handle_repeated_settings(
+    bot: Bot,
+    dialogue: UserDialogue,
+    msg: Message,
+) -> HandlerResult {
     if !assert_handle_request_limit(msg.clone()) {
         return Ok(());
     }
 
-    send_bot_message(
+    let new_message = send_bot_message(
         &bot,
         &msg,
         format!("🚫 Oops! It seems like you're already in the middle of customizing my settings! Please finish or {COMMAND_CANCEL} this before starting another one with me."),
-        ).await?;
+        ).await?.id;
+
+    repeat_state(dialogue, new_message).await;
+
     Ok(())
 }
 
@@ -86,24 +129,46 @@ pub async fn cancel_settings(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
         return Ok(());
     }
 
-    send_bot_message(&bot, &msg, CANCEL_MESSAGE.to_string()).await?;
+    send_bot_message(&bot, &msg, CANCEL_MESSAGE.to_string())
+        .await?
+        .id;
+
+    let state = dialogue.get().await;
+    if let Ok(Some(state)) = state {
+        match state {
+            State::SettingsMenu { messages }
+            | State::SettingsTimeZoneMenu { messages }
+            | State::SettingsTimeZone { messages }
+            | State::SettingsDefaultCurrencyMenu { messages }
+            | State::SettingsDefaultCurrency { messages }
+            | State::SettingsCurrencyConversion { messages } => {
+                delete_bot_messages(&bot, &msg.chat.id.to_string(), messages).await;
+            }
+            _ => (),
+        }
+    }
+
     dialogue.exit().await?;
+
     Ok(())
 }
 
 /* Blocks user command.
  * Called when user attempts to start another operation in the middle of editing/deleting a payment.
  */
-pub async fn block_settings(bot: Bot, msg: Message) -> HandlerResult {
+pub async fn block_settings(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
     if !assert_handle_request_limit(msg.clone()) {
         return Ok(());
     }
 
-    send_bot_message(
+    let new_message = send_bot_message(
         &bot,
         &msg,
         format!("🚫 Oops! It seems like you're in the middle of customizing my settings! Please finish or {COMMAND_CANCEL} this before starting something new with me."),
-        ).await?;
+        ).await?.id;
+
+    repeat_state(dialogue, new_message).await;
+
     Ok(())
 }
 
@@ -115,7 +180,7 @@ pub async fn action_settings(bot: Bot, dialogue: UserDialogue, msg: Message) -> 
         return Ok(());
     }
 
-    display_settings_menu(&bot, &dialogue, &msg, None).await?;
+    display_settings_menu(&bot, &dialogue, &msg, None, Vec::new()).await?;
     Ok(())
 }
 
@@ -126,6 +191,7 @@ pub async fn action_settings_menu(
     bot: Bot,
     dialogue: UserDialogue,
     query: CallbackQuery,
+    messages: Vec<MessageId>,
 ) -> HandlerResult {
     if let Some(button) = &query.data {
         bot.answer_callback_query(query.id.to_string()).await?;
@@ -146,7 +212,9 @@ pub async fn action_settings_menu(
                     )
                     .reply_markup(keyboard)
                     .await?;
-                    dialogue.update(State::SettingsTimeZoneMenu).await?;
+                    dialogue
+                        .update(State::SettingsTimeZoneMenu { messages })
+                        .await?;
                 }
                 "💵" => {
                     let setting = get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None))?;
@@ -167,9 +235,12 @@ pub async fn action_settings_menu(
                             msg.id,
                             format!(
                                 "{currency_info}\n\nWould you like to edit the default currency for this chat?",
-                                )).reply_markup(keyboard)
+                                ))
+                            .reply_markup(keyboard)
                             .await?;
-                        dialogue.update(State::SettingsDefaultCurrencyMenu).await?;
+                        dialogue
+                            .update(State::SettingsDefaultCurrencyMenu { messages })
+                            .await?;
                     }
                 }
                 "↔️" => {
@@ -213,7 +284,9 @@ pub async fn action_settings_menu(
                         )
                         .reply_markup(keyboard)
                         .await?;
-                        dialogue.update(State::SettingsCurrencyConversion).await?;
+                        dialogue
+                            .update(State::SettingsCurrencyConversion { messages })
+                            .await?;
                     }
                 }
                 "Cancel" => {
@@ -242,6 +315,7 @@ pub async fn action_time_zone_menu(
     bot: Bot,
     dialogue: UserDialogue,
     query: CallbackQuery,
+    messages: Vec<MessageId>,
 ) -> HandlerResult {
     if let Some(button) = &query.data {
         bot.answer_callback_query(query.id.to_string()).await?;
@@ -249,7 +323,7 @@ pub async fn action_time_zone_menu(
             let chat_id = msg.chat.id;
             match button.as_str() {
                 "Back" => {
-                    display_settings_menu(&bot, &dialogue, &msg, Some(msg.id)).await?;
+                    display_settings_menu(&bot, &dialogue, &msg, Some(msg.id), messages).await?;
                 }
                 "Edit" => {
                     let time_zone = retrieve_time_zone(&chat_id.to_string());
@@ -262,7 +336,9 @@ pub async fn action_time_zone_menu(
                             ),
                             )
                         .await?;
-                    dialogue.update(State::SettingsTimeZone).await?;
+                    dialogue
+                        .update(State::SettingsTimeZone { messages })
+                        .await?;
                 }
                 _ => {
                     if let Some(user) = msg.from() {
@@ -287,6 +363,7 @@ pub async fn action_settings_time_zone(
     bot: Bot,
     dialogue: UserDialogue,
     msg: Message,
+    messages: Vec<MessageId>,
 ) -> HandlerResult {
     let chat_id = msg.chat.id.to_string();
     match msg.text() {
@@ -323,6 +400,7 @@ pub async fn action_settings_time_zone(
                             );
                         }
                     }
+                    delete_bot_messages(&bot, &chat_id, messages).await?;
                     dialogue.exit().await?;
                 }
                 Err(err) => {
@@ -331,7 +409,10 @@ pub async fn action_settings_time_zone(
             }
         }
         None => {
-            send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}")).await?;
+            let new_message = send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}"))
+                .await?
+                .id;
+            repeat_state(dialogue, new_message).await;
         }
     }
     Ok(())
@@ -344,6 +425,7 @@ pub async fn action_default_currency_menu(
     bot: Bot,
     dialogue: UserDialogue,
     query: CallbackQuery,
+    messages: Vec<MessageId>,
 ) -> HandlerResult {
     if let Some(button) = &query.data {
         bot.answer_callback_query(query.id.to_string()).await?;
@@ -378,6 +460,7 @@ pub async fn action_default_currency_menu(
                                 );
                         }
                     }
+                    delete_bot_messages(&bot, &chat_id, messages).await?;
                     dialogue.exit().await?;
 
                     // Logging
@@ -403,11 +486,13 @@ pub async fn action_default_currency_menu(
                                 "{currency_info}\n\nWhat would you like to set as the default currency?\n\n{CURRENCY_INSTRUCTIONS_MESSAGE}",
                                 ))
                             .await?;
-                        dialogue.update(State::SettingsDefaultCurrency).await?;
+                        dialogue
+                            .update(State::SettingsDefaultCurrency { messages })
+                            .await?;
                     }
                 }
                 "Back" => {
-                    display_settings_menu(&bot, &dialogue, &msg, Some(msg.id)).await?;
+                    display_settings_menu(&bot, &dialogue, &msg, Some(msg.id), messages).await?;
                 }
                 _ => {
                     if let Some(user) = msg.from() {
@@ -432,6 +517,7 @@ pub async fn action_settings_default_currency(
     bot: Bot,
     dialogue: UserDialogue,
     msg: Message,
+    messages: Vec<MessageId>,
 ) -> HandlerResult {
     let chat_id = msg.chat.id.to_string();
     match msg.text() {
@@ -470,6 +556,7 @@ pub async fn action_settings_default_currency(
                                 );
                         }
                     }
+                    delete_bot_messages(&bot, &chat_id, messages).await?;
                     dialogue.exit().await?;
                 }
                 Err(err) => {
@@ -483,7 +570,10 @@ pub async fn action_settings_default_currency(
             }
         }
         None => {
-            send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}")).await?;
+            let new_message = send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}"))
+                .await?
+                .id;
+            repeat_state(dialogue, new_message).await;
         }
     }
     Ok(())
@@ -496,6 +586,7 @@ pub async fn action_settings_currency_conversion(
     bot: Bot,
     dialogue: UserDialogue,
     query: CallbackQuery,
+    messages: Vec<MessageId>,
 ) -> HandlerResult {
     if let Some(button) = &query.data {
         bot.answer_callback_query(query.id.to_string()).await?;
@@ -503,20 +594,19 @@ pub async fn action_settings_currency_conversion(
             let chat_id = msg.chat.id.to_string();
             match button.as_str() {
                 "Back" => {
-                    display_settings_menu(&bot, &dialogue, &msg, Some(msg.id)).await?;
+                    display_settings_menu(&bot, &dialogue, &msg, Some(msg.id), messages).await?;
                 }
                 "Turn On" => {
                     let setting = ChatSetting::CurrencyConversion(Some(true));
                     let process = set_chat_setting(&chat_id, setting).await;
                     match process {
                         Ok(_) => {
-                            bot.edit_message_text(
-                                chat_id.clone(),
-                                msg.id,
-                                "You got it! I've turned on ↔️ Currency Conversion!",
+                            send_bot_message(
+                                &bot,
+                                &msg,
+                                "You got it! I've turned on ↔️ Currency Conversion!".to_string(),
                             )
                             .await?;
-                            dialogue.exit().await?;
 
                             // Logging
                             log::info!(
@@ -535,6 +625,7 @@ pub async fn action_settings_currency_conversion(
                                 );
                         }
                     }
+                    delete_bot_messages(&bot, &chat_id, messages).await?;
                     dialogue.exit().await?;
                 }
                 "Turn Off" => {
@@ -542,10 +633,10 @@ pub async fn action_settings_currency_conversion(
                     let process = set_chat_setting(&chat_id, setting).await;
                     match process {
                         Ok(_) => {
-                            bot.edit_message_text(
-                                chat_id.clone(),
-                                msg.id,
-                                "You got it! I've turned off ↔️ Currency Conversion!",
+                            send_bot_message(
+                                &bot,
+                                &msg,
+                                "You got it! I've turned off ↔️ Currency Conversion!".to_string(),
                             )
                             .await?;
 
@@ -566,6 +657,7 @@ pub async fn action_settings_currency_conversion(
                                 );
                         }
                     }
+                    delete_bot_messages(&bot, &chat_id, messages).await?;
                     dialogue.exit().await?;
                 }
                 _ => {

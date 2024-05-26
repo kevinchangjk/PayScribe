@@ -8,7 +8,7 @@ use teloxide::{
     payloads::SendMessage,
     prelude::*,
     requests::JsonRequest,
-    types::{InlineKeyboardButton, InlineKeyboardMarkup, Message},
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, Message, MessageId},
     RequestError,
 };
 
@@ -102,6 +102,18 @@ pub fn send_bot_message(bot: &Bot, msg: &Message, text: String) -> JsonRequest<S
             .message_thread_id(thread_id),
         None => bot.send_message(msg.chat.id, text),
     }
+}
+
+// Removes all old messages, given a chat and a list of message IDs
+pub async fn delete_bot_messages(
+    bot: &Bot,
+    chat_id: &str,
+    messages: Vec<MessageId>,
+) -> Result<(), BotError> {
+    for message in messages {
+        bot.delete_message(chat_id.to_string(), message).await?;
+    }
+    Ok(())
 }
 
 // Retrieves the currency given a currency code.
