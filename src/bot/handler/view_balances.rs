@@ -28,26 +28,40 @@ async fn handle_balances_with_option(
     dialogue: UserDialogue,
     msg: Message,
     sender_id: String,
-    option: StatementOption,
+    mut option: StatementOption,
     id: Option<MessageId>,
 ) -> HandlerResult {
     let chat_id = msg.chat.id.to_string();
     let balances_data = retrieve_debts(&chat_id, option.clone()).await;
 
     match balances_data {
-        Ok(balances_data) => {
+        Ok(mut balances_data) => {
             let default_currency =
                 match get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None)) {
                     Ok(ChatSetting::DefaultCurrency(Some(currency))) => currency,
                     _ => CURRENCY_DEFAULT.0.to_string(),
                 };
 
-            let valid_currencies = process_valid_currencies(
+            let mut valid_currencies = process_valid_currencies(
                 &chat_id,
                 &sender_id,
                 option.clone(),
                 default_currency.clone(),
             );
+
+            // If no default currency, NIL has no balances, but other currencies do
+            if balances_data.len() == 0 && valid_currencies.len() > 0 {
+                let currency = valid_currencies.first().unwrap().clone();
+                option = StatementOption::Currency(currency.clone());
+                balances_data = match retrieve_debts(&chat_id, option.clone()).await {
+                    Ok(new_data) => {
+                        valid_currencies.retain(|curr| curr != &currency);
+                        new_data
+                    }
+                    Err(_err) => balances_data,
+                };
+            }
+
             let ref_valid_currencies = valid_currencies
                 .iter()
                 .map(|x| x.as_str())

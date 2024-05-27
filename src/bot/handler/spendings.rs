@@ -63,25 +63,39 @@ async fn handle_spendings_with_option(
     msg: Message,
     chat_id: String,
     sender_id: String,
-    option: StatementOption,
+    mut option: StatementOption,
     id: Option<MessageId>,
 ) -> HandlerResult {
     let spending_data = retrieve_spending_data(&chat_id, option.clone()).await;
 
     match spending_data {
-        Ok(spending_data) => {
+        Ok(mut spending_data) => {
             let default_currency =
                 match get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None)) {
                     Ok(ChatSetting::DefaultCurrency(Some(currency))) => currency,
                     _ => CURRENCY_DEFAULT.0.to_string(),
                 };
 
-            let valid_currencies = process_valid_currencies(
+            let mut valid_currencies = process_valid_currencies(
                 &chat_id,
                 &sender_id,
                 option.clone(),
                 default_currency.clone(),
             );
+
+            // If no default currency, NIL has no balances, but other currencies do
+            if spending_data.group_spending == 0 && valid_currencies.len() > 0 {
+                let currency = valid_currencies.first().unwrap().clone();
+                option = StatementOption::Currency(currency.clone());
+                spending_data = match retrieve_spending_data(&chat_id, option.clone()).await {
+                    Ok(new_data) => {
+                        valid_currencies.retain(|curr| curr != &currency);
+                        new_data
+                    }
+                    Err(_err) => spending_data,
+                };
+            }
+
             let ref_valid_currencies = valid_currencies
                 .iter()
                 .map(|x| x.as_str())
