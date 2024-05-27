@@ -5,43 +5,143 @@ use teloxide::{
 };
 
 use crate::bot::{
+    currency::Currency,
     dispatcher::State,
     handler::{
+        constants::{
+            COMMAND_CANCEL, COMMAND_VIEW_PAYMENTS, DEBT_EQUAL_DESCRIPTION_MESSAGE,
+            DEBT_EQUAL_INSTRUCTIONS_MESSAGE, DEBT_EXACT_DESCRIPTION_MESSAGE,
+            DEBT_EXACT_INSTRUCTIONS_MESSAGE, DEBT_RATIO_DESCRIPTION_MESSAGE,
+            DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE, TOTAL_INSTRUCTIONS_MESSAGE,
+        },
         utils::{
-            display_balances, display_debts, display_payment, make_keyboard, parse_amount,
-            parse_username, process_debts, HandlerResult, UserDialogue, COMMAND_VIEW_PAYMENTS,
-            DEBT_EQUAL_DESCRIPTION_MESSAGE, DEBT_EQUAL_INSTRUCTIONS_MESSAGE,
-            DEBT_EXACT_DESCRIPTION_MESSAGE, DEBT_EXACT_INSTRUCTIONS_MESSAGE,
-            DEBT_RATIO_DESCRIPTION_MESSAGE, DEBT_RATIO_INSTRUCTIONS_MESSAGE, NO_TEXT_MESSAGE,
+            display_balance_header, display_balances, display_currency_amount, display_debts,
+            display_payment, display_username, make_keyboard, make_keyboard_debt_selection,
+            parse_currency_amount, parse_username, process_debts, retrieve_time_zone,
+            send_bot_message, use_currency, HandlerResult, UserDialogue,
         },
         AddDebtsFormat, AddPaymentEdit, Payment,
     },
     processor::edit_payment,
 };
 
-use super::utils::make_keyboard_debt_selection;
+use super::utils::{assert_handle_request_limit, delete_bot_messages, is_erase_messages};
 
 /* Utilities */
 #[derive(Clone, Debug)]
 pub struct EditPaymentParams {
     description: Option<String>,
     creditor: Option<String>,
-    total: Option<f64>,
-    debts: Option<Vec<(String, f64)>>,
+    currency: Option<Currency>,
+    total: Option<i64>,
+    debts: Option<Vec<(String, i64)>>,
 }
 
-const CANCEL_MESSAGE: &str =
-    "Sure, I've cancelled editing the payment. No changes have been made! 👌";
+const CANCEL_MESSAGE: &str = "Okay! I've cancelled the edit. No changes have been made! 🌟";
+
+// Controls the state for misc handler actions that return to same state.
+async fn repeat_state(
+    dialogue: UserDialogue,
+    state: State,
+    new_message: MessageId,
+) -> HandlerResult {
+    match state {
+        State::EditPayment {
+            mut messages,
+            payment,
+            edited_payment,
+            payments,
+            page,
+        } => {
+            messages.push(new_message);
+            dialogue
+                .update(State::EditPayment {
+                    messages,
+                    payment,
+                    edited_payment,
+                    payments,
+                    page,
+                })
+                .await?;
+        }
+        State::EditPaymentDetails {
+            mut messages,
+            payment,
+            edited_payment,
+            edit,
+            payments,
+            page,
+        } => {
+            messages.push(new_message);
+            dialogue
+                .update(State::EditPaymentDetails {
+                    messages,
+                    payment,
+                    edited_payment,
+                    edit,
+                    payments,
+                    page,
+                })
+                .await?;
+        }
+        State::EditPaymentDebtSelection {
+            mut messages,
+            payment,
+            edited_payment,
+            payments,
+            page,
+        } => {
+            messages.push(new_message);
+            dialogue
+                .update(State::EditPaymentDebtSelection {
+                    messages,
+                    payment,
+                    edited_payment,
+                    payments,
+                    page,
+                })
+                .await?;
+        }
+        _ => (),
+    }
+
+    Ok(())
+}
+
+// Controls the dialogue for ending a edit payment operation.
+async fn complete_edit_payment(
+    bot: &Bot,
+    dialogue: UserDialogue,
+    chat_id: &str,
+    messages: Vec<MessageId>,
+    payments: Vec<Payment>,
+    page: usize,
+) -> HandlerResult {
+    if is_erase_messages(chat_id) {
+        delete_bot_messages(&bot, chat_id, messages).await?;
+    }
+    dialogue
+        .update(State::ViewPayments { payments, page })
+        .await?;
+    Ok(())
+}
 
 /* Displays a payment entry by combining original entry and edited fields.
- */
+*/
 fn display_edit_payment(payment: Payment, edited_payment: EditPaymentParams) -> String {
+    let currency = edited_payment.currency.unwrap_or(payment.currency);
     format!(
-        "Description: {}\nPayer: {}\nTotal: {:.2}\nSplit with:\n{}",
+        "Description: {}\nPayer: {}\nTotal: {}\nSplit:\n{}",
         edited_payment.description.unwrap_or(payment.description),
-        edited_payment.creditor.unwrap_or(payment.creditor),
-        edited_payment.total.unwrap_or(payment.total),
-        display_debts(&edited_payment.debts.unwrap_or(payment.debts.clone()))
+        display_username(&edited_payment.creditor.unwrap_or(payment.creditor)),
+        display_currency_amount(
+            edited_payment.total.unwrap_or(payment.total),
+            use_currency(currency.clone(), &payment.chat_id),
+        ),
+        display_debts(
+            &edited_payment.debts.unwrap_or(payment.debts.clone()),
+            currency.1
+        )
     )
 }
 
@@ -51,8 +151,9 @@ fn display_edit_payment(payment: Payment, edited_payment: EditPaymentParams) -> 
 async fn display_edit_overview(
     bot: Bot,
     dialogue: UserDialogue,
+    msg: &Message,
     msg_id: Option<MessageId>,
-    chat_id: String,
+    mut messages: Vec<MessageId>,
     payment: Payment,
     edited_payment: EditPaymentParams,
     payments: Vec<Payment>,
@@ -62,7 +163,7 @@ async fn display_edit_overview(
         "Description",
         "Payer",
         "Total",
-        "Splits",
+        "Split",
         "Cancel",
         "Confirm",
     ];
@@ -70,10 +171,10 @@ async fn display_edit_overview(
     match msg_id {
         Some(id) => {
             bot.edit_message_text(
-                chat_id,
+                msg.chat.id,
                 id,
                 format!(
-                    "Sure! What do you want to edit?\n\n{}",
+                    "Sure! What would you like to ✏️ edit?\n\n{}",
                     display_edit_payment(payment.clone(), edited_payment.clone())
                 ),
             )
@@ -81,20 +182,24 @@ async fn display_edit_overview(
             .await?;
         }
         None => {
-            bot.send_message(
-                chat_id,
+            let new_message = send_bot_message(
+                &bot,
+                msg,
                 format!(
-                    "Sure! What do you want to edit?\n\n{}",
+                    "Sure! What would you like to ✏️ edit?\n\n{}",
                     display_edit_payment(payment.clone(), edited_payment.clone())
                 ),
             )
             .reply_markup(keyboard)
-            .await?;
+            .await?
+            .id;
+            messages.push(new_message);
         }
     }
 
     dialogue
         .update(State::EditPayment {
+            messages,
             payment,
             edited_payment,
             payments,
@@ -105,83 +210,128 @@ async fn display_edit_overview(
 }
 
 /* Calls processor to execute the edit of the payment entry.
- */
+*/
 async fn call_processor_edit_payment(
     bot: Bot,
     dialogue: UserDialogue,
+    messages: Vec<MessageId>,
     payment: Payment,
     edited_payment: EditPaymentParams,
     payments: Vec<Payment>,
     page: usize,
     query: CallbackQuery,
 ) -> HandlerResult {
-    if let Some(Message { id, chat, .. }) = query.message {
+    if let Some(msg) = query.message {
+        let chat_id = msg.chat.id.to_string();
         let edited_clone = edited_payment.clone();
-        let edited = edit_payment(
-            &chat.id.to_string(),
-            &payment.payment_id,
-            edited_payment.description.as_deref(),
-            edited_payment.creditor.as_deref(),
-            edited_payment.total.as_ref(),
-            edited_payment.debts,
-        );
-
-        match edited {
-            Ok(balances) => {
-                let edit_overview = display_edit_payment(payment, edited_clone);
-                log::info!(
-                    "Edit Payment Submission - payment edited for chat {} with payment {}",
-                    chat.id,
-                    edit_overview
-                );
-
-                match balances {
-                    Some(balances) => {
-                        bot.edit_message_text(
-                            chat.id,
-                            id,
-                            format!(
-                                "🎉 I've edited the payment! 🎉\n\n{}\nHere are the updated balances:\n{}",
-                                edit_overview,
-                                display_balances(&balances)
-                            ),
-                        )
-                        .await?;
-                    }
-                    None => {
-                        bot.edit_message_text(
-                            chat.id,
-                            id,
-                            format!(
-                                "🎉 I've edited the payment! 🎉\n\n{}\nThere are no changes to the balances.",
-                                edit_overview
-                            ),
-                        )
-                        .await?;
-                    }
-                }
-                dialogue
-                    .update(State::ViewPayments { payments, page })
-                    .await?;
-            }
-            Err(err) => {
-                log::error!(
-                    "Edit Payment Submission - Processor failed to edit payment for chat {} with payment {}: {}",
-                    chat.id,
-                    display_payment(&payment, 1),
-                    err.to_string()
-                );
-                bot.edit_message_text(
-                    chat.id,
-                    id,
-                    format!(
-                        "❓ Hmm, something went wrong! Sorry, I can't edit the payment right now."
-                    ),
+        let user = msg.from();
+        if let Some(user) = user {
+            // Check first if there are any changes at all
+            if let EditPaymentParams {
+                description: None,
+                creditor: None,
+                currency: None,
+                total: None,
+                debts: None,
+            } = edited_payment
+            {
+                send_bot_message(
+                    &bot,
+                    &msg,
+                    format!("Hmm❓ it seems like you didn't make any changes! But that's okay, 🤭 I've cancelled editing the payment for you!"),
                 )
                 .await?;
-                dialogue
-                    .update(State::ViewPayments { payments, page })
+                complete_edit_payment(&bot, dialogue, &chat_id, messages, payments, page).await?;
+                return Ok(());
+            }
+
+            let edited = edit_payment(
+                &chat_id,
+                user.clone().username.unwrap_or("".to_string()),
+                user.id.to_string(),
+                &payment.payment_id,
+                edited_payment.description.as_deref(),
+                edited_payment.creditor.as_deref(),
+                edited_payment.currency.clone().unzip().0.as_deref(),
+                edited_payment.total.as_ref(),
+                edited_payment.debts,
+            )
+            .await;
+
+            match edited {
+                Ok(balances) => {
+                    let edit_overview = display_edit_payment(payment.clone(), edited_clone);
+                    match balances {
+                        Some(balances) => {
+                            send_bot_message(
+                                &bot,
+                                &msg,
+                                format!("🎉 Yay! Payment edited! 🎉\n\n{}", edit_overview,),
+                            )
+                            .await?;
+                            send_bot_message(
+                                &bot,
+                                &msg,
+                                format!(
+                                    "{}{}",
+                                    display_balance_header(
+                                        &chat_id,
+                                        edited_payment
+                                            .currency
+                                            .unzip()
+                                            .0
+                                            .as_deref()
+                                            .unwrap_or(&payment.currency.0)
+                                    ),
+                                    display_balances(&balances)
+                                ),
+                            )
+                            .await?;
+                        }
+                        None => {
+                            send_bot_message(
+                                &bot,
+                                &msg,
+                            format!(
+                                "🎉 Yay! Payment edited! 🎉\n\n{}\nThere are no changes to the balances! 🥳",
+                                edit_overview
+                                ),
+                                )
+                            .await?;
+                        }
+                    }
+                    complete_edit_payment(&bot, dialogue, &chat_id, messages, payments, page)
+                        .await?;
+
+                    // Logging
+                    log::info!(
+                        "Edit Payment Submission - payment edited for chat {} with payment {}",
+                        chat_id,
+                        edit_overview
+                    );
+                }
+                Err(err) => {
+                    let time_zone = retrieve_time_zone(&chat_id);
+                    send_bot_message(
+                        &bot,
+                        &msg,
+                        format!(
+                            "⁉️ Oh no! Something went wrong! 🥺 I'm sorry, but I can't edit the payment right now. Please try again later!\n\n"
+                        ),
+                    )
                     .await?;
+
+                    complete_edit_payment(&bot, dialogue, &chat_id, messages, payments, page)
+                        .await?;
+
+                    // Logging
+                    log::error!(
+                        "Edit Payment Submission - Processor failed to edit payment for chat {} with payment {}: {}",
+                        chat_id,
+                        display_payment(&payment, 1, time_zone),
+                        err.to_string()
+                    );
+                }
             }
         }
     }
@@ -194,31 +344,93 @@ async fn call_processor_edit_payment(
 /* Handles a repeated call to edit payment entry.
  * Does nothing, simply notifies the user.
  */
-pub async fn handle_repeated_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(
-        msg.chat.id,
-        "🚫 You are already editing a payment entry! Please complete or cancel the current operation before starting a new one.",
-    ).await?;
+pub async fn handle_repeated_edit_payment(
+    bot: Bot,
+    dialogue: UserDialogue,
+    state: State,
+    msg: Message,
+) -> HandlerResult {
+    let new_message = send_bot_message(
+        &bot,
+        &msg,
+        format!("🚫 Oops! It seems like you're already in the middle of editing a payment! Please finish or {COMMAND_CANCEL} this before starting another one with me."),
+        ).await?;
+
+    repeat_state(dialogue, state, new_message.id).await?;
     Ok(())
 }
 
 /* Cancels the edit payment operation.
  * Can be called at any step of the process.
  */
-pub async fn cancel_edit_payment(bot: Bot, dialogue: UserDialogue, msg: Message) -> HandlerResult {
-    bot.send_message(msg.chat.id, CANCEL_MESSAGE).await?;
-    dialogue.exit().await?;
+pub async fn cancel_edit_payment(
+    bot: Bot,
+    dialogue: UserDialogue,
+    state: State,
+    msg: Message,
+) -> HandlerResult {
+    send_bot_message(&bot, &msg, CANCEL_MESSAGE.to_string()).await?;
+
+    match state {
+        State::SelectPayment {
+            messages,
+            payments,
+            page,
+            function: _,
+        }
+        | State::EditPayment {
+            messages,
+            payment: _,
+            edited_payment: _,
+            payments,
+            page,
+        }
+        | State::EditPaymentDebtSelection {
+            messages,
+            payment: _,
+            edited_payment: _,
+            payments,
+            page,
+        }
+        | State::EditPaymentDetails {
+            messages,
+            payment: _,
+            edited_payment: _,
+            edit: _,
+            payments,
+            page,
+        } => {
+            complete_edit_payment(
+                &bot,
+                dialogue,
+                &msg.chat.id.to_string(),
+                messages,
+                payments,
+                page,
+            )
+            .await?;
+        }
+        _ => (),
+    }
+
     Ok(())
 }
 
 /* Blocks user command.
  * Called when user attempts to start another operation in the middle of adding a payment.
  */
-pub async fn block_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(
-        msg.chat.id,
-        "🚫 You are currently editing a payment entry! Please complete or cancel the current payment entry before starting another command.",
-    ).await?;
+pub async fn block_edit_payment(
+    bot: Bot,
+    dialogue: UserDialogue,
+    state: State,
+    msg: Message,
+) -> HandlerResult {
+    let new_message = send_bot_message(&bot,
+        &msg,
+        format!("🚫 Oops! It seems like you're in the middle of editing a payment! Please finish or {COMMAND_CANCEL} this before starting something new with me."),
+        ).await?.id;
+
+    repeat_state(dialogue, state, new_message).await?;
     Ok(())
 }
 
@@ -226,11 +438,17 @@ pub async fn block_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
  * Called when user attempts to edit payment without first viewing anything.
  */
 pub async fn no_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
-    bot.send_message(
-        msg.chat.id,
-        format!("❌ Please view the payment records first with {COMMAND_VIEW_PAYMENTS}!"),
+    if !assert_handle_request_limit(msg.clone()) {
+        return Ok(());
+    }
+
+    send_bot_message(
+        &bot,
+        &msg,
+        format!("Uh-oh! ❌ Sorry, please {COMMAND_VIEW_PAYMENTS} before editing them!"),
     )
     .await?;
+
     Ok(())
 }
 
@@ -241,15 +459,16 @@ pub async fn no_edit_payment(bot: Bot, msg: Message) -> HandlerResult {
 pub async fn action_edit_payment(
     bot: Bot,
     dialogue: UserDialogue,
+    msg: &Message,
     msg_id: MessageId,
-    chat_id: String,
-    (payments, page): (Vec<Payment>, usize),
+    (messages, payments, page): (Vec<MessageId>, Vec<Payment>, usize),
     index: usize,
 ) -> HandlerResult {
     let payment = payments[index].clone();
     let edited_payment = EditPaymentParams {
         description: None,
         creditor: None,
+        currency: None,
         total: None,
         debts: None,
     };
@@ -257,8 +476,9 @@ pub async fn action_edit_payment(
     display_edit_overview(
         bot,
         dialogue,
+        &msg,
         Some(msg_id),
-        chat_id,
+        messages,
         payment,
         edited_payment,
         payments,
@@ -274,25 +494,30 @@ pub async fn action_edit_payment(
 pub async fn action_edit_payment_confirm(
     bot: Bot,
     dialogue: UserDialogue,
-    (payment, edited_payment, payments, page): (Payment, EditPaymentParams, Vec<Payment>, usize),
+    state: State,
+    (mut messages, payment, edited_payment, payments, page): (
+        Vec<MessageId>,
+        Payment,
+        EditPaymentParams,
+        Vec<Payment>,
+        usize,
+    ),
     query: CallbackQuery,
 ) -> HandlerResult {
     if let Some(button) = &query.data {
         bot.answer_callback_query(query.id.to_string()).await?;
 
-        if let Some(Message { id, chat, .. }) = &query.message {
+        if let Some(msg) = &query.message {
+            let chat_id = msg.chat.id.to_string();
             match button.as_str() {
                 "Cancel" => {
-                    bot.edit_message_text(chat.id, *id, format!("{CANCEL_MESSAGE}"))
-                        .await?;
-                    dialogue
-                        .update(State::ViewPayments { payments, page })
-                        .await?;
+                    cancel_edit_payment(bot, dialogue, state, msg.clone()).await?;
                 }
                 "Confirm" => {
                     call_processor_edit_payment(
                         bot,
                         dialogue,
+                        messages,
                         payment,
                         edited_payment,
                         payments,
@@ -302,14 +527,23 @@ pub async fn action_edit_payment_confirm(
                     .await?;
                 }
                 "Description" => {
-                    bot.send_message(
-                        chat.id,
-                        format!("Current description: {}\n\nWhat do you want the new description to be?",
-                        payment.description),
+                    let new_message = send_bot_message(
+                        &bot,
+                        &msg,
+                        format!(
+                            "Current description: {}\n\nWhat should the description be?",
+                            edited_payment
+                                .description
+                                .clone()
+                                .unwrap_or(payment.description.clone())
+                        ),
                     )
-                    .await?;
+                    .await?
+                    .id;
+                    messages.push(new_message);
                     dialogue
                         .update(State::EditPaymentDetails {
+                            messages,
                             payment,
                             edited_payment,
                             edit: AddPaymentEdit::Description,
@@ -319,16 +553,25 @@ pub async fn action_edit_payment_confirm(
                         .await?;
                 }
                 "Payer" => {
-                    bot.send_message(
-                        chat.id,
+                    let new_message = send_bot_message(
+                        &bot,
+                        &msg,
                         format!(
                             "Current payer: {}\n\nWho should the payer be?",
-                            payment.creditor
+                            display_username(
+                                &edited_payment
+                                    .creditor
+                                    .clone()
+                                    .unwrap_or(payment.creditor.clone())
+                            )
                         ),
                     )
-                    .await?;
+                    .await?
+                    .id;
+                    messages.push(new_message);
                     dialogue
                         .update(State::EditPaymentDetails {
+                            messages,
                             payment,
                             edited_payment,
                             edit: AddPaymentEdit::Creditor,
@@ -338,16 +581,24 @@ pub async fn action_edit_payment_confirm(
                         .await?;
                 }
                 "Total" => {
-                    bot.send_message(
-                        chat.id,
+                    let currency = edited_payment
+                        .currency
+                        .clone()
+                        .unwrap_or(payment.currency.clone());
+                    let actual_currency = use_currency(currency, &payment.chat_id);
+                    let new_message = send_bot_message(
+                        &bot,
+                        &msg,
                         format!(
-                            "Current total: {}\n\nWhat should the total be?",
-                            payment.total
-                        ),
-                    )
-                    .await?;
+                            "Current total: {}\n\nWhat should the total be?\n\n{TOTAL_INSTRUCTIONS_MESSAGE}",
+                            display_currency_amount(edited_payment.total.unwrap_or(payment.total), actual_currency)
+                            ),
+                            )
+                        .await?.id;
+                    messages.push(new_message);
                     dialogue
                         .update(State::EditPaymentDetails {
+                            messages,
                             payment,
                             edited_payment,
                             edit: AddPaymentEdit::Total,
@@ -356,17 +607,20 @@ pub async fn action_edit_payment_confirm(
                         })
                         .await?;
                 }
-                "Splits" => {
-                    bot.send_message(
-                        chat.id,
+                "Split" => {
+                    let new_message = send_bot_message(
+                        &bot,
+                        &msg,
                         format!(
-                            "Current splits:\n{}\n\nHow are we splitting this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
-                            display_debts(&payment.debts)
-                        ),
-                    ).reply_markup(make_keyboard_debt_selection())
-                    .await?;
+                            "Current split:\n{}\nHow should we split this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}",
+                            display_debts(&edited_payment.debts.clone().unwrap_or(payment.debts.clone()), edited_payment.currency.clone().unwrap_or(payment.currency.clone()).1)
+                            )
+                            ).reply_markup(make_keyboard_debt_selection())
+                        .await?.id;
+                    messages.push(new_message);
                     dialogue
                         .update(State::EditPaymentDebtSelection {
+                            messages,
                             payment,
                             edited_payment,
                             payments,
@@ -377,12 +631,9 @@ pub async fn action_edit_payment_confirm(
                 _ => {
                     log::error!(
                         "Edit Payment Menu - Invalid button in chat {}: {}",
-                        chat.id,
+                        chat_id,
                         button
                     );
-                    dialogue
-                        .update(State::ViewPayments { payments, page })
-                        .await?;
                 }
             }
         }
@@ -398,7 +649,13 @@ pub async fn action_edit_payment_debts(
     bot: Bot,
     dialogue: UserDialogue,
     query: CallbackQuery,
-    (payment, edited_payment, payments, page): (Payment, EditPaymentParams, Vec<Payment>, usize),
+    (messages, payment, edited_payment, payments, page): (
+        Vec<MessageId>,
+        Payment,
+        EditPaymentParams,
+        Vec<Payment>,
+        usize,
+    ),
 ) -> HandlerResult {
     if let Some(button) = &query.data {
         bot.answer_callback_query(query.id.to_string()).await?;
@@ -410,12 +667,13 @@ pub async fn action_edit_payment_debts(
                         chat.id,
                         id,
                         format!(
-                            "Okay, who is involved in the payment?\n\n{DEBT_EQUAL_INSTRUCTIONS_MESSAGE}",
-                        ),
-                    )
-                    .await?;
+                            "Okay! Who is involved in the payment?\n\n{DEBT_EQUAL_INSTRUCTIONS_MESSAGE}",
+                            ),
+                            )
+                        .await?;
                     dialogue
                         .update(State::EditPaymentDetails {
+                            messages,
                             payment,
                             edited_payment,
                             edit: AddPaymentEdit::DebtsEqual,
@@ -431,10 +689,11 @@ pub async fn action_edit_payment_debts(
                         chat.id,
                         id,
                         format!(
-                            "Okay, who is involved and how much do they owe?\n\n{DEBT_EXACT_INSTRUCTIONS_MESSAGE}",
-                        )).await?;
+                            "Okay! Who is involved and how much do they owe?\n\n{DEBT_EXACT_INSTRUCTIONS_MESSAGE}",
+                            )).await?;
                     dialogue
                         .update(State::EditPaymentDetails {
+                            messages,
                             payment,
                             edited_payment,
                             edit: AddPaymentEdit::DebtsExact,
@@ -444,16 +703,17 @@ pub async fn action_edit_payment_debts(
                         .await?;
                 }
             }
-            "Ratio" => {
+            "Proportion" => {
                 if let Some(Message { id, chat, .. }) = query.message {
                     bot.edit_message_text(
                         chat.id,
                         id,
                         format!(
-                            "Okay, who is involved and what proportions do they owe?\n\n{DEBT_RATIO_INSTRUCTIONS_MESSAGE}",
-                        )).await?;
+                            "Okay! Who is involved and how much do they owe?\n\n{DEBT_RATIO_INSTRUCTIONS_MESSAGE}",
+                            )).await?;
                     dialogue
                         .update(State::EditPaymentDetails {
+                            messages,
                             payment,
                             edited_payment,
                             edit: AddPaymentEdit::DebtsRatio,
@@ -478,8 +738,10 @@ pub async fn action_edit_payment_debts(
 pub async fn action_edit_payment_edit(
     bot: Bot,
     dialogue: UserDialogue,
+    state: State,
     msg: Message,
-    (payment, edited_payment, edit, payments, page): (
+    (mut messages, payment, edited_payment, edit, payments, page): (
+        Vec<MessageId>,
         Payment,
         EditPaymentParams,
         AddPaymentEdit,
@@ -493,20 +755,16 @@ pub async fn action_edit_payment_edit(
                 let new_edited_payment = EditPaymentParams {
                     description: Some(text.to_string()),
                     creditor: edited_payment.creditor,
+                    currency: edited_payment.currency,
                     total: edited_payment.total,
                     debts: edited_payment.debts,
                 };
-                log::info!(
-                    "Edit Payment - Description updated successfully for user {} in chat {}: {:?}",
-                    msg.from().unwrap().id,
-                    msg.chat.id,
-                    display_edit_payment(payment.clone(), new_edited_payment.clone())
-                );
                 display_edit_overview(
                     bot,
                     dialogue,
+                    &msg,
                     None,
-                    msg.chat.id.to_string(),
+                    messages,
                     payment,
                     new_edited_payment,
                     payments,
@@ -517,26 +775,23 @@ pub async fn action_edit_payment_edit(
             AddPaymentEdit::Creditor => {
                 let username = parse_username(text);
                 if let Err(err) = username {
-                    bot.send_message(msg.chat.id, err.to_string()).await?;
+                    let new_message = send_bot_message(&bot, &msg, err.to_string()).await?.id;
+                    repeat_state(dialogue, state, new_message).await?;
                     return Ok(());
                 }
                 let new_edited_payment = EditPaymentParams {
                     description: edited_payment.description,
                     creditor: Some(username?),
+                    currency: edited_payment.currency,
                     total: edited_payment.total,
                     debts: edited_payment.debts,
                 };
-                log::info!(
-                    "Edit Payment - Creditor updated successfully for user {} in chat {}: {:?}",
-                    msg.from().unwrap().id,
-                    msg.chat.id,
-                    display_edit_payment(payment.clone(), new_edited_payment.clone())
-                );
                 display_edit_overview(
                     bot,
                     dialogue,
+                    &msg,
                     None,
-                    msg.chat.id.to_string(),
+                    messages,
                     payment,
                     new_edited_payment,
                     payments,
@@ -545,44 +800,50 @@ pub async fn action_edit_payment_edit(
                 .await?;
             }
             AddPaymentEdit::Total => {
-                let total = parse_amount(text);
-                if let Err(err) = total {
-                    bot.send_message(
-                        msg.chat.id,
-                        format!("{}\n\nWhat should the total be?", err.to_string()),
-                    )
-                    .await?;
-                    return Ok(());
+                let currency_amount = parse_currency_amount(text);
+                match currency_amount {
+                    Ok((total, currency)) => {
+                        let new_edited_payment = EditPaymentParams {
+                            description: edited_payment.description,
+                            creditor: edited_payment.creditor,
+                            currency: Some(currency),
+                            total: Some(total),
+                            debts: None,
+                        };
+
+                        let new_message = send_bot_message(
+                            &bot,
+                            &msg,
+                            format!("Fantastic! How should we split this?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}")
+                            )
+                            .reply_markup(make_keyboard_debt_selection())
+                            .await?.id;
+                        messages.push(new_message);
+                        dialogue
+                            .update(State::EditPaymentDebtSelection {
+                                messages,
+                                payment,
+                                edited_payment: new_edited_payment,
+                                payments,
+                                page,
+                            })
+                            .await?;
+                    }
+                    Err(err) => {
+                        let new_message = send_bot_message(
+                            &bot,
+                            &msg,
+                            format!(
+                                "{}\n\nWhat should the total be?\n\n{TOTAL_INSTRUCTIONS_MESSAGE}",
+                                err.to_string()
+                            ),
+                        )
+                        .await?
+                        .id;
+                        repeat_state(dialogue, state, new_message).await?;
+                        return Ok(());
+                    }
                 }
-
-                let new_edited_payment = EditPaymentParams {
-                    description: edited_payment.description,
-                    creditor: edited_payment.creditor,
-                    total: Some(total.unwrap()),
-                    debts: None,
-                };
-
-                log::info!(
-                    "Edit Payment - Total updated successfully for user {} in chat {}: {:?}",
-                    msg.from().unwrap().id,
-                    msg.chat.id,
-                    display_edit_payment(payment.clone(), new_edited_payment.clone())
-                );
-
-                bot.send_message(
-                    msg.chat.id,
-                    format!("How are we splitting this new total?\n\n{DEBT_EQUAL_DESCRIPTION_MESSAGE}{DEBT_EXACT_DESCRIPTION_MESSAGE}{DEBT_RATIO_DESCRIPTION_MESSAGE}")
-                )
-                .reply_markup(make_keyboard_debt_selection())
-                .await?;
-                dialogue
-                    .update(State::EditPaymentDebtSelection {
-                        payment,
-                        edited_payment: new_edited_payment,
-                        payments,
-                        page,
-                    })
-                    .await?;
             }
             AddPaymentEdit::DebtsEqual
             | AddPaymentEdit::DebtsExact
@@ -607,35 +868,38 @@ pub async fn action_edit_payment_edit(
                                 .creditor
                                 .clone()
                                 .or(Some(payment.creditor.clone())),
+                            edited_payment
+                                .currency
+                                .clone()
+                                .or(Some(payment.currency.clone())),
                             edited_payment.total.or(Some(payment.total)),
                         );
                         if let Err(err) = debts {
-                            bot.send_message(
-                                msg.chat.id,
+                            let new_message = send_bot_message(
+                                &bot,
+                                &msg,
                                 format!("{}\n\n{error_msg}", err.to_string()),
                             )
-                            .await?;
+                            .await?
+                            .id;
+                            repeat_state(dialogue, state, new_message).await?;
                             return Ok(());
                         }
 
                         let new_edited_payment = EditPaymentParams {
                             description: edited_payment.description,
                             creditor: edited_payment.creditor,
+                            currency: edited_payment.currency,
                             total: edited_payment.total,
                             debts: Some(debts.unwrap()),
                         };
 
-                        log::info!(
-                        "Edit Payment - Creditor updated successfully for user {} in chat {}: {:?}",
-                        msg.from().unwrap().id,
-                        msg.chat.id,
-                        display_edit_payment(payment.clone(), new_edited_payment.clone())
-                    );
                         display_edit_overview(
                             bot,
                             dialogue,
+                            &msg,
                             None,
-                            msg.chat.id.to_string(),
+                            messages,
                             payment,
                             new_edited_payment,
                             payments,
@@ -644,15 +908,19 @@ pub async fn action_edit_payment_edit(
                         .await?;
                     }
                     None => {
-                        bot.send_message(msg.chat.id, format!("{error_msg}"))
-                            .await?;
+                        let new_message = send_bot_message(&bot, &msg, format!("{error_msg}"))
+                            .await?
+                            .id;
+                        repeat_state(dialogue, state, new_message).await?;
                     }
                 }
             }
         },
         None => {
-            bot.send_message(msg.chat.id, format!("{NO_TEXT_MESSAGE}"))
-                .await?;
+            let new_message = send_bot_message(&bot, &msg, format!("{NO_TEXT_MESSAGE}"))
+                .await?
+                .id;
+            repeat_state(dialogue, state, new_message).await?;
         }
     }
 

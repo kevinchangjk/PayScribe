@@ -10,6 +10,8 @@ const USERNAME_KEY: &str = "username";
  */
 
 /* User CRUD Operations
+ * NOTE: Currently, not really being used.
+ *
  * User represents a user, most likely in a group chat on Telegram.
  * User comprises a list of chats they are using PayScribe in.
  * Has add, exists, get, update, and delete operations.
@@ -21,12 +23,8 @@ pub fn add_user(
     con: &mut Connection,
     username: &str,
     chat_id: &str,
-    user_id: Option<&str>,
+    _user_id: Option<&str>,
 ) -> RedisResult<()> {
-    if let Some(id) = user_id {
-        initialize_user(con, id, username)?;
-    }
-
     con.rpush(format!("{USER_KEY}:{username}"), chat_id)
 }
 
@@ -49,26 +47,32 @@ pub fn update_user_chats(con: &mut Connection, username: &str, chat_id: &str) ->
 // Deletes a user from Redis
 // Mainly for testing purposes
 // In application, no real need to delete keys
+#[allow(dead_code)]
 pub fn delete_user(con: &mut Connection, username: &str) -> RedisResult<()> {
     con.del(format!("{USER_KEY}:{username}"))
 }
 
-/* User ID CRUD Operations
+/* NOTE: Currently, User ID operations are not supported. The bot will not track User ID.
+ *
+ * User ID CRUD Operations
  * User ID represents a mapping of user_id to username.
  * Has add, exists, get, update, and delete operations.
  */
 
 // Initialises user with user_id
+#[allow(dead_code)]
 pub fn initialize_user(con: &mut Connection, user_id: &str, username: &str) -> RedisResult<()> {
     con.set(format!("{USER_ID_KEY}:{user_id}"), username)
 }
 
 // Checks if user is initialised
+#[allow(dead_code)]
 pub fn get_user_is_init(con: &mut Connection, user_id: &str) -> RedisResult<bool> {
     con.exists(format!("{USER_ID_KEY}:{user_id}"))
 }
 
 // Gets username from a specified user_id
+#[allow(dead_code)]
 pub fn get_username(con: &mut Connection, user_id: &str) -> RedisResult<String> {
     con.get(format!("{USER_ID_KEY}:{user_id}"))
 }
@@ -76,6 +80,7 @@ pub fn get_username(con: &mut Connection, user_id: &str) -> RedisResult<String> 
 // Updates username for a specified user_id
 // Only used when user_id is provided, activated when a change in username is detected
 // Otherwise, impossible to detect change in username without user_id
+#[allow(dead_code)]
 pub fn update_username(con: &mut Connection, user_id: &str, username: &str) -> RedisResult<()> {
     con.set(format!("{USER_ID_KEY}:{user_id}"), username)
 }
@@ -83,6 +88,7 @@ pub fn update_username(con: &mut Connection, user_id: &str, username: &str) -> R
 // Deletes a user_id from Redis
 // Mainly for testing purposes
 // In application, no real need to delete keys
+#[allow(dead_code)]
 pub fn delete_user_id(con: &mut Connection, user_id: &str) -> RedisResult<()> {
     con.del(format!("{USER_ID_KEY}:{user_id}"))
 }
@@ -110,6 +116,7 @@ pub fn get_preferred_username(con: &mut Connection, user_key: &str) -> RedisResu
 // Deletes the preferred username of a user
 // Mainly for testing purposes
 // In application, no real need to delete keys
+#[allow(dead_code)]
 pub fn delete_preferred_username(con: &mut Connection, user_key: &str) -> RedisResult<()> {
     con.del(format!("{USERNAME_KEY}:{user_key}"))
 }
@@ -130,7 +137,6 @@ mod tests {
         assert!(add_user(&mut con, username, chat_id, Some(user_id),).is_ok());
 
         delete_user(&mut con, username).unwrap();
-        delete_user_id(&mut con, user_id).unwrap();
     }
 
     #[test]
@@ -188,6 +194,7 @@ mod tests {
         assert!(!get_user_exists(&mut con, username).unwrap());
     }
 
+    /*
     #[test]
     fn test_initialize_get_user() {
         let mut con = connect().unwrap();
@@ -254,6 +261,7 @@ mod tests {
         delete_user_id(&mut con, user_id).unwrap();
         assert!(!get_user_is_init(&mut con, user_id).unwrap());
     }
+    */
 
     #[test]
     fn test_set_get_delete_preferred_username() {
