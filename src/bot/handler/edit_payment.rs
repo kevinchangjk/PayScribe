@@ -226,6 +226,25 @@ async fn call_processor_edit_payment(
         let edited_clone = edited_payment.clone();
         let user = msg.from();
         if let Some(user) = user {
+            // Check first if there are any changes at all
+            if let EditPaymentParams {
+                description: None,
+                creditor: None,
+                currency: None,
+                total: None,
+                debts: None,
+            } = edited_payment
+            {
+                send_bot_message(
+                    &bot,
+                    &msg,
+                    format!("Hmm❓ it seems like you didn't make any changes! But that's okay, 🤭 I've cancelled editing the payment for you!"),
+                )
+                .await?;
+                complete_edit_payment(&bot, dialogue, &chat_id, messages, payments, page).await?;
+                return Ok(());
+            }
+
             let edited = edit_payment(
                 &chat_id,
                 user.clone().username.unwrap_or("".to_string()),
