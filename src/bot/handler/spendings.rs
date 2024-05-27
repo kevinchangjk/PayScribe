@@ -33,7 +33,7 @@ fn display_individual_spending(spending: UserSpending, currency: Currency) -> St
 
 fn display_spendings(spending_data: &SpendingData) -> String {
     if spending_data.group_spending == 0 {
-        return format!("Total Group Spending: 0");
+        return format!("Total Group Spending: 0\n");
     }
 
     let currency = match get_currency(&spending_data.currency) {
