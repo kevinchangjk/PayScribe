@@ -8,13 +8,12 @@ use crate::bot::{
     handler::{
         constants::{STATEMENT_INSTRUCTIONS_MESSAGE, UNKNOWN_ERROR_MESSAGE},
         utils::{
-            display_amount, display_username, get_currency, make_keyboard, send_bot_message,
-            HandlerResult, UserDialogue,
+            display_amount, display_username, get_currency, make_keyboard,
+            process_valid_currencies, send_bot_message, HandlerResult, UserDialogue,
         },
     },
     processor::{
-        get_chat_setting, retrieve_spending_data, retrieve_valid_currencies, ChatSetting,
-        SpendingData, UserSpending,
+        get_chat_setting, retrieve_spending_data, ChatSetting, SpendingData, UserSpending,
     },
     State,
 };
@@ -34,7 +33,7 @@ fn display_individual_spending(spending: UserSpending, currency: Currency) -> St
 
 fn display_spendings(spending_data: &SpendingData) -> String {
     if spending_data.group_spending == 0 {
-        return format!("Total Group Spending: 0");
+        return format!("Total Group Spending: 0\n");
     }
 
     let currency = match get_currency(&spending_data.currency) {
@@ -52,7 +51,7 @@ fn display_spendings(spending_data: &SpendingData) -> String {
     }
 
     format!(
-        "Total Group Spending: {}\nTotal Individual Spendings:\n\n{}",
+        "Total Group Spending: {}\n\n{}",
         display_amount(spending_data.group_spending, currency.1),
         individual_spendings
     )
@@ -64,69 +63,46 @@ async fn handle_spendings_with_option(
     msg: Message,
     chat_id: String,
     sender_id: String,
-    option: StatementOption,
+    mut option: StatementOption,
     id: Option<MessageId>,
 ) -> HandlerResult {
     let spending_data = retrieve_spending_data(&chat_id, option.clone()).await;
 
     match spending_data {
-        Ok(spending_data) => {
-            let valid_currencies = match retrieve_valid_currencies(&chat_id) {
-                Ok(currencies) => currencies,
-                Err(_) => {
-                    log::error!(
-                        "View Spendings - User {} failed to retrieve valid currencies for group {}",
-                        sender_id,
-                        chat_id
-                    );
-                    vec![]
-                }
-            };
-
+        Ok(mut spending_data) => {
             let default_currency =
                 match get_chat_setting(&chat_id, ChatSetting::DefaultCurrency(None)) {
                     Ok(ChatSetting::DefaultCurrency(Some(currency))) => currency,
                     _ => CURRENCY_DEFAULT.0.to_string(),
                 };
 
-            let mut valid_currencies: Vec<&str> =
-                valid_currencies.iter().map(|s| s.as_ref()).collect();
-            valid_currencies.retain(|&x| x != CURRENCY_DEFAULT.0 && x != default_currency);
+            let mut valid_currencies = process_valid_currencies(
+                &chat_id,
+                &sender_id,
+                option.clone(),
+                default_currency.clone(),
+            );
 
-            if let StatementOption::Currency(ref curr) = option {
-                valid_currencies.retain(|&x| x != curr);
-            }
-
-            // Add back default currency button if not NIL, and currently not default
-            if default_currency != CURRENCY_DEFAULT.0 {
-                if let StatementOption::Currency(ref curr) = option {
-                    if curr != &default_currency {
-                        valid_currencies.push(&default_currency);
+            // If no default currency, NIL has no balances, but other currencies do
+            if spending_data.group_spending == 0 && valid_currencies.len() > 0 {
+                let currency = valid_currencies.first().unwrap().clone();
+                option = StatementOption::Currency(currency.clone());
+                spending_data = match retrieve_spending_data(&chat_id, option.clone()).await {
+                    Ok(new_data) => {
+                        valid_currencies.retain(|curr| curr != &currency);
+                        new_data
                     }
-                } else {
-                    valid_currencies.push(&default_currency);
-                }
+                    Err(_err) => spending_data,
+                };
             }
 
-            // Special buttons
-            let conversion_button = format!("Convert To {default_currency}");
-            // Add conversion button only if not currently on convert, and have default currency
-            if option != StatementOption::ConvertCurrency
-                && default_currency != CURRENCY_DEFAULT.0
-                && valid_currencies.len() > 0
-            {
-                valid_currencies.push(&conversion_button);
-                // Add no currency button if no default currency, and not currently NIL
-            } else if default_currency == CURRENCY_DEFAULT.0 {
-                if let StatementOption::Currency(ref curr) = option {
-                    if curr != CURRENCY_DEFAULT.0 {
-                        valid_currencies.push("No Currency");
-                    }
-                }
-            }
+            let ref_valid_currencies = valid_currencies
+                .iter()
+                .map(|x| x.as_str())
+                .collect::<Vec<&str>>();
 
             let has_buttons = valid_currencies.len() > 0;
-            let keyboard = make_keyboard(valid_currencies, Some(2));
+            let keyboard = make_keyboard(ref_valid_currencies, Some(2));
 
             let header = if let StatementOption::Currency(curr) = option {
                 if curr == CURRENCY_DEFAULT.0 {
@@ -134,8 +110,10 @@ async fn handle_spendings_with_option(
                 } else {
                     format!("🔥 Here are the total spendings for {curr}!")
                 }
-            } else {
+            } else if has_buttons {
                 format!("🔥 Here are the total spendings, converted to {default_currency}!")
+            } else {
+                format!("🔥 Here are the total spendings!")
             };
 
             match id {

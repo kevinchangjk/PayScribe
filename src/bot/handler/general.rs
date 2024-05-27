@@ -16,11 +16,20 @@ use super::{
  * addressed to it.
  * Currently, simply does not respond to anything. Reduces spam.
  */
-pub async fn invalid_state(_bot: Bot, msg: Message) -> HandlerResult {
+pub async fn invalid_state(bot: Bot, msg: Message) -> HandlerResult {
     // Checks if msg is a service message, ignores it if so
     let is_service_msg = msg.from().is_none();
 
     if is_service_msg {
+        // Check if the message is SPECIFICALLY about the bot itself being added to a group
+        let new_members = msg.new_chat_members();
+        if let Some(new_members) = new_members {
+            let bot_id = bot.get_me().send().await?.id;
+            if new_members.iter().any(|member| member.id == bot_id) {
+                action_start(bot, msg).await?;
+            }
+        }
+
         Ok(())
     } else {
         // send_bot_message(&bot, &msg, format!("Sorry, I'm not intelligent enough to process that! 🤖\nPlease refer to {COMMAND_HELP} on how to use me!")).await?;
@@ -51,7 +60,7 @@ pub async fn action_start(bot: Bot, msg: Message) -> HandlerResult {
         return Ok(());
     }
 
-    let introduction = format!("👋 Hello! I'm PayScribe! 😊\n\n🧚 I'll be tracking your group payments and working my magic to simplify your debts, so you won't have to juggle so many payments back to your friends!");
+    let introduction = format!("👋 Hello! I'm PayScribe! 😊\n\n🧚 I'll be tracking your group payments and working my magic 🪄 to simplify your debts, so you won't have to juggle so many payments back to your friends!");
     let add_info = &format!("✍️ Ready to track together in this group chat? Start with {COMMAND_ADD_PAYMENT}! You can {COMMAND_VIEW_PAYMENTS} anytime, and I'll help to {COMMAND_EDIT_PAYMENT} or {COMMAND_DELETE_PAYMENT} if you'd like!");
     let view_info = &format!("🙈 Check out {COMMAND_SPENDINGS} to see who's been splurging! Peek at {COMMAND_BALANCES} for who owes what, but don't forget to {COMMAND_PAY_BACK} your friends!");
     let closing =
@@ -76,8 +85,10 @@ pub async fn action_help(bot: Bot, msg: Message) -> HandlerResult {
     let mut commands = Command::descriptions().to_string();
     commands = commands.replace("–", "\\—");
 
-    let user_guide_info = &format!("🆘 For all the nitty\\-gritty details on supported time zones, currencies, and more, check out my [User Guide]({USER_GUIDE_URL})\\!");
-    let feedback_info = &format!("💡 And if you have any feedback for me, I'd love to hear it over [here]({FEEDBACK_URL})\\!");
+    let user_guide_info = &format!("🆘 For all the nitty\\-gritty details on supported 🕔 time zones, 💵 currencies, and more, check out my [User Guide]({USER_GUIDE_URL})\\!");
+    let feedback_info = &format!(
+        "💖 And if you have any [feedback]({FEEDBACK_URL}) for me, I'd love to hear it\\!"
+    );
 
     send_bot_message(
         &bot,
@@ -104,7 +115,7 @@ pub async fn action_cancel(bot: Bot, msg: Message) -> HandlerResult {
     send_bot_message(
         &bot,
         &msg,
-        format!("I'm not doing anything... 👀\nThere's nothing to cancel!"),
+        format!("❌ I'm not doing anything... 👀\nThere's nothing to cancel!"),
     )
     .await?;
     Ok(())

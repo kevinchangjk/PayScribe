@@ -7,11 +7,11 @@ use super::{
     redis::{
         add_payment_entry, delete_payment_entry, get_chat_balances, get_chat_balances_currency,
         get_chat_payments_details, get_currency_conversion, get_default_currency,
-        get_payment_entry, get_time_zone, get_valid_chat_currencies, is_request_limit_exceeded,
-        retrieve_chat_spendings, retrieve_chat_spendings_currency, set_currency_conversion,
-        set_default_currency, set_time_zone, update_chat, update_chat_balances,
-        update_chat_spendings, update_payment_entry, update_user, CrudError, Debt, Payment,
-        UserBalance, UserPayment, CURRENCY_CODE_DEFAULT,
+        get_erase_messages, get_payment_entry, get_time_zone, get_valid_chat_currencies,
+        is_request_limit_exceeded, retrieve_chat_spendings, retrieve_chat_spendings_currency,
+        set_currency_conversion, set_default_currency, set_erase_messages, set_time_zone,
+        update_chat, update_chat_balances, update_chat_spendings, update_payment_entry,
+        update_user, CrudError, Debt, Payment, UserBalance, UserPayment, CURRENCY_CODE_DEFAULT,
     },
 };
 
@@ -24,9 +24,10 @@ use super::{
 
 #[derive(Debug, Clone)]
 pub enum ChatSetting {
-    TimeZone(Option<String>),
     DefaultCurrency(Option<String>),
     CurrencyConversion(Option<bool>),
+    EraseMessages(Option<bool>),
+    TimeZone(Option<String>),
 }
 
 #[derive(Debug, Clone)]
@@ -879,6 +880,10 @@ pub fn get_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<ChatSetti
             let convert = get_currency_conversion(chat_id)?;
             Ok(ChatSetting::CurrencyConversion(Some(convert)))
         }
+        ChatSetting::EraseMessages(_) => {
+            let erase = get_erase_messages(chat_id)?;
+            Ok(ChatSetting::EraseMessages(Some(erase)))
+        }
     }
 }
 
@@ -902,6 +907,11 @@ pub async fn set_chat_setting(chat_id: &str, setting: ChatSetting) -> Result<(),
 
                 // If currency conversion is updated, need to update balances
                 update_balances(chat_id, Vec::new())?;
+            }
+        }
+        ChatSetting::EraseMessages(erase) => {
+            if let Some(erase) = erase {
+                set_erase_messages(chat_id, erase)?;
             }
         }
     }
