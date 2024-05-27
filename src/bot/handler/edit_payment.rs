@@ -174,7 +174,7 @@ async fn display_edit_overview(
                 msg.chat.id,
                 id,
                 format!(
-                    "Sure! What would you like to edit?\n\n{}",
+                    "Sure! What would you like to ✏️ edit?\n\n{}",
                     display_edit_payment(payment.clone(), edited_payment.clone())
                 ),
             )
@@ -186,7 +186,7 @@ async fn display_edit_overview(
                 &bot,
                 msg,
                 format!(
-                    "Sure! What would you like to edit?\n\n{}",
+                    "Sure! What would you like to ✏️ edit?\n\n{}",
                     display_edit_payment(payment.clone(), edited_payment.clone())
                 ),
             )

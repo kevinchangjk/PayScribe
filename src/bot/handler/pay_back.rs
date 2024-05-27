@@ -122,10 +122,17 @@ async fn display_pay_back_overview(
     let buttons = vec!["Cancel", "Edit", "Confirm"];
     let keyboard = make_keyboard(buttons, Some(2));
 
-    let new_message = send_bot_message(&bot, &msg, display_pay_back_entry(&payment))
-        .reply_markup(keyboard)
-        .await?
-        .id;
+    let new_message = send_bot_message(
+        &bot,
+        &msg,
+        format!(
+            "Amazing! 💫 Did I get everything right?\n\n{}",
+            display_pay_back_entry(&payment)
+        ),
+    )
+    .reply_markup(keyboard)
+    .await?
+    .id;
     messages.push(new_message);
     dialogue
         .update(State::PayBackConfirm { messages, payment })
