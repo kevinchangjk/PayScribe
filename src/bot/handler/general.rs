@@ -60,7 +60,7 @@ pub async fn action_start(bot: Bot, msg: Message) -> HandlerResult {
         return Ok(());
     }
 
-    let introduction = format!("👋 Hello! I'm PayScribe! 😊\n\n🧚 I'll be tracking your group payments and working my magic 🪄 to simplify your debts, so you won't have to juggle so many payments back to your friends!");
+    let introduction = format!("👋 Hello! I'm PayScribe! 😊\n\n🧚‍♀️ I'll be tracking your group payments and working my magic 🪄 to simplify your debts, so you won't have to juggle so many payments back to your friends!");
     let add_info = &format!("✍️ Ready to track together in this group chat? Start with {COMMAND_ADD_PAYMENT}! You can {COMMAND_VIEW_PAYMENTS} anytime, and I'll help to {COMMAND_EDIT_PAYMENT} or {COMMAND_DELETE_PAYMENT} if you'd like!");
     let view_info = &format!("🙈 Check out {COMMAND_SPENDINGS} to see who's been splurging! Peek at {COMMAND_BALANCES} for who owes what, but don't forget to {COMMAND_PAY_BACK} your friends!");
     let closing =

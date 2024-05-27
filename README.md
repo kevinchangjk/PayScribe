@@ -43,7 +43,7 @@ To get started with using the bot, add the bot into any group chat of your choic
 
 `/addpayment` — Add a new payment entry for the group.
 
-`/payback` — Add a new entry paying back other members in the group to settle debts.
+`/payback` — Add a new entry paying back other members in the group.
 
 `/viewpayments` — View all payment records for the group.
 
@@ -53,13 +53,15 @@ To get started with using the bot, add the bot into any group chat of your choic
 
 `/balances` — View the current balances for the group.
 
-`/totalspendings` — View the total spendings for the group.
+`/spendings` — View the total spendings for the group.
 
-`/cancel` — Cancels an ongoing action.
+`/settings` - View and edit bot settings for the group.
+
+`/cancel` — Cancel an ongoing action.
 
 ### User Guide
 
-For more details on how to use the bot, the various commands and configurations, do check out the [User Guide](https://github.com/kevinchangjk/PayScribe/wiki/User-Guide)!
+For more details on how to use the bot, the various commands and configurations, do check out the [User Guide](https://payscribe.super.site/)!
 
 The guide also contains more examples, tips, and advice on maximizing your use of **PayScribe**.
 
