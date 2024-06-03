@@ -616,7 +616,7 @@ pub fn process_debts_ratio(text: &str, total: Option<i64>) -> Result<Vec<(String
                 ratios[pos] += parse_float(items[i + 1])?;
             }
             None => {
-                users.push(items[i].to_string());
+                users.push(curr.to_string());
                 ratios.push(parse_float(items[i + 1])?);
             }
         }
