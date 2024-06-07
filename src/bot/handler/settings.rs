@@ -336,11 +336,11 @@ pub async fn action_settings_menu(
                 }
                 "🚮" => {
                     let setting = get_chat_setting(&chat_id, ChatSetting::EraseMessages(None))?;
-                    if let ChatSetting::EraseMessages(Some(convert)) = setting {
+                    if let ChatSetting::EraseMessages(Some(erase)) = setting {
                         let status: &str;
                         let prompt: &str;
                         let buttons: Vec<&str>;
-                        if convert {
+                        if erase {
                             status = "ENABLED ✅";
                             buttons = vec!["Back", "Turn Off"];
                             prompt = "Would you like to turn off automatic message erasing for this chat?";
