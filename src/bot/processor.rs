@@ -139,6 +139,11 @@ fn update_users_chat(
     Ok(())
 }
 
+pub fn init_chat_config(chat_id: &str) -> Result<(), ProcessError> {
+    update_chat(chat_id, Vec::new())?;
+    Ok(())
+}
+
 /* Retrieves all valid currencies for a chat.
  * Valid currencies are currencies with some payments.
  */

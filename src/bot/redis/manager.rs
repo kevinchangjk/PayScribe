@@ -6,8 +6,10 @@ use super::{
         add_chat, add_chat_currency, add_chat_payment, add_chat_user_multiple, delete_chat_payment,
         get_chat_currencies, get_chat_currency_conversion, get_chat_default_currency,
         get_chat_erase_messages, get_chat_exists, get_chat_payment_exists, get_chat_payments,
-        get_chat_time_zone, get_chat_users, set_chat_currency_conversion,
-        set_chat_default_currency, set_chat_erase_messages, set_chat_time_zone,
+        get_chat_time_zone, get_chat_users, is_exists_chat_currency_conversion,
+        is_exists_chat_default_currency, is_exists_chat_erase_messages, is_exists_chat_time_zone,
+        set_chat_currency_conversion, set_chat_default_currency, set_chat_erase_messages,
+        set_chat_time_zone,
     },
     connect::{connect, DBError},
     payment::{add_payment, delete_payment, get_payment, update_payment, Payment},
@@ -104,7 +106,9 @@ pub fn update_chat(chat_id: &str, usernames: Vec<String>) -> Result<(), CrudErro
 
     // Adds chat if not exists
     if !get_chat_exists(&mut con, chat_id)? {
-        add_chat(&mut con, chat_id, &usernames[0].to_lowercase())?;
+        if !usernames.is_empty() {
+            add_chat(&mut con, chat_id, &usernames[0].to_lowercase())?;
+        }
         init_chat_settings(chat_id)?;
     }
 
@@ -153,6 +157,11 @@ pub fn set_time_zone(chat_id: &str, time_zone: &str) -> Result<(), CrudError> {
 pub fn get_time_zone(chat_id: &str) -> Result<String, CrudError> {
     let mut con = connect()?;
 
+    // By default, return UTC
+    if !is_exists_chat_time_zone(&mut con, chat_id)? {
+        return Ok("UTC".to_string());
+    }
+
     let time_zone = get_chat_time_zone(&mut con, chat_id);
     match time_zone {
         Ok(time_zone) => Ok(time_zone),
@@ -173,6 +182,11 @@ pub fn set_default_currency(chat_id: &str, currency: &str) -> Result<(), CrudErr
  */
 pub fn get_default_currency(chat_id: &str) -> Result<String, CrudError> {
     let mut con = connect()?;
+
+    // By default, return NIL
+    if !is_exists_chat_default_currency(&mut con, chat_id)? {
+        return Ok(CURRENCY_CODE_DEFAULT.to_string());
+    }
 
     let currency = get_chat_default_currency(&mut con, chat_id);
     match currency {
@@ -195,6 +209,11 @@ pub fn set_currency_conversion(chat_id: &str, conversion: bool) -> Result<(), Cr
 pub fn get_currency_conversion(chat_id: &str) -> Result<bool, CrudError> {
     let mut con = connect()?;
 
+    // By default, return false
+    if !is_exists_chat_currency_conversion(&mut con, chat_id)? {
+        return Ok(false);
+    }
+
     let conversion = get_chat_currency_conversion(&mut con, chat_id);
     match conversion {
         Ok(conversion) => Ok(conversion),
@@ -216,10 +235,15 @@ pub fn set_erase_messages(chat_id: &str, erase: bool) -> Result<(), CrudError> {
 pub fn get_erase_messages(chat_id: &str) -> Result<bool, CrudError> {
     let mut con = connect()?;
 
+    // By default, return true
+    if !is_exists_chat_erase_messages(&mut con, chat_id)? {
+        return Ok(true);
+    }
+
     let erase = get_chat_erase_messages(&mut con, chat_id);
     match erase {
         Ok(erase) => Ok(erase),
-        Err(_) => Ok(false),
+        Err(_) => Ok(true),
     }
 }
 
