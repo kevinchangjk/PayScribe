@@ -219,7 +219,7 @@ pub fn get_erase_messages(chat_id: &str) -> Result<bool, CrudError> {
     let erase = get_chat_erase_messages(&mut con, chat_id);
     match erase {
         Ok(erase) => Ok(erase),
-        Err(_) => Ok(false),
+        Err(_) => Ok(true),
     }
 }
 

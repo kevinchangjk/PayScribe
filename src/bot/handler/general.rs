@@ -1,6 +1,6 @@
 use teloxide::{prelude::*, types::ParseMode, utils::command::BotCommands};
 
-use crate::bot::dispatcher::Command;
+use crate::bot::{dispatcher::Command, processor::init_chat_config};
 
 use super::{
     constants::{
@@ -59,6 +59,9 @@ pub async fn action_start(bot: Bot, msg: Message) -> HandlerResult {
     if !assert_handle_request_limit(msg.clone()) {
         return Ok(());
     }
+
+    // Inits chat configs
+    init_chat_config(&msg.chat.id.to_string())?;
 
     let introduction = format!("👋 Hello! I'm PayScribe! 😊\n\n🧚‍♀️ I'll be tracking your group payments and working my magic 🪄 to simplify your debts, so you won't have to juggle so many payments back to your friends!");
     let add_info = &format!("✍️ Ready to track together in this group chat? Start with {COMMAND_ADD_PAYMENT}! You can {COMMAND_VIEW_PAYMENTS} anytime, and I'll help to {COMMAND_EDIT_PAYMENT} or {COMMAND_DELETE_PAYMENT} if you'd like!");
