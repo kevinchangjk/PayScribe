@@ -185,6 +185,49 @@ pub fn set_chat_erase_messages(
     )
 }
 
+// Checks if time zone exists for a chat
+pub fn is_exists_chat_time_zone(con: &mut Connection, chat_id: &str) -> RedisResult<bool> {
+    let keys: Vec<String> = con.hkeys(format!("{CHAT_SETTING_KEY}:{chat_id}"))?;
+    if keys.contains(&SETTING_TIME_ZONE.to_string()) {
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+// Checks if default currency exists for a chat
+pub fn is_exists_chat_default_currency(con: &mut Connection, chat_id: &str) -> RedisResult<bool> {
+    let keys: Vec<String> = con.hkeys(format!("{CHAT_SETTING_KEY}:{chat_id}"))?;
+    if keys.contains(&SETTING_DEFAULT_CURRENCY.to_string()) {
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+// Checks if currency conversion exists for a chat
+pub fn is_exists_chat_currency_conversion(
+    con: &mut Connection,
+    chat_id: &str,
+) -> RedisResult<bool> {
+    let keys: Vec<String> = con.hkeys(format!("{CHAT_SETTING_KEY}:{chat_id}"))?;
+    if keys.contains(&SETTING_CURRENCY_CONVERSION.to_string()) {
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+// Checks if erase messages exists for a chat
+pub fn is_exists_chat_erase_messages(con: &mut Connection, chat_id: &str) -> RedisResult<bool> {
+    let keys: Vec<String> = con.hkeys(format!("{CHAT_SETTING_KEY}:{chat_id}"))?;
+    if keys.contains(&SETTING_ERASE_MESSAGES.to_string()) {
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
 // Gets time zone for a chat
 pub fn get_chat_time_zone(con: &mut Connection, chat_id: &str) -> RedisResult<String> {
     con.hget(format!("{CHAT_SETTING_KEY}:{chat_id}"), SETTING_TIME_ZONE)
@@ -393,11 +436,13 @@ mod tests {
         let chat_id = "12345678900";
         let time_zone = "SST";
 
+        assert!(!is_exists_chat_time_zone(&mut con, chat_id).unwrap());
         assert!(set_chat_time_zone(&mut con, chat_id, time_zone).is_ok());
         assert_eq!(
             get_chat_time_zone(&mut con, chat_id).unwrap(),
             time_zone.to_string()
         );
+        assert!(is_exists_chat_time_zone(&mut con, chat_id).unwrap());
 
         let second_time_zone = "PST";
         assert!(set_chat_time_zone(&mut con, chat_id, second_time_zone).is_ok());
@@ -416,11 +461,13 @@ mod tests {
         let chat_id = "12345678901";
         let currency = "USD";
 
+        assert!(!is_exists_chat_default_currency(&mut con, chat_id).unwrap());
         assert!(set_chat_default_currency(&mut con, chat_id, currency).is_ok());
         assert_eq!(
             get_chat_default_currency(&mut con, chat_id).unwrap(),
             currency.to_string()
         );
+        assert!(is_exists_chat_default_currency(&mut con, chat_id).unwrap());
 
         let second_currency = "EUR";
         assert!(set_chat_default_currency(&mut con, chat_id, second_currency).is_ok());
@@ -439,11 +486,13 @@ mod tests {
         let chat_id = "12345678902";
         let currency_conversion = true;
 
+        assert!(!is_exists_chat_currency_conversion(&mut con, chat_id).unwrap());
         assert!(set_chat_currency_conversion(&mut con, chat_id, currency_conversion).is_ok());
         assert_eq!(
             get_chat_currency_conversion(&mut con, chat_id).unwrap(),
             currency_conversion
         );
+        assert!(is_exists_chat_currency_conversion(&mut con, chat_id).unwrap());
 
         let second_currency_conversion = false;
         assert!(
@@ -464,11 +513,13 @@ mod tests {
         let chat_id = "12345678903";
         let erase_messages = true;
 
+        assert!(!is_exists_chat_erase_messages(&mut con, chat_id).unwrap());
         assert!(set_chat_erase_messages(&mut con, chat_id, erase_messages).is_ok());
         assert_eq!(
             get_chat_erase_messages(&mut con, chat_id).unwrap(),
             erase_messages
         );
+        assert!(is_exists_chat_erase_messages(&mut con, chat_id).unwrap());
 
         let second_erase_messages = false;
         assert!(set_chat_erase_messages(&mut con, chat_id, second_erase_messages).is_ok());
